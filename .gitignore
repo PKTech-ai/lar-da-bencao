@@ -1,0 +1,12 @@
+# Credenciais e arquivos locais não devem entrar no histórico.
+.env
+.env.*
+!.env.example
+node_modules/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+Thumbs.db
+/tmp/
+/backups-pessoais/
