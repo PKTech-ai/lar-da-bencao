@@ -2,6 +2,8 @@
 
 Pasta do sistema com histórico Git. Versão atual: **215 — Visual acolhedor**, publicada em 14/09/2026. Organização desta cópia: 15/09/2026.
 
+Repositório privado da PK: [PKTech-ai/lar-da-bencao](https://github.com/PKTech-ai/lar-da-bencao).
+
 ## Arquivos principais
 
 - `dist/index.html`: sistema completo, com telas para computador, celular e tablet.
