@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 node_modules/
+.next/
+.vercel/
+.env.local
+.env.production.local
+coverage/
+*.tsbuildinfo
 __pycache__/
 *.pyc
 *.log

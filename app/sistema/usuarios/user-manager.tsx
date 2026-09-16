@@ -1,0 +1,44 @@
+"use client";
+
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+
+type Option = { key: string; label: string };
+type User = { id: string; email: string; full_name: string; role_key: string; status: string; departments: string[]; version: number };
+type Payload = { users: User[]; roles: Option[]; departments: Option[] };
+
+export function UserManager() {
+  const [data, setData] = useState<Payload>({ users: [], roles: [], departments: [] });
+  const [editing, setEditing] = useState<User | null>(null);
+  const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => { const response = await fetch("/api/users", { cache: "no-store" }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setData(body); }, []);
+  // A carga inicial é a sincronização desta tela cliente com a API protegida.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
+
+  function departments(form: HTMLFormElement) { return [...form.querySelectorAll<HTMLInputElement>('input[name="departments"]:checked')].map((item) => item.value); }
+  async function create(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError(""); setMessage(""); const form = event.currentTarget, values = new FormData(form);
+    try { const response = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: values.get("email"), name: values.get("name"), role: values.get("role"), status: values.get("status"), departments: departments(form) }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error); form.reset(); setMessage("Convite enviado. O usuário deverá criar a senha e ativar o MFA."); await load(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Falha ao convidar."); } finally { setBusy(false); }
+  }
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!editing) return; setBusy(true); setError(""); setMessage(""); const form = event.currentTarget, values = new FormData(form);
+    try { const response = await fetch(`/api/users/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: values.get("name"), role: values.get("role"), status: values.get("status"), departments: departments(form), version: editing.version }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setEditing(null); setMessage("Acesso atualizado e registrado no Dedo-duro."); await load(); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Falha ao atualizar."); } finally { setBusy(false); }
+  }
+
+  const fields = (user?: User) => <>
+    <label>Nome completo<input name="name" defaultValue={user?.full_name} required minLength={3} maxLength={160} /></label>
+    {!user ? <label>E-mail<input name="email" type="email" required /></label> : null}
+    <label>Perfil<select name="role" defaultValue={user?.role_key ?? "trabalhador"}>{data.roles.map((role) => <option key={role.key} value={role.key}>{role.label}</option>)}</select></label>
+    <label>Situação<select name="status" defaultValue={user?.status ?? "active"}><option value="active">Ativo</option><option value="pending">Pendente</option>{user ? <option value="suspended">Suspenso</option> : null}</select></label>
+    <fieldset style={{ border: 0, padding: 0 }}><legend style={{ fontWeight: 700, marginBottom: 7 }}>Departamentos</legend><div className="grid cards">{data.departments.map((department) => <label key={department.key} style={{ display: "flex", alignItems: "center", gridTemplateColumns: "auto 1fr", fontWeight: 400 }}><input style={{ width: 20, minHeight: 20 }} type="checkbox" name="departments" value={department.key} defaultChecked={user?.departments.includes(department.key)} />{department.label}</label>)}</div></fieldset>
+  </>;
+
+  return <div className="grid">
+    <section className="card"><h2>Convidar usuário</h2><form className="form-stack" onSubmit={create}>{fields()}<button className="button primary" disabled={busy}>Enviar convite</button></form></section>
+    {editing ? <section className="card"><div className="toolbar"><h2>Editar acesso</h2><button className="button" onClick={() => setEditing(null)}>Cancelar</button></div><form className="form-stack" key={editing.id} onSubmit={save}>{fields(editing)}<button className="button primary" disabled={busy}>Salvar alteração</button></form></section> : null}
+    {error ? <div className="error" role="alert">{error}</div> : null}{message ? <div className="success">{message}</div> : null}
+    <section className="card"><h2>Contas institucionais</h2><div className="table-wrap"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Departamentos</th><th>Situação</th><th>Ação</th></tr></thead><tbody>{data.users.map((user) => <tr key={user.id}><td><strong>{user.full_name}</strong><br/><span className="muted">{user.email}</span></td><td>{data.roles.find((role) => role.key === user.role_key)?.label ?? user.role_key}</td><td>{user.departments.map((key) => data.departments.find((d) => d.key === key)?.label ?? key).join(", ") || "—"}</td><td>{user.status}</td><td><button className="button" onClick={() => setEditing(user)}>Editar</button></td></tr>)}</tbody></table></div></section>
+  </div>;
+}

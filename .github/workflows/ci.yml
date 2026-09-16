@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - name: Build de produção com configuração sintética
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_dummy_1234567890
+          SUPABASE_SERVICE_ROLE_KEY: service_role_dummy_1234567890
+          DATABASE_URL: postgresql://user:password@localhost:5432/lar_da_bencao
+          CRON_SECRET: cron_dummy_123456789012345678901234567890
+          BOOTSTRAP_SECRET: bootstrap_dummy_123456789012345678901234567890
+          ANTIMALWARE_API_URL: https://scanner.example.test/scan
+          ANTIMALWARE_API_TOKEN: scanner_dummy_1234567890
+          APP_URL: https://app.example.test
+
+  migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: lar_test
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar papéis equivalentes ao Supabase
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create role anon;
+          create role authenticated;
+          create schema auth;
+          create table auth.users (id uuid primary key);
+          SQL
+      - name: Aplicar migração em banco vazio
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202609150001_initial.sql
+      - name: Validar privilégios e cadeia do Dedo-duro
+        run: psql -f supabase/verify_permissions.sql

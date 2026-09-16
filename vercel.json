@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "*": false
+    }
+  },
+  "functions": {
+    "app/api/attachments/**": {
+      "maxDuration": 60
+    },
+    "app/api/maintenance/**": {
+      "maxDuration": 120
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/maintenance/integrity",
+      "schedule": "15 7 * * *"
+    }
+  ]
+}
