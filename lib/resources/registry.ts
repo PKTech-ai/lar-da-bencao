@@ -1,6 +1,6 @@
 import {
   basketSupporters, brechoLedger, childrenCoffeeDonors, clubDeliveries, clubPeople, clubeMaesLedger,
-  hygieneKits, ranchoDeliveries, socialActivities, socialFamilies, socialVolunteers
+  hygieneKits, ranchoDeliveries, socialActivities, socialFamilies, socialPlanning, socialVolunteers
 } from "@/lib/resources/defs/assistencia";
 import { elections, fiscalReviews } from "@/lib/resources/defs/conselho-juridico";
 import { bookLoans, bookSales, bookStock, books } from "@/lib/resources/defs/divulgacao";
@@ -16,7 +16,7 @@ const ALL: ResourceDef[] = [
   books, bookStock, bookLoans, bookSales,
   meetings,
   socialFamilies, socialVolunteers, basketSupporters, ranchoDeliveries, hygieneKits, socialActivities, childrenCoffeeDonors,
-  brechoLedger, clubeMaesLedger, clubPeople, clubDeliveries,
+  brechoLedger, clubeMaesLedger, clubPeople, clubDeliveries, socialPlanning,
   treasuryEntries, treasuryContributions, treasurySupporters, treasuryDonations,
   fiscalReviews, elections
 ];

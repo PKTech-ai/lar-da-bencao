@@ -7,6 +7,7 @@ import { brDate, formatMoney } from "@/lib/resources/types";
 
 type Card = { key: string; label: string; value: string; href?: string; hint?: string };
 type Pending = { key: string; label: string; count: number; href: string };
+type AgendaItem = { date: string; label: string; module: string; href: string };
 type Area = {
   worker: { full_name: string; status: string; functions: string[]; departments: string[] } | null;
   cleaning: { clean_date: string; status: string; fee_cents: number; payment_status: string | null }[];
@@ -25,11 +26,13 @@ const CLEANING = { scheduled: "Escalado", done: "Realizada", fee: "Taxa de servi
 export function HomeClient({ firstName }: { firstName: string }) {
   const [home, setHome] = useState<Home | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
+  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
     void api<Home>("/api/home").then(setHome).catch((e: Error) => setError(e.message));
     void api<{ pending: Pending[] }>("/api/pendencias").then((b) => setPending(b.pending)).catch(() => undefined);
+    void api<{ items: AgendaItem[] }>("/api/agenda").then((b) => setAgenda(b.items)).catch(() => undefined);
   }, []);
 
   const memory = home?.memory;
@@ -55,6 +58,26 @@ export function HomeClient({ firstName }: { firstName: string }) {
             {pending.map((item) => (
               <Link key={item.key} href={item.href} className="card card-link kpi"><span className="small">{item.label}</span><b>{item.count}</b></Link>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      {agenda.length ? (
+        <section className="card">
+          <h2>Próximos 45 dias</h2>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Data</th><th>Compromisso</th><th>Módulo</th></tr></thead>
+              <tbody>
+                {agenda.map((item, index) => (
+                  <tr key={`${item.date}-${index}`}>
+                    <td>{brDate(item.date)}</td>
+                    <td><Link href={item.href}>{item.label}</Link></td>
+                    <td className="small">{item.module}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
       ) : null}

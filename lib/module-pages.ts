@@ -74,6 +74,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
       { slug: "clube-maes-entregas", label: "Clube de Mães — Entregas", resource: "clube-maes-entregas", access: { resource: "social_clube_maes" } },
       { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-assistencia" },
       { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
+      { slug: "planejamento", label: "Planejamento Anual", resource: "assistencia-planejamento" },
       { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-assistencia" }
     ]
   },
@@ -102,6 +103,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     sections: [
       { slug: "", label: "Reuniões e Atas", resource: "secretaria-reunioes" },
       { slug: "gravador", label: "Gravador", panel: "secretaria-gravador" },
+      { slug: "admissoes", label: "Admissões", panel: "admissoes-atalho" },
       { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" }
     ]
   },
@@ -154,7 +156,9 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     access: { resource: "presidencia" },
     sections: [
       { slug: "", label: "Painel", panel: "presidencia-painel" },
-      { slug: "baixas", label: "Autorizações de Baixa", panel: "presidencia-baixas" }
+      { slug: "baixas", label: "Autorizações de Baixa", panel: "presidencia-baixas" },
+      { slug: "admissoes", label: "Aprovação de Trabalhadores", panel: "admissoes-atalho" },
+      { slug: "sugestoes", label: "Sugestões", panel: "sugestoes-atalho" }
     ]
   }
 ];

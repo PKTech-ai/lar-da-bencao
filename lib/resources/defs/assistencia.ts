@@ -266,6 +266,33 @@ export const clubPeople: ResourceDef = {
   ]
 };
 
+export const socialPlanning: ResourceDef = {
+  key: "assistencia-planejamento",
+  table: "social_plan_items",
+  title: "Planejamento Anual",
+  singular: "Ação planejada",
+  module: "Assistência e Promoção Social",
+  section: "Planejamento Anual",
+  flag: FLAG,
+  scope: SCOPE,
+  intro: "O que o departamento se compromete a fazer no ano. A execução aparece no Controle de Atividades e no Relatório Anual.",
+  archiveLabel: "Arquivar",
+  orderBy: "r.year desc, r.month, r.created_at",
+  search: ["action", "basis", "responsible", "notes"],
+  filters: [{ name: "status", label: "Situação" }, { name: "activity", label: "Atividade" }],
+  fields: [
+    { name: "year", label: "Ano", type: "integer", min: 1900, max: 2199, required: true },
+    { name: "month", label: "Mês previsto", type: "integer", min: 1, max: 12, required: true },
+    { name: "action", label: "Ação", type: "text", max: 200, required: true },
+    { name: "activity", label: "Atividade relacionada", type: "select", options: SOCIAL_AREAS },
+    { name: "status", label: "Situação", type: "select", options: ["Planejada", "Em andamento", "Concluída", "Cancelada"], required: true },
+    { name: "basis", label: "Fundamento / objetivo", type: "text", max: 250 },
+    { name: "responsible", label: "Responsável", type: "text", max: 160 },
+    { name: "goal", label: "Meta", type: "text", max: 120, hideInList: true },
+    { name: "notes", label: "Observações", type: "textarea", max: 2000, wide: true, hideInList: true }
+  ]
+};
+
 export const clubDeliveries: ResourceDef = {
   key: "clube-maes-entregas",
   table: "club_deliveries",

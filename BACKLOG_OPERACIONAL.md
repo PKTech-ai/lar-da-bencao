@@ -249,16 +249,17 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Critério de aceite:** ✅ nenhum trabalho perdido por conflito silencioso; ✅ autosave sem localStorage.
 
 ### BL-017 — Backup ZIP / restauração demo (descontinuar em prod)
-- **Módulo:** Ops / RF-012
+- **Módulo:** sistema
 - **Severidade:** importante
-- **Onda:** ops
-- **Origem mock:** nav “Backup e restauração” / `CompleteBackup` / botão restaurar cenário fictício
-- **Estado v216:** só HTML
-- **O que falta:**
-  - UI: remover restauração de fictícios em produção
-  - ops: backup Postgres PITR (substitui ZIP local)
-  - teste: função demo ausente em prod
-- **Critério de aceite:** produção sem “restaurar dados fictícios”; backup institucional cobre metadados+BYTEA.
+- **Onda:** fundação
+- **Origem mock:** `CompleteBackup` (baixa/restaura o localStorage inteiro)
+- **Estado v216:** descontinuado por decisão (2026-09-17)
+- **Decisão:** o backup do mock existia porque os dados viviam no navegador. Na v216 os dados estão no PostgreSQL, com
+  backup contínuo (PITR) e restauração testada — `docs/BACKUP_RESTORE.md`. Um “baixar tudo” pela tela criaria uma cópia
+  completa de dados pessoais fora do banco, sem auditoria de quem levou o arquivo; por isso não será implementado.
+- **No lugar dele:** exportação por módulo, com permissão e registro no Dedo-duro (Dedo-duro em CSV já disponível; demais
+  módulos usam a impressão/relatório anual). Restauração é sempre operação de banco, no runbook.
+- **Critério de aceite:** ✅ decisão registrada; ✅ backup e restauração cobertos por PITR e runbook, não por download de tela.
 
 ---
 
@@ -279,17 +280,18 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Critério de aceite:** ✅ home com memória institucional e cards por permissão; ✅ nenhum número fora do escopo de leitura.
 
 ### BL-019 — Estatuto e Regimento (documentos institucionais)
-- **Módulo:** documentos
+- **Módulo:** institucional
 - **Severidade:** importante
 - **Onda:** 1
-- **Origem mock:** `page-documentos` (PDFs embutidos no HTML)
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API: anexos `institutional_document` (tipo já previsto em `attachments.ts`)
-  - UI: abrir/baixar com auth
-  - permissão: leitura a todos ativos
-  - teste: sem URL pública
-- **Critério de aceite:** PDFs oficiais no Postgres; download autorizado; disponível a trabalhadores ativos.
+- **Origem mock:** `INSTITUTIONAL_DOCS` (PDFs embutidos no HTML)
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.institutional_documents` + `/sistema/documentos`: os 10 documentos do mock, cada um com descrição, versão e PDF anexado
+  - leitura liberada aos perfis que o mock libera (inclusive trabalhador, evangelizador, Brechó, Clube de Mães e auditoria)
+  - substituição do PDF só pelo Administrador, com o arquivo já inspecionado pelo antimalware e a troca auditada
+  - “Abrir” usa visualização embutida (`?inline=1`) e “Salvar PDF” baixa o arquivo
+- **Pendências residuais:** extrair os PDFs embutidos no HTML v215 fica na Importação v215.
+- **Critério de aceite:** ✅ Estatuto e Regimento no Postgres, com permissão de leitura ampla e troca controlada.
 
 ### BL-020 — Organograma sintético e analítico
 - **Módulo:** transversal
@@ -427,16 +429,16 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Critério de aceite:** ✅ paridade funcional com o mock e com a Infância; ✅ dados no Postgres; ✅ isolamento Infância × Juventude.
 
 ### BL-030 — Agendas / escalas transversais (ops diárias)
-- **Módulo:** home + departamentos / Onda 1 PRD
+- **Módulo:** transversal
 - **Severidade:** importante
 - **Onda:** 1
-- **Origem mock:** pendências home (`Operations212`) ligadas a escalas/comprovantes/eventos
-- **Estado v216:** só HTML
-- **O que falta:**
-  - API: feed de pendências por usuário
-  - UI: lista na home
-  - teste: só itens do escopo
-- **Critério de aceite:** pendências operacionais iguais ao mock, calculadas no servidor.
+- **Origem mock:** agenda do dia a dia
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `GET /api/agenda`: próximos 45 dias com limpeza, eventos, reuniões e kits programados — só do que a pessoa pode ler e com o módulo ligado
+  - `GET /api/pendencias`: fichas aguardando decisão, baixas pendentes, taxas a receber, sugestões sem resposta, extrato a conciliar, meses em aberto, meses aguardando parecer e empréstimos atrasados
+  - as duas listas aparecem na Visão Geral e o feed de pendências também no painel da Diretoria
+- **Critério de aceite:** ✅ cada pessoa vê o que precisa fazer e o que está marcado, sem nada fora do escopo.
 
 ---
 
@@ -521,13 +523,13 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Módulo:** assistencia
 - **Severidade:** importante
 - **Onda:** 2
-- **Origem mock:** `SocialAnnualPlanning` `SocialAnnualReport` `SocialExecution` `socialAnnualPlanning` `socialActivityResults`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API/UI
-  - permissão `print`/`export`
-  - teste
-- **Critério de aceite:** planejamento/execução/relatório anual Social no Postgres.
+- **Origem mock:** `SocialAnnualPlanning` `AnnualAnalytic` `SocialExecution`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.social_plan_items`: ações do ano por mês, com fundamento, meta, responsável e situação
+  - a execução não é redigitada: sai do Controle de Atividades, das entregas de rancho e dos kits, no Relatório Anual
+- **Pendências residuais:** comparação automática entre meta e realizado mês a mês (hoje a leitura é lado a lado no relatório).
+- **Critério de aceite:** ✅ planejamento anual no Postgres e execução lida dos registros reais, sem duplicar digitação.
 
 ### BL-038 — Patrimônio — cadastro de bens
 - **Módulo:** patrimonio
@@ -615,25 +617,24 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Módulo:** secretaria
 - **Severidade:** importante
 - **Onda:** 2
-- **Origem mock:** `sec-admissoes` `sec-aniversariantes` / `sec-trabalhadores`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - API/UI acompanhamento de admissões + aniversariantes Casa
-  - permissão/teste
-- **Critério de aceite:** rotinas Secretaria iguais ao mock no Postgres.
+- **Origem mock:** `sec-admissoes` `sec-aniversariantes`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - aba “Admissões” leva ao cadastro único de Trabalhadores, onde a Secretaria acompanha as fichas de todos os departamentos (sem duplicar cadastro)
+  - aba “Aniversariantes” usa o painel comum, que para a Secretaria mostra todos os trabalhadores ativos
+- **Critério de aceite:** ✅ Secretaria acompanha admissões e aniversariantes de toda a Casa, dentro da própria página.
 
 ### BL-045 — Presidência — painel, módulos, aprovações
-- **Módulo:** diretoria
+- **Módulo:** presidencia
 - **Severidade:** importante
 - **Onda:** 2
-- **Origem mock:** `dir-painel` `dir-modulos` `dir-admissoes` `dir-trabalhadores` `dir-relatorio`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - API: visão consolidada + situação dos módulos
-  - UI Presidência
-  - permissão `presidencia`
-  - teste
-- **Critério de aceite:** supervisão e aprovações da Diretoria no Postgres como no mock.
+- **Origem mock:** `page-diretoria`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `/sistema/presidencia`: pendências da Diretoria, situação de cada módulo (onda, ligado/desligado e referência do UAT) e atalhos para as aprovações
+  - abas de Autorizações de Baixa (decisão sobre os memorandos do Patrimônio), Aprovação de Trabalhadores e Sugestões
+  - a Diretoria **acompanha** a situação dos módulos; ligar e desligar continua só com o Administrador
+- **Critério de aceite:** ✅ painel da Diretoria com o que espera decisão e a situação das ondas.
 
 ---
 
