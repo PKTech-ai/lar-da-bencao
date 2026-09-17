@@ -3,8 +3,8 @@ import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { query, transaction } from "@/lib/db";
-import { AppError, errorResponse } from "@/lib/errors";
-import { assertPermission } from "@/lib/permissions";
+import { AppError, AuthorizationError, errorResponse } from "@/lib/errors";
+import { assertPermission, hasPermission } from "@/lib/permissions";
 
 const patchSchema = z.object({
   key: z.string().regex(/^[a-z0-9_]+$/),
@@ -18,7 +18,9 @@ const LOCKED = new Set(["audit"]);
 export async function GET() {
   try {
     const actor = await requireActor();
-    await assertPermission(actor, "modules", "admin");
+    // A Diretoria acompanha a situação dos módulos; só o Administrador liga e desliga.
+    const canRead = (await hasPermission(actor, "modules", "admin")) || (await hasPermission(actor, "presidencia", "read"));
+    if (!canRead) throw new AuthorizationError();
     const result = await query(
       `select f.key, f.enabled, f.description, f.wave, f.uat_reference, f.enabled_at, f.updated_at, u.full_name as updated_by_name
          from app.feature_flags f

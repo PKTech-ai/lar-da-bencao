@@ -3,6 +3,7 @@
 import { BirthdaysPanel } from "@/components/modules/aniversariantes";
 import { BookLoansPanel, BookshopSummary } from "@/components/modules/divulgacao-livraria";
 import { MeetingRecorder } from "@/components/modules/secretaria-gravador";
+import { AnnualReport } from "@/components/modules/relatorio-anual";
 import { DepartmentWorkers } from "@/components/modules/trabalhadores-departamento";
 import { PresidenciaPainel } from "@/components/modules/presidencia-painel";
 import { TreasuryAccountsPanel, TreasuryMonthPanel, TreasuryReportPanel, TreasuryStatementPanel } from "@/components/modules/tesouraria";
@@ -35,6 +36,11 @@ export function ModulePanel({ name }: { name: string }) {
     case "trabalhadores-eventos": return <DepartmentWorkers department="eventos" />;
     case "trabalhadores-divulgacao": return <DepartmentWorkers department="divulgacao" />;
     case "trabalhadores-juridico": return <DepartmentWorkers department="juridico" />;
+    case "relatorio-assistencia": return <AnnualReport department="assistencia_social" />;
+    case "relatorio-eventos": return <AnnualReport department="eventos" />;
+    case "relatorio-divulgacao": return <AnnualReport department="divulgacao" />;
+    case "relatorio-secretaria": return <AnnualReport department="secretaria" />;
+    case "relatorio-juridico": return <AnnualReport department="juridico" />;
     case "presidencia-painel": return <PresidenciaPainel />;
     default: return <p className="notice">Painel em preparação.</p>;
   }

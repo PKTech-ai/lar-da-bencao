@@ -50,7 +50,8 @@ export const MODULE_PAGES: readonly ModulePage[] = [
       { slug: "itens", label: "Itens", resource: "eventos-itens" },
       { slug: "escala", label: "Escala de Trabalho", resource: "eventos-escala" },
       { slug: "avaliacao", label: "Avaliação", resource: "eventos-avaliacao" },
-      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-eventos" }
+      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-eventos" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-eventos" }
     ]
   },
   {
@@ -72,7 +73,8 @@ export const MODULE_PAGES: readonly ModulePage[] = [
       { slug: "clube-maes-pessoas", label: "Clube de Mães — Pessoas", resource: "clube-maes-pessoas", access: { resource: "social_clube_maes" } },
       { slug: "clube-maes-entregas", label: "Clube de Mães — Entregas", resource: "clube-maes-entregas", access: { resource: "social_clube_maes" } },
       { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-assistencia" },
-      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" }
+      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-assistencia" }
     ]
   },
   {
@@ -87,7 +89,8 @@ export const MODULE_PAGES: readonly ModulePage[] = [
       { slug: "estoque", label: "Estoque", resource: "divulgacao-estoque" },
       { slug: "emprestimos", label: "Empréstimos", panel: "divulgacao-emprestimos" },
       { slug: "vendas", label: "Vendas", resource: "divulgacao-vendas" },
-      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-divulgacao" }
+      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-divulgacao" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-divulgacao" }
     ]
   },
   {
@@ -139,7 +142,8 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     access: { resource: "department", department: "juridico" },
     sections: [
       { slug: "", label: "Eleições", resource: "juridico-eleicoes" },
-      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-juridico" }
+      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-juridico" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-juridico" }
     ]
   },
   {

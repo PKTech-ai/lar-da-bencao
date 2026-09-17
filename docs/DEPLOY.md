@@ -14,7 +14,7 @@ Stack escolhida (sem VPS): **Vercel** (Next.js) + **Supabase** (Auth + PostgreSQ
 1. Migrações, com a credencial de migração (owner), de uma máquina com `psql`:
    ```bash
    export MIGRATION_DATABASE_URL="postgresql://postgres:SENHA@db.<projeto>.supabase.co:5432/postgres"
-   scripts/migrate.sh --dry-run   # lista as pendentes (hoje: as 15 de supabase/migrations/)
+   scripts/migrate.sh --dry-run   # lista as pendentes (todas as de supabase/migrations/)
    scripts/migrate.sh             # aplica em ordem, registra em public.lar_schema_migrations e roda verify_permissions.sql
    ```
    O script recusa migração já aplicada que tenha mudado de conteúdo. Não cole arquivos à mão no SQL Editor.
@@ -54,7 +54,16 @@ Stack escolhida (sem VPS): **Vercel** (Next.js) + **Supabase** (Auth + PostgreSQ
 2. No registrador: CNAME/A conforme instruções da Vercel
 3. Confirme HTTPS e que `APP_URL` bate com o host canônico (`proxy.ts` redireciona hosts extras)
 
-## 4. Pós-deploy
+## 4. Primeiro acesso e configuração institucional
+
+Depois do bootstrap, ainda como Administrador:
+
+1. **Dados da instituição** (`/sistema/instituicao`): nome, fundação, CNPJ, endereço e contatos — a Visão Geral e as impressões leem daqui.
+2. **Biênio** (`/sistema/acesso` → Biênios): cadastre o biênio vigente **antes** de criar as contas da Diretoria. Presidente, vice, secretaria, tesouraria e conselho fiscal só acessam dentro do biênio (15 dias de tolerância após o fim).
+3. **Usuários**: ao criar cada conta, vincule o biênio (cargos da Diretoria) e a ficha de trabalhador, quando houver.
+4. **Matriz de acesso** (`/sistema/acesso` → Matriz): confira o padrão por perfil e registre exceções apenas onde a Casa decidir diferente do mock. Cada exceção fica no Dedo-duro.
+
+## 5. Pós-deploy
 
 ```bash
 curl -X POST https://sistema.lardabencao.org/api/bootstrap \
@@ -71,11 +80,14 @@ curl -X POST https://sistema.lardabencao.org/api/bootstrap \
 5. Despublique o site estático de teste antigo do HTML v215
 6. Só então dados reais
 
-## 5. Checklist rápido
+## 6. Checklist rápido
 
 - [ ] Health `GET /api/health` OK
 - [ ] Convite + MFA + termos
 - [ ] Trabalhadores / Doutrina / Infância / Juventude (onda 1)
+- [ ] Biênio cadastrado e vinculado aos cargos da Diretoria
+- [ ] Matriz de acesso conferida (exceções registradas)
+- [ ] Dados da instituição preenchidos
 - [ ] Dedo-duro e anexos
 - [ ] Encerrar sessões e Redefinir MFA (admin)
 - [ ] Login bloqueia após 5 tentativas (docs/SECURITY_AUTH.md §4)

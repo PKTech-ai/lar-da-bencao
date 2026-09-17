@@ -166,7 +166,7 @@ test("Infância: matrícula com turma pela idade e chamada dominical", async () 
 
 test("todas as telas da fundação e da onda 1 abrem sem erro", async () => {
   const pages: [string, RegExp][] = [
-    ["/sistema", /Ao Lar da Bênção/], ["/sistema/conta", /Minha conta/], ["/sistema/usuarios", /Usuários e permissões/],
+    ["/sistema", /Visão Geral/], ["/sistema/conta", /Minha conta/], ["/sistema/usuarios", /Usuários e permissões/],
     ["/sistema/modulos", /Módulos e ondas/], ["/sistema/auditoria", /Dedo-duro/], ["/sistema/anexos", /Anexos/],
     ["/sistema/importacao", /Importação do backup v215/], ["/sistema/documentos", /Estatuto e Regimento/],
     ["/sistema/trabalhadores", /Trabalhadores/], ["/sistema/admissoes", /Aprovação de Trabalhadores/],
@@ -180,6 +180,62 @@ test("todas as telas da fundação e da onda 1 abrem sem erro", async () => {
     ["/sistema/juventude", /Juventude/], ["/sistema/juventude/evangelizandos", /Evangelizandos/]
   ];
   for (const [path, heading] of pages) await expectHealthyPage(admin, path, heading);
+});
+
+test("telas das ondas 2 e 3 abrem sem erro com os módulos ligados", async () => {
+  // As flags nascem desligadas: o UAT é registrado ao ligar cada módulo.
+  await sql(
+    `update app.feature_flags set enabled = true, uat_reference = 'E2E ondas 2 e 3'
+      where key in ('module_patrimonio','module_assistencia','module_eventos','module_divulgacao','module_secretaria',
+                    'module_presidencia','module_tesouraria','module_conselho_fiscal','module_juridico','module_whatsapp')`
+  );
+  const pages: [string, RegExp][] = [
+    ["/sistema/acesso", /Controle de Acesso/], ["/sistema/instituicao", /Dados da instituição/],
+    ["/sistema/organograma", /Organograma/], ["/sistema/sugestoes", /Sugestões/],
+    ["/sistema/patrimonio", /Patrimônio/], ["/sistema/patrimonio/baixas", /Patrimônio/],
+    ["/sistema/patrimonio/limpeza", /Patrimônio/], ["/sistema/patrimonio/trabalhadores", /Patrimônio/],
+    ["/sistema/patrimonio/relatorio", /Patrimônio/],
+    ["/sistema/assistencia", /Assistência/], ["/sistema/assistencia/rancho", /Assistência/],
+    ["/sistema/assistencia/kits", /Assistência/], ["/sistema/assistencia/brecho", /Assistência/],
+    ["/sistema/assistencia/clube-maes", /Assistência/], ["/sistema/assistencia/relatorio", /Assistência/],
+    ["/sistema/eventos", /Eventos/], ["/sistema/eventos/itens", /Eventos/], ["/sistema/eventos/escala", /Eventos/],
+    ["/sistema/divulgacao", /Divulgação/], ["/sistema/divulgacao/obras", /Divulgação/], ["/sistema/divulgacao/emprestimos", /Divulgação/],
+    ["/sistema/secretaria", /Secretaria/], ["/sistema/secretaria/gravador", /Secretaria/],
+    ["/sistema/tesouraria", /Tesouraria/], ["/sistema/tesouraria/lancamentos", /Tesouraria/],
+    ["/sistema/tesouraria/extrato", /Tesouraria/], ["/sistema/tesouraria/plano-de-contas", /Tesouraria/],
+    ["/sistema/tesouraria/whatsapp", /Tesouraria/],
+    ["/sistema/conselhofiscal", /Conselho Fiscal/], ["/sistema/juridico", /Jurídico/],
+    ["/sistema/presidencia", /Presidência/], ["/sistema/presidencia/baixas", /Presidência/]
+  ];
+  for (const [path, heading] of pages) await expectHealthyPage(admin, path, heading);
+});
+
+test("um bem vira memorando de baixa e a Diretoria autoriza", async () => {
+  await admin.goto("/sistema/patrimonio");
+  await admin.getByRole("button", { name: "+ Novo" }).click();
+  await admin.getByLabel("Número de tombamento *").fill("PAT-E2E-001");
+  await admin.getByLabel("Descrição").fill("Cadeira do salão");
+  await admin.getByLabel("Novo / usado *").selectOption("Usado");
+  await admin.getByLabel("Departamento *").selectOption("patrimonio");
+  await admin.getByLabel("Data de entrada *").fill("2020-05-10");
+  await admin.getByLabel("Valor cadastrado *").fill("150,00");
+  await admin.getByRole("button", { name: "Salvar" }).click();
+  await expect(admin.getByText("Bem patrimonial salvo")).toBeVisible();
+
+  await admin.goto("/sistema/patrimonio/baixas");
+  await admin.getByRole("button", { name: "Solicitar baixa" }).click();
+  await admin.getByLabel("Bem a baixar *").selectOption({ label: "PAT-E2E-001 — Cadeira do salão" });
+  await admin.getByLabel("Motivo / justificativa da baixa *").fill("Assento quebrado, sem conserto.");
+  await admin.getByRole("button", { name: "Gerar memorando e encaminhar" }).click();
+  await expect(admin.getByText(/Memorando PAT-BAIXA-\d{4}-\d{4} gerado/)).toBeVisible();
+
+  await admin.goto("/sistema/presidencia/baixas");
+  await admin.getByRole("button", { name: "Analisar" }).first().click();
+  await admin.getByLabel("Decisão *").selectOption("approved");
+  await admin.getByRole("button", { name: "Registrar decisão" }).click();
+  await expect(admin.getByText("Baixa autorizada e registrada na ficha do bem")).toBeVisible();
+  const [asset] = await sql<{ disposal_date: string | null }>("select disposal_date from app.patrimony_assets where tombamento = 'PAT-E2E-001'");
+  expect(asset.disposal_date).not.toBeNull();
 });
 
 test("Minha conta: códigos novos e troca de senha exigem o código atual", async () => {

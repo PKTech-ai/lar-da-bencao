@@ -15,21 +15,13 @@ Edite `.env.local` com URL, chaves e `DATABASE_URL` do projeto local.
 
 No SQL Editor (role owner/migration):
 
-1. Execute, **em ordem**, todos os arquivos de `supabase/migrations/`:
-   - `202609150001_initial.sql`
-   - `202609161200_business_wave1.sql`
-   - `202609161210_auth_hardening.sql`
-   - `202609161300_session_revocation.sql`
-   - `202609161310_auth_attempts.sql`
-   - `202609161320_module_flags.sql`
-   - `202609161330_worker_admissions.sql`
-   - `202609161340_doutrina.sql`
-   - `202609161350_education.sql`
-   - `202609161400_legacy_import.sql`
-   - `202609161410_pgcrypto_search_path.sql`
-   - `202609171000_institucional_e_limpeza.sql`
-   - `202609171100_acesso_por_pagina.sql`
-   - `202609171300_ondas_2_3_patrimonio.sql`
+1. Aplique **todas** as migrações de `supabase/migrations/`, em ordem alfabética (o nome começa pela data):
+   ```bash
+   for file in supabase/migrations/*.sql; do
+     docker exec -i supabase_db_lar-da-bencao psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$file" || break
+   done
+   ```
+   Em Supabase gerenciado, use `scripts/migrate.sh` (registra o que já foi aplicado e confere o hash de cada arquivo).
 2. Crie o login de runtime:
 
 ```sql
