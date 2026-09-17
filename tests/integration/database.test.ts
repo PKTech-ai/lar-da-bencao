@@ -7,6 +7,7 @@ const current = vi.hoisted(() => ({ actor: null as unknown }));
 vi.mock("@/lib/auth", () => ({ requireActor: async () => current.actor }));
 vi.mock("@/lib/csrf", () => ({ assertSameOrigin: () => undefined }));
 
+const todayIso = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 const json = (method: string, body?: object, url = "https://app.test/x") =>
   new Request(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
 
@@ -388,5 +389,94 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     const both = await (await list.GET(json("GET", undefined, "https://app.test/x"), brechoParams)).json();
     expect(both.capabilities).toEqual({ create: true, update: true, delete: true });
     expect(both.records.some((r: { description: string }) => r.description === "Bazar de setembro")).toBe(true);
+  });
+  it("tesouraria: lançamento, fechamento do mês e envio ao Conselho Fiscal", async () => {
+    const resource = await import("@/app/api/r/[resource]/route");
+    const monthRoute = await import("@/app/api/tesouraria/mes/route");
+    const treasurer = await createActor("tesoureiro");
+    current.actor = treasurer;
+    const entries = { params: Promise.resolve({ resource: "tesouraria-lancamentos" }) };
+    const month = `19${20 + Math.floor(Math.random() * 60)}-0${1 + Math.floor(Math.random() * 9)}`; // mês passado: a data do lançamento não pode ser futura
+    const entry = { entry_date: `${month}-10`, account_code: "1.01.01", description: "Contribuição de setembro", amount_cents: 15000,
+      cost_center: "Institucional / Administração", payment_method: "PIX", fund_source: "Banco", reference: "", notes: "" };
+    expect((await resource.POST(json("POST", entry), entries)).status).toBe(201);
+    // Conta sintética não recebe lançamento.
+    const parent = await resource.POST(json("POST", { ...entry, account_code: "1.01" }), entries);
+    expect(parent.status).toBe(400);
+    expect((await parent.json()).error).toMatch(/analítica/);
+    expect((await resource.POST(json("POST", { ...entry, account_code: "2.02.01", description: "Energia", amount_cents: 8990, fund_source: "Caixa" }), entries)).status).toBe(201);
+
+    const summary = await (await monthRoute.GET(json("GET", undefined, `https://app.test/x?month=${month}`))).json();
+    expect(summary.totals).toMatchObject({ income: 15000, expense: 8990, closing: 6010 });
+    expect(summary.status).toBe("Aberto");
+
+    // Envio exige fechamento antes.
+    expect((await monthRoute.POST(json("POST", { month, action: "send" }))).status).toBe(409);
+    expect((await monthRoute.POST(json("POST", { month, action: "close" }))).status).toBe(200);
+    // Mês fechado não recebe lançamento novo.
+    const blocked = await resource.POST(json("POST", { ...entry, description: "Atrasado" }), entries);
+    expect(blocked.status).toBe(409);
+    expect((await blocked.json()).code).toBe("MONTH_CLOSED");
+    expect((await monthRoute.POST(json("POST", { month, action: "send" }))).status).toBe(200);
+    // Depois de enviado, só com devolução do Conselho.
+    expect((await monthRoute.POST(json("POST", { month, action: "reopen", notes: "Correção" }))).status).toBe(409);
+
+    // O Conselho Fiscal registra o parecer; a Tesouraria não entra nessa aba.
+    const reviews = { params: Promise.resolve({ resource: "conselho-analises" }) };
+    const review = { reference_month: month, status: "Aprovado com ressalvas", review_date: todayIso(), reviewers: "Conselho", analysis: "Conferido", opinion: "Aprovado com ressalvas." };
+    expect((await resource.POST(json("POST", review), reviews)).status).toBe(403);
+    current.actor = await createActor("conselheiro_fiscal");
+    expect((await resource.POST(json("POST", review), reviews)).status).toBe(201);
+    // Um parecer por mês.
+    expect((await resource.POST(json("POST", review), reviews)).status).toBe(409);
+  });
+
+  it("extrato bancário: importação sem repetir linhas e conciliação pelo valor", async () => {
+    const statement = await import("@/app/api/tesouraria/extrato/route");
+    const reconcile = await import("@/app/api/tesouraria/conciliacao/route");
+    const resource = await import("@/app/api/r/[resource]/route");
+    const treasurer = await createActor("tesoureiro");
+    current.actor = treasurer;
+    const month = `19${20 + Math.floor(Math.random() * 60)}-1${Math.floor(Math.random() * 2)}`;
+    const csv = `Data;Histórico;Valor\n10/${month.slice(5)}/${month.slice(0, 4)};Doação PIX;1.250,00\n15/${month.slice(5)}/${month.slice(0, 4)};Tarifa;-12,90`;
+    const first = await statement.POST(json("POST", { reference_month: month, filename: "extrato.csv", format: "CSV", content: csv }));
+    expect(first.status).toBe(201);
+    expect(await first.json()).toMatchObject({ imported: 2, repeated: 0 });
+    const again = await statement.POST(json("POST", { reference_month: month, filename: "extrato.csv", format: "CSV", content: csv }));
+    expect(await again.json()).toMatchObject({ imported: 0, repeated: 2 });
+
+    const entries = { params: Promise.resolve({ resource: "tesouraria-lancamentos" }) };
+    const created = await resource.POST(json("POST", { entry_date: `${month}-10`, account_code: "1.04.02", description: "Doação PIX", amount_cents: 125000,
+      cost_center: "Institucional / Administração", payment_method: "PIX", fund_source: "Banco", reference: "", notes: "" }), entries);
+    expect(created.status).toBe(201);
+    const entryId = (await created.json()).id;
+
+    const lines = (await (await statement.GET(json("GET", undefined, `https://app.test/x?month=${month}`))).json()).lines;
+    const donation = lines.find((l: { description: string }) => l.description === "Doação PIX");
+    expect(donation.suggestions.map((s: { id: string }) => s.id)).toContain(entryId);
+    // Valor diferente não concilia.
+    const fee = lines.find((l: { description: string }) => l.description === "Tarifa");
+    expect((await reconcile.POST(json("POST", { line_id: fee.id, action: "match", entry_id: entryId }))).status).toBe(400);
+    expect((await reconcile.POST(json("POST", { line_id: donation.id, action: "match", entry_id: entryId }))).status).toBe(200);
+    expect((await reconcile.POST(json("POST", { line_id: fee.id, action: "ignore", reason: "Tarifa lançada no mês seguinte." }))).status).toBe(200);
+    const after = (await (await statement.GET(json("GET", undefined, `https://app.test/x?month=${month}`))).json()).lines;
+    expect(after.map((l: { status: string }) => l.status).sort()).toEqual(["ignored", "matched"]);
+  });
+
+  it("whatsapp: só entra na fila com consentimento e o envio é registrado", async () => {
+    const queue = await import("@/app/api/whatsapp/route");
+    const item = await import("@/app/api/whatsapp/[id]/route");
+    current.actor = await createActor("tesoureiro");
+    const message = { scope: "tesouraria", recipient_name: "Maria Teste", phone: "(31) 99999-1234", body: "Bom dia! Seguem os dados da contribuição.", consent_source: "Autorização na ficha" };
+    expect((await queue.POST(json("POST", { ...message, consent: false }))).status).toBe(400);
+    const created = await queue.POST(json("POST", { ...message, consent: true }));
+    expect(created.status).toBe(201);
+    const { id, phone } = await created.json();
+    expect(phone).toBe("5531999991234");
+    expect((await item.POST(json("POST", { scope: "tesouraria", action: "sent" }), { params: Promise.resolve({ id }) })).status).toBe(200);
+    // Fora da fila, não se decide de novo.
+    expect((await item.POST(json("POST", { scope: "tesouraria", action: "cancel", reason: "Enganei-me" }), { params: Promise.resolve({ id }) })).status).toBe(409);
+    const audit = await query("select 1 from app.audit_events where entity_type = 'whatsapp' and entity_id = $1 and action like '%enviada%'", [id]);
+    expect(audit.rowCount).toBe(1);
   });
 });

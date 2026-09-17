@@ -4,6 +4,8 @@ import { BirthdaysPanel } from "@/components/modules/aniversariantes";
 import { BookLoansPanel, BookshopSummary } from "@/components/modules/divulgacao-livraria";
 import { MeetingRecorder } from "@/components/modules/secretaria-gravador";
 import { PresidenciaPainel } from "@/components/modules/presidencia-painel";
+import { TreasuryAccountsPanel, TreasuryMonthPanel, TreasuryReportPanel, TreasuryStatementPanel } from "@/components/modules/tesouraria";
+import { WhatsappQueue } from "@/components/modules/whatsapp";
 import { DisposalsPanel } from "@/components/modules/patrimonio-baixas";
 import { CleaningPanel } from "@/components/modules/patrimonio-limpeza";
 import { PatrimonyReport } from "@/components/modules/patrimonio-relatorio";
@@ -22,6 +24,11 @@ export function ModulePanel({ name }: { name: string }) {
     case "aniversariantes-patrimonio": return <BirthdaysPanel department="patrimonio" />;
     case "aniversariantes-eventos": return <BirthdaysPanel department="eventos" />;
     case "aniversariantes-divulgacao": return <BirthdaysPanel department="divulgacao" />;
+    case "tesouraria-mes": return <TreasuryMonthPanel />;
+    case "tesouraria-extrato": return <TreasuryStatementPanel />;
+    case "tesouraria-contas": return <TreasuryAccountsPanel />;
+    case "tesouraria-relatorio": return <TreasuryReportPanel />;
+    case "whatsapp-tesouraria": return <WhatsappQueue scope="tesouraria" />;
     case "presidencia-painel": return <PresidenciaPainel />;
     default: return <p className="notice">Painel em preparação.</p>;
   }

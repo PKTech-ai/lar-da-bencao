@@ -645,105 +645,103 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Módulo:** tesouraria
 - **Severidade:** bloqueia uso
 - **Onda:** 3
-- **Origem mock:** `treasury-contrib` `treasury-chart` / `contrib` `accounts` / `TreasuryContributionPdf`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: plano de contas, contribuições (centavos inteiros)
-  - API/UI/PDF
-  - permissão `tesouraria`
-  - teste: valores e impressão
-- **Critério de aceite:** contribuições e plano de contas iguais ao mock; money em centavos no Postgres.
+- **Origem mock:** `treasury-contrib` `treasury-chart` / `TreasuryContributionPdf`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.financial_accounts` com o plano de contas do mock (54 contas, natureza e grupo; sintéticas não recebem lançamento)
+  - `app.treasury_contributions`: contribuinte, vínculo com a ficha do trabalhador, tipo, mês de referência, valor em centavos, forma e comprovante
+  - abas “Plano de Contas” e “Contribuições” em `/sistema/tesouraria`, com impressão
+- **Critério de aceite:** ✅ contribuições e plano de contas no Postgres, em centavos inteiros; ✅ impressão disponível.
 
 ### BL-047 — Tesouraria — caixa mensal e comprovantes
 - **Módulo:** tesouraria
 - **Severidade:** bloqueia uso
 - **Onda:** 3
-- **Origem mock:** `treasury-cash` `treasury-comprovantes` / `cashMoves` `cashClosings` `TreasuryProofs` `treasuryProofs`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema movimentos/fechamentos
-  - API + anexos `treasury_proof`
-  - UI
-  - permissão/teste: lançamento sem comprovante aparece como pendência
-- **Critério de aceite:** caixa mensal e comprovantes iguais ao mock; binários no Postgres.
+- **Origem mock:** `treasury-cash` `treasury-comprovantes` / `TreasuryProofs`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.treasury_entries` (lançamento com conta, centro de custo, forma, origem) e `app.treasury_months` (situação do mês)
+  - painel “Caixa Mensal”: saldo anterior, entradas, saídas, saldo final, totais por conta e por centro de custo
+  - fechamento, reabertura com motivo e envio ao Conselho Fiscal, tudo no Dedo-duro
+  - mês fechado recusa inclusão e alteração de lançamento (código `MONTH_CLOSED`)
+  - comprovantes (`treasury_proof`) por lançamento
+- **Critério de aceite:** ✅ caixa mensal igual ao mock; ✅ fechamento protege o histórico; ✅ comprovantes no Postgres.
 
 ### BL-048 — Tesouraria — extrato bancário e conciliação
 - **Módulo:** tesouraria
-- **Severidade:** bloqueia uso
+- **Severidade:** importante
 - **Onda:** 3
-- **Origem mock:** `treasury-extrato-bancario` / `TreasuryBankStatements` `BankInlineProofs` `treasuryBankStatements` `bankReconciliations`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema extratos/linhas/conciliação
-  - API import PDF/OFX (limite 20MB) + `bank_statement`
-  - UI conferência
-  - permissão/teste
-- **Critério de aceite:** importação/conciliação igual ao mock; arquivos privados no Postgres.
+- **Origem mock:** `treasury-extrato-bancario` / `TreasuryBankStatements` `BankInlineProofs`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.bank_statements` e `app.bank_statement_lines`; leitura de OFX (STMTTRN) e CSV (com ou sem cabeçalho, `;` ou `,`, valores no formato brasileiro)
+  - linha repetida (mesmo dia, valor e histórico) não entra duas vezes: impressão digital SHA-256 por linha
+  - conciliação sugere lançamentos do banco com o mesmo valor até cinco dias de diferença; conciliar exige valor igual; “deixar fora” exige motivo; dá para desfazer
+  - o arquivo original fica anexado (`bank_statement`)
+  - teste: `lib/treasury.test.ts` (leitura de OFX/CSV) + integração (importação sem repetir, conciliação por valor)
+- **Pendências residuais:** extrato em PDF não é lido automaticamente (só anexado); o mock também não lia.
+- **Critério de aceite:** ✅ extrato importado e conciliado no Postgres, com auditoria de cada decisão.
 
 ### BL-049 — Tesouraria — mantenedores e histórico de doações
 - **Módulo:** tesouraria
 - **Severidade:** importante
 - **Onda:** 3
-- **Origem mock:** `treasury-mantenedores` / `TreasurySupporters` `treasurySupporters` `treasurySupporterDonationHistory`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API/UI
-  - permissão/teste
-- **Critério de aceite:** cadastro de mantenedores e histórico iguais ao mock no Postgres.
+- **Origem mock:** `treasury-mantenedores` / `TreasurySupporters`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.treasury_supporters` (combinado, periodicidade, dia previsto, situação) e `app.treasury_donations` (recebimentos com destino e comprovante)
+  - mantenedor encerrado não recebe novo lançamento de doação; mês fechado também bloqueia
+- **Critério de aceite:** ✅ mantenedores e histórico de doações no Postgres, com comprovantes.
 
 ### BL-050 — Tesouraria — WhatsApp cobrança/avisos
-- **Módulo:** tesouraria / WhatsApp
+- **Módulo:** tesouraria / doutrina
 - **Severidade:** importante
 - **Onda:** 3
-- **Origem mock:** `treasury-whatsapp` / `TreasuryWhatsApp` `TreasuryWhatsAppBatch` `treasuryWhatsAppSettings` `treasuryWhatsAppConsents` `treasuryWhatsAppBatchDraft`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema consentimento/opt-out/config
-  - API fila backend (RF-011)
-  - UI prévia de lote
-  - permissão/ops/teste
-- **Critério de aceite:** lotes só via backend; consentimento verificável; sem credenciais no browser.
+- **Origem mock:** `treasury-whatsapp` / `TreasuryWhatsApp` `TreasuryWhatsAppBatch`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.whatsapp_messages`: fila por módulo (Tesouraria e Doutrina), consentimento obrigatório com a origem registrada, número normalizado (55 + DDD)
+  - o sistema **não envia sozinho**: abre a conversa no WhatsApp e registra quem enviou; cancelamento exige motivo
+  - no Dedo-duro, o telefone aparece mascarado (`***1234`)
+- **Pendências residuais:** envio em lote e opt-out por link público ficam fora desta entrega (dependeriam de API externa).
+- **Critério de aceite:** ✅ nenhuma mensagem sai sem consentimento registrado; ✅ fila e envios auditados.
 
 ### BL-051 — Tesouraria — integração Conselho Fiscal (envio mensal)
-- **Módulo:** tesouraria / conselhofiscal
+- **Módulo:** tesouraria / conselho fiscal
 - **Severidade:** bloqueia uso
 - **Onda:** 3
 - **Origem mock:** `treasury-fiscal` / `fiscalReviews` `cashClosingChecks`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema pacotes mensais + status
-  - API envio Tesouraria → CF
-  - UI ambos lados
-  - permissão/teste
-- **Critério de aceite:** fechamento mensal enviado ao CF como no mock; trilha no Dedo-duro.
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - situação do mês em `app.treasury_months`: Aberto → Fechado → Enviado ao Conselho Fiscal
+  - enviar exige mês fechado; mês enviado não reabre sem devolução do Conselho
+  - teste de integração cobre os três passos e os bloqueios
+- **Critério de aceite:** ✅ envio mensal ao CF registrado dos dois lados, sem alterar lançamentos.
 
 ### BL-052 — Conselho Fiscal — análise, parecer, histórico, anexos
-- **Módulo:** conselhofiscal
+- **Módulo:** conselho fiscal
 - **Severidade:** bloqueia uso
 - **Onda:** 3
-- **Origem mock:** `cf-analise` `cf-parecer` `cf-historico` / `CouncilFiscalProofs` `fiscalReviews`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema pareceres
-  - API read tesouraria + write parecer
-  - UI
-  - permissão: CF edita parecer; não altera lançamentos
-  - teste
-- **Critério de aceite:** análise/parecer/histórico iguais ao mock; leitura financeira autorizada; Postgres.
+- **Origem mock:** `cf-analise` `cf-parecer` `cf-historico` / `CouncilFiscalProofs`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.fiscal_reviews`: um parecer por mês, situação (em análise, aprovado, com ressalvas, reprovado), conselheiros presentes, análise e parecer
+  - só aceita mês que a Tesouraria enviou; o Conselho não altera lançamento nenhum
+  - parecer assinado e documentos anexados (`fiscal_council_document`)
+  - teste de integração: Tesouraria não escreve no parecer; parecer duplicado é recusado
+- **Critério de aceite:** ✅ análise e parecer no Postgres, com histórico e anexos; ✅ separação de poderes preservada.
 
 ### BL-053 — Jurídico — eleições e documentos
 - **Módulo:** juridico
-- **Severidade:** bloqueia uso
+- **Severidade:** importante
 - **Onda:** 3
-- **Origem mock:** `jur-eleicoes` / `JuridicoElections` `ElectionDocuments` `ElectionDocumentEngine` `juridicoElections`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema eleições/chapas/docs
-  - API + anexos `legal_document`
-  - UI
-  - permissão `juridico`
-  - teste
-- **Critério de aceite:** eleições e documentos iguais ao mock; anexos privados no Postgres.
+- **Origem mock:** `jur-eleicoes` / `JuridicoElections` `ElectionDocuments`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.elections`: etapas do mock (edital, inscrições, homologação, votação, apuração, posse, encerrada), datas encadeadas e biênio eleito
+  - anexos `legal_document` agora aceitam também `.docx` (modelos de documento), com conferência da assinatura do arquivo
+- **Pendências residuais:** extração dos modelos `.docx` embutidos no HTML v215 fica na Importação v215.
+- **Critério de aceite:** ✅ eleições e documentos no Postgres, com as etapas e datas do mock.
 
 ### BL-054 — Trabalhadores por departamento (painéis `*-trabalhadores`)
 - **Módulo:** transversal departamentos

@@ -98,6 +98,45 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     ]
   },
   {
+    slug: "tesouraria",
+    title: "Tesouraria",
+    intro: "Caixa mensal com plano de contas, contribuições, mantenedores, extrato bancário conciliado e envio ao Conselho Fiscal.",
+    flag: "module_tesouraria",
+    access: { resource: "tesouraria" },
+    sections: [
+      { slug: "", label: "Caixa Mensal", panel: "tesouraria-mes" },
+      { slug: "lancamentos", label: "Lançamentos", resource: "tesouraria-lancamentos" },
+      { slug: "contribuicoes", label: "Contribuições", resource: "tesouraria-contribuicoes" },
+      { slug: "mantenedores", label: "Mantenedores", resource: "tesouraria-mantenedores" },
+      { slug: "doacoes", label: "Doações recebidas", resource: "tesouraria-doacoes" },
+      { slug: "extrato", label: "Extrato e Conciliação", panel: "tesouraria-extrato" },
+      { slug: "plano-de-contas", label: "Plano de Contas", panel: "tesouraria-contas" },
+      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
+      { slug: "whatsapp", label: "WhatsApp", panel: "whatsapp-tesouraria" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "tesouraria-relatorio" }
+    ]
+  },
+  {
+    slug: "conselhofiscal",
+    title: "Conselho Fiscal",
+    intro: "Análise dos meses enviados pela Tesouraria, com parecer registrado e histórico.",
+    flag: "module_conselho_fiscal",
+    access: { resource: "conselho_fiscal" },
+    sections: [
+      { slug: "", label: "Análises e Pareceres", resource: "conselho-analises" }
+    ]
+  },
+  {
+    slug: "juridico",
+    title: "Jurídico",
+    intro: "Eleições da Casa: etapas, datas e documentos (inclusive modelos .docx).",
+    flag: "module_juridico",
+    access: { resource: "department", department: "juridico" },
+    sections: [
+      { slug: "", label: "Eleições", resource: "juridico-eleicoes" }
+    ]
+  },
+  {
     slug: "presidencia",
     title: "Presidência",
     intro: "Painel da Diretoria: decisões pendentes e situação dos módulos.",

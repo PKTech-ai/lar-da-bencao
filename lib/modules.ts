@@ -21,6 +21,9 @@ export const moduleCatalog: ModuleDef[] = [
   { key: "eventos", href: "/sistema/eventos", label: "Eventos", flagKey: "module_eventos", permissionResource: "department", department: "eventos" },
   { key: "divulgacao", href: "/sistema/divulgacao", label: "Divulgação", flagKey: "module_divulgacao", permissionResource: "department", department: "divulgacao" },
   { key: "secretaria", href: "/sistema/secretaria", label: "Secretaria", flagKey: "module_secretaria", permissionResource: "secretaria" },
+  { key: "tesouraria", href: "/sistema/tesouraria", label: "Tesouraria", flagKey: "module_tesouraria", permissionResource: "tesouraria" },
+  { key: "conselhofiscal", href: "/sistema/conselhofiscal", label: "Conselho Fiscal", flagKey: "module_conselho_fiscal", permissionResource: "conselho_fiscal" },
+  { key: "juridico", href: "/sistema/juridico", label: "Jurídico", flagKey: "module_juridico", permissionResource: "department", department: "juridico" },
   { key: "presidencia", href: "/sistema/presidencia", label: "Presidência", flagKey: "module_presidencia", permissionResource: "presidencia" }
 ];
 

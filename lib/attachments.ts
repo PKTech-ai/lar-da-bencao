@@ -7,8 +7,10 @@ export const CHUNK_SIZE = 3 * 1024 * 1024;
 export const COMMON_FILE_LIMIT = 15 * 1024 * 1024;
 export const BANK_FILE_LIMIT = 20 * 1024 * 1024;
 
+export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 export const allowedMimeTypes = [
-  "application/pdf", "image/jpeg", "image/png", "audio/webm", "audio/ogg", "text/csv", "application/x-ofx"
+  "application/pdf", "image/jpeg", "image/png", "audio/webm", "audio/ogg", "text/csv", "application/x-ofx", DOCX_MIME
 ] as const;
 
 export function sha256(data: Uint8Array | string) {
@@ -38,6 +40,7 @@ export function validateSignature(mime: string, bytes: Uint8Array) {
     : mime === "image/jpeg" ? starts(0xff, 0xd8, 0xff)
     : mime === "audio/ogg" ? starts(0x4f, 0x67, 0x67, 0x53)
     : mime === "audio/webm" ? starts(0x1a, 0x45, 0xdf, 0xa3)
+    : mime === DOCX_MIME ? starts(0x50, 0x4b, 0x03, 0x04)
     : mime === "application/x-ofx" ? /^(OFXHEADER:|<\?OFX|<OFX)/i.test(text)
     : mime === "text/csv" ? !bytes.slice(0, 256).includes(0)
     : false;

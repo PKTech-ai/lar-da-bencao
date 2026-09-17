@@ -57,9 +57,12 @@ export type ResourceDef = {
 
 export const IMAGE_MIMES = ["image/jpeg", "image/png"] as const;
 export const DOC_MIMES = ["application/pdf", "image/jpeg", "image/png"] as const;
+export const OFFICE_MIMES = [...DOC_MIMES, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] as const;
 
 export const PHOTO_KIND = (label = "Foto"): AttachmentKind => ({ key: "photo", label, accept: ".jpg,.jpeg,.png", mimes: IMAGE_MIMES });
 export const DOC_KIND = (key: string, label: string): AttachmentKind => ({ key, label, accept: ".pdf,.jpg,.jpeg,.png", mimes: DOC_MIMES });
+/** Documentos que também aceitam modelos .docx (Jurídico). */
+export const OFFICE_KIND = (key: string, label: string): AttachmentKind => ({ key, label, accept: ".pdf,.jpg,.jpeg,.png,.docx", mimes: OFFICE_MIMES });
 
 /** Converte "1.250,00" / "1250,5" / "1250.50" em centavos; lança erro legível. */
 export function parseMoney(value: string): number {

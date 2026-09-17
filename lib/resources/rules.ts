@@ -59,3 +59,41 @@ RULES["assistencia-rancho"] = async ({ client, input }) => {
   const date = String(input.delivery_date ?? "");
   if (date && row.start_date && date < row.start_date) throw new AppError("A entrega não pode ser anterior ao início do acompanhamento.");
 };
+
+/** Lançamento do caixa: conta analítica ativa e mês aberto (também no mês de origem, ao mudar a data). */
+RULES["tesouraria-lancamentos"] = async ({ client, input, before }) => {
+  const { assertMonthOpen, assertPostingAccount } = await import("@/lib/treasury");
+  await assertPostingAccount(client, String(input.account_code));
+  await assertMonthOpen(client, String(input.entry_date).slice(0, 7));
+  if (before?.entry_date) await assertMonthOpen(client, String(before.entry_date).slice(0, 7));
+};
+
+/** Contribuição: o mês de referência precisa estar aberto. */
+RULES["tesouraria-contribuicoes"] = async ({ client, input, before }) => {
+  const { assertMonthOpen } = await import("@/lib/treasury");
+  await assertMonthOpen(client, String(input.reference_month));
+  if (before?.reference_month && before.reference_month !== input.reference_month) await assertMonthOpen(client, String(before.reference_month));
+};
+
+/** Doação recebida: mantenedor ativo e mês aberto. */
+RULES["tesouraria-doacoes"] = async ({ client, input }) => {
+  const { assertMonthOpen } = await import("@/lib/treasury");
+  const supporter = await client.query<{ status: string }>("select status from app.treasury_supporters where id = $1", [String(input.supporter_id)]);
+  if (!supporter.rows[0]) throw new AppError("Mantenedor não encontrado.");
+  if (supporter.rows[0].status === "Encerrado") throw new AppError("Este mantenedor está com a colaboração encerrada.");
+  await assertMonthOpen(client, String(input.received_at).slice(0, 7));
+};
+
+/** Análise do Conselho Fiscal: só sobre mês enviado pela Tesouraria, e um parecer por mês. */
+RULES["conselho-analises"] = async ({ client, input, before }) => {
+  const month = String(input.reference_month);
+  const sent = await client.query<{ status: string }>("select status from app.treasury_months where reference_month = $1", [month]);
+  if (sent.rows[0]?.status !== "Enviado ao Conselho Fiscal") {
+    throw new AppError("Este mês ainda não foi enviado pela Tesouraria ao Conselho Fiscal.");
+  }
+  const duplicated = await client.query(
+    "select 1 from app.fiscal_reviews where reference_month = $1 and ($2::uuid is null or id <> $2)",
+    [month, before?.id ?? null]
+  );
+  if (duplicated.rowCount) throw new AppError("Já existe uma análise registrada para este mês.", 409, "DUPLICATE");
+};
