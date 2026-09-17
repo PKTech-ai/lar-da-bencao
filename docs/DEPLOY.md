@@ -11,24 +11,20 @@ Stack escolhida (sem VPS): **Vercel** (Next.js) + **Supabase** (Auth + PostgreSQ
 
 ## 1. Banco e Auth (Supabase)
 
-1. SQL Editor (owner): execute em ordem todos os arquivos de `supabase/migrations/`
-   - `202609150001_initial.sql`
-   - `202609161200_business_wave1.sql`
-   - `202609161210_auth_hardening.sql`
-   - `202609161300_session_revocation.sql`
-   - `202609161310_auth_attempts.sql`
-   - `202609161320_module_flags.sql`
-   - `202609161330_worker_admissions.sql`
-   - `202609161340_doutrina.sql`
-   - `202609161350_education.sql`
-   - `202609161400_legacy_import.sql`
-   - `202609161410_pgcrypto_search_path.sql`
-   - depois: `supabase/verify_permissions.sql` (deve terminar sem erro)
+1. Migrações, com a credencial de migração (owner), de uma máquina com `psql`:
+   ```bash
+   export MIGRATION_DATABASE_URL="postgresql://postgres:SENHA@db.<projeto>.supabase.co:5432/postgres"
+   scripts/migrate.sh --dry-run   # lista as pendentes (hoje: as 11 de supabase/migrations/)
+   scripts/migrate.sh             # aplica em ordem, registra em public.lar_schema_migrations e roda verify_permissions.sql
+   ```
+   O script recusa migração já aplicada que tenha mudado de conteúdo. Não cole arquivos à mão no SQL Editor.
 2. Crie o runtime:
    ```sql
    create role lar_runtime login password 'SEGREDO_FORTE';
    grant lar_app to lar_runtime;
+   alter role lar_runtime set search_path = "$user", public, extensions;
    ```
+   Depois, teste “Encerrar sessões” com um usuário de teste. Se a função não conseguir apagar `auth.sessions` (permissão negada), registre a limitação no BL-002 e peça o grant ao suporte do Supabase.
 3. Auth (checklist completo em `docs/SECURITY_AUTH.md`):
    - Desabilite signup público
    - MFA TOTP obrigatório
