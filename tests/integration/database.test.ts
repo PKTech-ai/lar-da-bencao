@@ -182,6 +182,9 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     const rows = await (await schedule.GET(json("GET", undefined, "https://app.test/x?month=2026-09"), params)).json();
     expect(rows.rows.find((r: { date: string; group: string }) => r.date === "2026-09-06" && r.group === "1º Ciclo")).toMatchObject({ theme: "Amor ao próximo", objective: "Reconhecer gestos de amor", status: "Realizado" });
     const planYear = 2040 + Math.floor(Math.random() * 50);
+    // O banco local é reaproveitado entre execuções: começa sem plano para o ano sorteado.
+    await owner((client) => client.query("delete from app.education_plan_items where plan_id in (select id from app.education_plans where year = $1)", [planYear]));
+    await owner((client) => client.query("delete from app.education_plans where year = $1", [planYear]));
     expect((await plan.PUT(json("PUT", { year: planYear, objective: "o", priorities: "p", expected: "e", notes: "n", version: 0 }), params)).status).toBe(200);
     const saved = await (await plan.GET(json("GET", undefined, `https://app.test/x?year=${planYear}`), params)).json();
     expect(saved.saved).toBe(true);
@@ -359,5 +362,31 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect((await item.PATCH(json("PATCH", { ...base, version: 2, status: "done", payment_status: "paid" }), itemParams)).status).toBe(400);
     expect((await item.PATCH(json("PATCH", { ...base, version: 2, payment_status: "pending" }), itemParams)).status).toBe(400);
     expect((await item.PATCH(json("PATCH", { ...base, version: 2, payment_status: "pending", reason: "Estorno do PIX." }), itemParams)).status).toBe(200);
+  });
+  it("setores sociais: cada perfil lança apenas no próprio livro caixa", async () => {
+    const list = await import("@/app/api/r/[resource]/route");
+    const brecho = await createActor("brecho");
+    const clube = await createActor("clube_maes");
+    const brechoParams = { params: Promise.resolve({ resource: "brecho-caixa" }) };
+    const clubeParams = { params: Promise.resolve({ resource: "clube-maes-caixa" }) };
+    const entry = { entry_date: "2026-09-10", direction: "Entrada", description: "Bazar de setembro", category: "Vendas", amount_cents: 12500, payment_method: "PIX", quantity: 3, notes: "" };
+
+    current.actor = brecho;
+    expect((await list.POST(json("POST", entry), brechoParams)).status).toBe(201);
+    expect((await list.POST(json("POST", entry), clubeParams)).status).toBe(403);
+
+    current.actor = clube;
+    expect((await list.POST(json("POST", { ...entry, description: "Enxovais doados" }), clubeParams)).status).toBe(201);
+    expect((await list.POST(json("POST", entry), brechoParams)).status).toBe(403);
+    // A lista de cada setor mostra apenas os próprios lançamentos.
+    const clubeRows = await (await list.GET(json("GET", undefined, "https://app.test/x"), clubeParams)).json();
+    expect(clubeRows.records.every((r: { description: string }) => r.description !== "Bazar de setembro")).toBe(true);
+    expect(clubeRows.records.some((r: { description: string }) => r.description === "Enxovais doados")).toBe(true);
+
+    // A coordenação da Assistência enxerga e lança nos dois setores.
+    current.actor = await createActor("coordenador", ["assistencia_social"]);
+    const both = await (await list.GET(json("GET", undefined, "https://app.test/x"), brechoParams)).json();
+    expect(both.capabilities).toEqual({ create: true, update: true, delete: true });
+    expect(both.records.some((r: { description: string }) => r.description === "Bazar de setembro")).toBe(true);
   });
 });

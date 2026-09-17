@@ -23,7 +23,8 @@ function fieldSchema(field: Field): z.ZodTypeAny {
     case "multiselect": schema = z.array(z.enum(field.options as [string, ...string[]])).max(field.options.length); break;
     case "boolean": schema = z.boolean(); break;
     case "department": schema = z.string().regex(/^[a-z_]+$/).or(z.literal("")); break;
-    case "worker": schema = z.string().uuid().or(z.literal("")); break;
+    case "worker":
+    case "reference": schema = z.string().uuid().or(z.literal("")); break;
   }
   if (field.type === "boolean") return schema.default(false);
   if (field.type === "multiselect") return schema.default([]);
@@ -55,6 +56,7 @@ export function sqlType(field: Field) {
     case "boolean": return "boolean not null default false";
     case "multiselect": return "text[] not null default '{}'";
     case "worker": return "uuid references app.workers(id)";
+    case "reference": return `uuid references app.${field.table}(id)`;
     case "department": return "text references app.departments(key)";
     case "text":
     case "textarea": return `text not null default '' check (char_length(${field.name}) <= ${field.max})`;

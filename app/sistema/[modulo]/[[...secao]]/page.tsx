@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ModulePanel } from "@/components/modules/panels";
 import { ResourceManager } from "@/components/resources/resource-manager";
-import { findModulePage, type SectionAccess } from "@/lib/module-pages";
+import { findModulePage, SECTOR_ROLE_RESOURCE, type SectionAccess } from "@/lib/module-pages";
 import { requireModulePage } from "@/lib/page-auth";
 import { hasPermission } from "@/lib/permissions";
 import { RESOURCES } from "@/lib/resources/registry";
@@ -16,9 +16,15 @@ export default async function ModuleSectionPage({ params }: Params) {
   const actor = await requireModulePage(page.flag, { resource: page.access.resource, department: page.access.department });
   const can = (access: SectionAccess | undefined) =>
     access ? hasPermission(actor, access.resource, "read", access.department) : Promise.resolve(true);
+  const sectorResource = SECTOR_ROLE_RESOURCE[actor.role];
   const visible = [];
-  for (const section of page.sections) if (await can(section.access)) visible.push(section);
+  for (const section of page.sections) {
+    if (sectorResource && section.access?.resource !== sectorResource) continue;
+    if (await can(section.access)) visible.push(section);
+  }
   const current = visible.find((s) => s.slug === (secao?.[0] ?? ""));
+  // Sem a aba pedida (ex.: perfil de setor entrando pela raiz do módulo), abre a primeira permitida.
+  if (!current && !secao && visible.length) redirect(`/sistema/${page.slug}/${visible[0].slug}`);
   if (!current) notFound();
   const def = current.resource ? RESOURCES[current.resource] : null;
 

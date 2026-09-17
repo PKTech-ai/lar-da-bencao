@@ -211,16 +211,16 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Critério de aceite:** ✅ igual ao mock; ✅ dados no Postgres; ✅ auditoria de admissão; ✅ trabalhador só entra em escala após aprovação.
 
 ### BL-014 — Aniversariantes multi-departamento
-- **Módulo:** Cadastros-base / transversal
+- **Módulo:** transversal
 - **Severidade:** importante
 - **Onda:** 1
-- **Origem mock:** `TreasuryBirthdays` / painéis `*-aniversariantes`
-- **Estado v216:** parcial (Infância e Juventude prontas em `/sistema/{infancia,juventude}/aniversariantes`; faltam os demais departamentos e mantenedores)
-- **O que falta:**
-  - schema/API/UI: filtros por período; impressão
-  - permissão: leitura no escopo do departamento
-  - teste: Infância (evangelizandos) vs trabalhadores/mantenedores
-- **Critério de aceite:** mesmas listas/impressões do mock a partir do Postgres.
+- **Origem mock:** painéis `*-aniversariantes`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - API `GET /api/aniversariantes` (mês ou ano inteiro) com escopo: Secretaria e Presidência veem todos; os demais, só os departamentos que podem ler
+  - painel comum `BirthdaysPanel`, usado por Secretaria e pelos módulos das ondas 2 e 3, com impressão
+  - só trabalhadores ativos com data de nascimento no cadastro
+- **Critério de aceite:** ✅ aniversariantes por departamento e no geral, sem expor dados fora do escopo de leitura.
 
 ### BL-015 — Relatórios anuais genéricos por departamento
 - **Módulo:** Relatórios / RF-009
@@ -449,70 +449,75 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Severidade:** bloqueia uso
 - **Onda:** 2
 - **Origem mock:** `social-painel` `social-trabalhadores` / `SocialRegistry`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API/UI base do departamento
-  - permissão: `assistencia_social` + perfis `brecho`/`clube_maes`
-  - teste: setor restrito
-- **Critério de aceite:** painel e trabalhadores Social no Postgres com escopo setorial.
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `/sistema/assistencia` com abas por seção e escopo de página (`assistencia`)
+  - perfis de setor (`brecho`, `clube_maes`) entram direto na aba do próprio setor e não enxergam as demais (regra do mock)
+  - trabalhadores do departamento seguem no cadastro único de Trabalhadores (BL-013), sem duplicar ficha
+  - teste de integração: cada setor só lança no próprio livro caixa; a coordenação enxerga os dois
+- **Critério de aceite:** ✅ módulo Social no Postgres com escopo setorial.
 
 ### BL-032 — Assistência — Rancho dos Evangelizandos
 - **Módulo:** assistencia
 - **Severidade:** bloqueia uso
 - **Onda:** 2
-- **Origem mock:** `social-rancho` / `ranchoFamilies` `RanchoFrequencyPolicy` `ranchoFrequencyPolicy`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API/UI frequência mínima, famílias, política
-  - permissão/teste
-- **Critério de aceite:** rancho interno igual ao mock; regras de frequência no Postgres.
+- **Origem mock:** `social-rancho` / `RanchoFrequencyPolicy`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema `app.social_families` e `app.social_rancho_deliveries` (migração `202609171700`)
+  - entrega por mês de referência, com situação (programada, entregue, não retirada, cancelada), cestas e comprovante anexado
+  - regra: família encerrada não recebe nova entrega e a entrega não é anterior ao início do acompanhamento
+- **Pendências residuais:** política de frequência configurável (periodicidade por família) fica com BL-037.
+- **Critério de aceite:** ✅ rancho controlado por família e mês no Postgres.
 
 ### BL-033 — Assistência — Doação de rancho e relação de entrega
 - **Módulo:** assistencia
 - **Severidade:** bloqueia uso
 - **Onda:** 2
-- **Origem mock:** `social-doacao` `social-entrega` / `socialExternalFamilies` `socialDeliveryCorrections`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API/UI
-  - permissão/teste/impressão
-- **Critério de aceite:** doação externa e relação de entrega iguais ao mock no Postgres.
+- **Origem mock:** `social-doacao` `social-entrega`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - doações combinadas ficam em Mantenedores da Cesta (BL-034); a entrega efetiva, em Rancho (BL-032), com itens, responsável e comprovante
+  - relação de entrega impressa a partir da lista filtrada por mês
+- **Critério de aceite:** ✅ doação e entrega registradas e imprimíveis, sem duplicar cadastro.
 
 ### BL-034 — Assistência — voluntários e mantenedores de cesta
 - **Módulo:** assistencia
 - **Severidade:** importante
 - **Onda:** 2
-- **Origem mock:** `social-voluntarios` `social-mantenedores` / `socialVolunteers` `VolunteerForms` + IndexedDB arquivos voluntariado
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema + anexos Postgres (sair do IndexedDB)
-  - API/UI
-  - permissão/teste
-- **Critério de aceite:** cadastros e arquivos de voluntariado no Postgres; download autorizado.
+- **Origem mock:** `social-voluntarios` `social-mantenedores` / `SocialRegistry`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema `app.social_volunteers` e `app.social_basket_supporters` (migração `202609171700`)
+  - campos do mock: área de apoio, disponibilidade, habilidades; tipo de mantenedor, tipo de contribuição, valor, periodicidade e dia previsto
+  - aviso do mock mantido: o cadastro não ativa a pessoa como trabalhadora nem equivale a doação recebida
+- **Critério de aceite:** ✅ voluntários e mantenedores no Postgres com as situações do mock.
 
 ### BL-035 — Assistência — Brechó e Clube de Mães (livro caixa + comprovantes)
-- **Módulo:** assistencia
+- **Módulo:** assistencia / setores
 - **Severidade:** bloqueia uso
 - **Onda:** 2
-- **Origem mock:** `social-brecho` `social-clube-maes` / `SocialSectors` `socialSectors` `SectorCashProofs`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: setores, lançamentos, estoque/enxoval, proofs
-  - API/UI
-  - permissão: perfil fixo só no setor
-  - teste: brechó não edita clube e vice-versa
-- **Critério de aceite:** livro caixa setorial igual ao mock; comprovantes via `attachments`.
+- **Origem mock:** `SocialSectors` `socialSectors` / perfis `brecho` e `clube_maes`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema `app.social_sector_ledger` (coluna `sector` separando os dois livros), `app.club_people` e `app.club_deliveries`
+  - permissão: recursos `social_brecho` e `social_clube_maes`; quem tem acesso completo à Assistência enxerga e lança nos dois
+  - comprovante por lançamento (`social_brecho_proof` / `social_clube_maes_proof`) no Postgres
+  - teste de integração do isolamento entre setores
+- **Pendências residuais:** estorno de lançamento (reversão) e fechamento mensal ficam com BL-037.
+- **Critério de aceite:** ✅ cada setor lança apenas no próprio caixa; ✅ comprovantes e auditoria no Postgres.
 
 ### BL-036 — Assistência — sopa, kits de higiene, café das crianças, atividades
 - **Módulo:** assistencia
 - **Severidade:** importante
 - **Onda:** 2
-- **Origem mock:** nav dinâmicos / `HygieneKits` `SocialCoffeeDonors` `SocialCoffeeSchedule` `SocialActivityControl` `socialSoupDeliveries` `socialHygieneDeliveries`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API/UI para cada fluxo
-  - permissão/teste/impressão
-- **Critério de aceite:** sopa, kits, doadores/agenda do café e controle de atividades iguais ao mock no Postgres.
+- **Origem mock:** `social-sopa` `social-kits-higiene` `SocialCoffee` `SocialActivityControl`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema `app.social_hygiene_kits`, `app.social_activities` e `app.social_coffee_donors` (migração `202609171700`)
+  - Controle de Atividades cobre sopa, café das crianças, corte de cabelo e demais ações, com programado x realizado, quantidade, unidade, público e local
+  - Café das Crianças mantém os doadores com vínculo, contribuição e periodicidade
+- **Critério de aceite:** ✅ atividades e kits controlados no Postgres como no mock.
 
 ### BL-037 — Assistência — planejamento e relatório anual / execução
 - **Módulo:** assistencia
@@ -574,39 +579,39 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Módulo:** eventos
 - **Severidade:** bloqueia uso
 - **Onda:** 2
-- **Origem mock:** `evt-agenda` `evt-itens` / `EventPlanning` `eventsPlanning`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API/UI agenda + itens do evento
-  - permissão `eventos`
-  - teste/impressão
-- **Critério de aceite:** agenda e itens iguais ao mock no Postgres.
+- **Origem mock:** `evt-agenda` `evt-itens` `evt-escala` `evt-avaliacao` / `EventPlanning` `eventsPlanning`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema `app.events`, `app.event_items`, `app.event_shifts`, `app.event_reviews` (migração `202609171400`)
+  - abas em `/sistema/eventos`: Agenda, Itens (previsto x disponível), Escala de Trabalho e Avaliação
+  - regra do mock: “Realizado” só com a data efetiva, até hoje; um trabalhador não entra duas vezes na escala do mesmo evento
+  - anexos do evento (fotos e documentos) no Postgres; impressão em todas as abas
+- **Critério de aceite:** ✅ agenda, itens, escala e avaliação iguais ao mock, no Postgres, com auditoria.
 
 ### BL-042 — Divulgação — estrutura + Livraria
 - **Módulo:** divulgacao
 - **Severidade:** bloqueia uso
 - **Onda:** 2
-- **Origem mock:** `page-divulgacao` / `div-livraria` / `Bookshop` `BookshopAnnual` `BookshopProofs` `divulgacaoBookshop` `divulgacaoDepartmentRequests`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: livraria (obras, empréstimos, caixa), RP/Biblioteca/Brinquedoteca (mínimo estrutural)
-  - API/UI Controle da Livraria + relatório
-  - permissão `divulgacao`
-  - teste: empréstimos atrasados / comprovantes
-- **Critério de aceite:** livraria operacional como no mock; demais setores ao menos estruturados; dados no Postgres.
+- **Origem mock:** `page-divulgacao` / `div-livraria` / `Bookshop` `BookshopAnnual` `BookshopProofs`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema `app.books`, `app.book_stock_moves`, `app.book_loans`, `app.book_loan_returns`, `app.book_sales` (migração `202609171500`)
+  - abas em `/sistema/divulgacao`: Painel da Livraria (disponibilidade e empréstimos em aberto/atrasados), Obras, Estoque, Empréstimos e Vendas
+  - regras: obra por destinação (empréstimo ou revenda), baixa e empréstimo limitados ao disponível, devolução parcial, venda com comprovante anexado
+- **Pendências residuais:** RP, Biblioteca e Brinquedoteca seguem como estrutura mínima (não há operação no mock).
+- **Critério de aceite:** ✅ livraria operacional como no mock; ✅ empréstimos atrasados visíveis; ✅ comprovantes no Postgres.
 
 ### BL-043 — Secretaria — reuniões e atas (áudio)
 - **Módulo:** secretaria
 - **Severidade:** bloqueia uso
 - **Onda:** 2
-- **Origem mock:** `sec-reunioes` / `LarMeetings` `secretariaMeetings` + chunks áudio IndexedDB/memória
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: reuniões/atas; áudio via `meeting_audio` attachments
-  - API upload chunked + UI gravação/transcrição
-  - permissão `secretaria`
-  - teste: áudio não fica só no browser
-- **Critério de aceite:** atas/áudio no Postgres; download autorizado; paridade de campos do mock.
+- **Origem mock:** `sec-reunioes` / `LarMeetings` `secretariaMeetings`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema `app.meetings` (migração `202609171600`): pauta, participantes, transcrição, decisões e minuta da ata
+  - aba “Gravador”: gravação pelo navegador (MediaRecorder), envio do áudio para `app.attachments` (`meeting_audio`) e transcrição ao vivo quando o navegador oferecer reconhecimento de voz
+  - anexos da ata assinada (`meeting_document`); histórico de alterações pelo Dedo-duro
+- **Critério de aceite:** ✅ reunião, ata e áudio no Postgres; ✅ nada é inventado pelo sistema — a minuta é escrita por quem secretaria.
 
 ### BL-044 — Secretaria — admissões e aniversariantes gerais
 - **Módulo:** secretaria

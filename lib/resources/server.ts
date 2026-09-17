@@ -56,10 +56,16 @@ async function validateReferences(client: PoolClient, def: ResourceDef, values: 
       );
       if (!found.rowCount) throw new AppError(`${field.label}: trabalhador sem aprovação da Diretoria ou fora do departamento.`);
     }
+    if (field.type === "reference") {
+      const found = await client.query(`select 1 from app.${field.table} where id = $1 and archived_at is null`, [value]);
+      if (!found.rowCount) throw new AppError(`${field.label}: registro vinculado não encontrado ou arquivado.`);
+    }
     if ((field.type === "text") && field.unique) {
+      const fixed = Object.entries(def.fixed ?? {});
       const dup = await client.query(
-        `select 1 from app.${def.table} where upper(regexp_replace(${field.name}, '\\s+', '', 'g')) = $1 and ($2::uuid is null or id <> $2)`,
-        [normalize(value), id]
+        `select 1 from app.${def.table} where upper(regexp_replace(${field.name}, '\\s+', '', 'g')) = $1 and ($2::uuid is null or id <> $2)
+           ${fixed.map(([column], i) => `and ${column} = $${i + 3}`).join(" ")}`,
+        [normalize(value), id, ...fixed.map(([, v]) => v)]
       );
       if (dup.rowCount) throw new AppError(`${field.label} já cadastrado (inclusive entre os arquivados).`, 409, "DUPLICATE");
     }
@@ -73,6 +79,7 @@ function writableFields(def: ResourceDef) {
 export async function listRecords(def: ResourceDef, params: URLSearchParams) {
   const where: string[] = [];
   const values: unknown[] = [];
+  for (const [column, value] of Object.entries(def.fixed ?? {})) { values.push(value); where.push(`r.${column} = $${values.length}`); }
   const archived = params.get("archived");
   if (archived !== "all") where.push(archived === "only" ? "r.archived_at is not null" : "r.archived_at is null");
   for (const filter of def.filters ?? []) {
@@ -93,7 +100,11 @@ export async function listRecords(def: ResourceDef, params: URLSearchParams) {
 
 export async function getRecord(def: ResourceDef, id: string, client?: PoolClient, lock = false) {
   const executor = client ?? dbPool();
-  const result = await executor.query(`select ${selectList(def)} from app.${def.table} r where r.id=$1 ${lock ? "for update" : ""}`, [id]);
+  const fixed = Object.entries(def.fixed ?? {});
+  const result = await executor.query(
+    `select ${selectList(def)} from app.${def.table} r where r.id=$1 ${fixed.map(([c], i) => `and r.${c} = $${i + 2}`).join(" ")} ${lock ? "for update" : ""}`,
+    [id, ...fixed.map(([, v]) => v)]
+  );
   const row = result.rows[0] as Record<string, unknown> | undefined;
   if (!row) throw new AppError(`${def.singular} não encontrado.`, 404, "NOT_FOUND");
   return row;
@@ -119,11 +130,12 @@ export async function createRecord(def: ResourceDef, actor: Actor, body: unknown
     await validateReferences(client, def, input, null);
     await runRules(def, { client, actor, def, input, before: null, mode: "create" });
     const fields = writableFields(def);
-    const cols = fields.map((f) => f.name);
+    const fixed = Object.entries(def.fixed ?? {});
+    const cols = [...fields.map((f) => f.name), ...fixed.map(([column]) => column)];
     const inserted = await client.query<{ id: string }>(
       `insert into app.${def.table} (${cols.join(", ")}, created_by, updated_by)
        values (${cols.map((_, i) => `$${i + 1}`).join(", ")}, $${cols.length + 1}, $${cols.length + 1}) returning id`,
-      [...fields.map((f) => toDbValue(f, input[f.name])), actor.id]
+      [...fields.map((f) => toDbValue(f, input[f.name])), ...fixed.map(([, value]) => value), actor.id]
     );
     const id = inserted.rows[0].id;
     await appendAudit(actor, {

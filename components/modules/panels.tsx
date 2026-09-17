@@ -1,5 +1,8 @@
 "use client";
 
+import { BirthdaysPanel } from "@/components/modules/aniversariantes";
+import { BookLoansPanel, BookshopSummary } from "@/components/modules/divulgacao-livraria";
+import { MeetingRecorder } from "@/components/modules/secretaria-gravador";
 import { PresidenciaPainel } from "@/components/modules/presidencia-painel";
 import { DisposalsPanel } from "@/components/modules/patrimonio-baixas";
 import { CleaningPanel } from "@/components/modules/patrimonio-limpeza";
@@ -12,6 +15,13 @@ export function ModulePanel({ name }: { name: string }) {
     case "presidencia-baixas": return <DisposalsPanel area="diretoria" />;
     case "patrimonio-limpeza": return <CleaningPanel />;
     case "patrimonio-relatorio": return <PatrimonyReport />;
+    case "divulgacao-painel": return <BookshopSummary />;
+    case "divulgacao-emprestimos": return <BookLoansPanel />;
+    case "secretaria-gravador": return <MeetingRecorder />;
+    case "aniversariantes": return <BirthdaysPanel />;
+    case "aniversariantes-patrimonio": return <BirthdaysPanel department="patrimonio" />;
+    case "aniversariantes-eventos": return <BirthdaysPanel department="eventos" />;
+    case "aniversariantes-divulgacao": return <BirthdaysPanel department="divulgacao" />;
     case "presidencia-painel": return <PresidenciaPainel />;
     default: return <p className="notice">Painel em preparação.</p>;
   }

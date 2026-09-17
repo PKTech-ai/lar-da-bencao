@@ -12,8 +12,8 @@ type Attachment = { id: string; kind: string | null; filename: string; size_byte
 type HistoryEntry = { occurred_at: string; actor: string; action: string; before_json: Record<string, unknown> | null; after_json: Record<string, unknown> | null; details: string | null };
 type Option = { key: string; label: string };
 
-function FieldInput({ field, value, disabled, departments, workers }: {
-  field: Field; value: unknown; disabled: boolean; departments: Option[]; workers: Option[];
+function FieldInput({ field, value, disabled, departments, workers, references }: {
+  field: Field; value: unknown; disabled: boolean; departments: Option[]; workers: Option[]; references: Map<string, Option[]>;
 }) {
   const common = { name: field.name, disabled: disabled || field.readOnly, required: field.required && !field.readOnly, "aria-describedby": field.help ? `${field.name}-help` : undefined };
   const text = value === null || value === undefined ? "" : String(value);
@@ -30,6 +30,7 @@ function FieldInput({ field, value, disabled, departments, workers }: {
     case "select": input = <select {...common} defaultValue={text}><option value="">Selecione</option>{field.options.map((o) => <option key={o}>{o}</option>)}</select>; break;
     case "department": input = <select {...common} defaultValue={text}><option value="">Selecione o departamento</option>{departments.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}</select>; break;
     case "worker": input = <select {...common} defaultValue={text}><option value="">Selecione o trabalhador</option>{workers.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}</select>; break;
+    case "reference": input = <select {...common} defaultValue={text}><option value="">Selecione</option>{(references.get(field.name) ?? []).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}</select>; break;
     case "boolean": return <label className="check-inline"><input type="checkbox" name={field.name} disabled={disabled || field.readOnly} defaultChecked={Boolean(value)} />{field.label}</label>;
     case "multiselect": {
       const selected = new Set((value as string[] | undefined) ?? []);
@@ -94,6 +95,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [departments, setDepartments] = useState<Option[]>([]);
   const [workers, setWorkers] = useState<Option[]>([]);
+  const [references, setReferences] = useState<Map<string, Option[]>>(new Map());
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -101,10 +103,12 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
   const needsDepartments = def.fields.some((f) => f.type === "department");
   const workerField = def.fields.find((f): f is Extract<Field, { type: "worker" }> => f.type === "worker");
   const listFields = def.fields.filter((f) => !f.hideInList);
+  const referenceFields = useMemo(() => def.fields.filter((f): f is Extract<Field, { type: "reference" }> => f.type === "reference"), [def]);
   const lookups = useMemo(() => ({
     departments: new Map(departments.map((d) => [d.key, d.label])),
-    workers: new Map(workers.map((w) => [w.key, w.label]))
-  }), [departments, workers]);
+    workers: new Map(workers.map((w) => [w.key, w.label])),
+    references: new Map([...references].map(([name, list]) => [name, new Map(list.map((o) => [o.key, o.label]))]))
+  }), [departments, workers, references]);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -126,6 +130,15 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
       void api<{ workers: { id: string; name: string }[] }>(url).then((b) => setWorkers(b.workers.map((w) => ({ key: w.id, label: w.name })))).catch(() => undefined);
     }
   }, [needsDepartments, workerField, def.filters]);
+  useEffect(() => {
+    if (!referenceFields.length) return;
+    void Promise.all(referenceFields.map(async (field) => {
+      const other = RESOURCES[field.resource];
+      const body = await api<{ records: Record<string, unknown>[] }>(`/api/r/${field.resource}?archived=all`);
+      const label = (row: Record<string, unknown>) => other.fields.slice(0, 2).map((f) => fieldDisplay(f, row[f.name])).filter((v) => v !== "—").join(" — ");
+      return [field.name, body.records.map((row) => ({ key: String(row.id), label: label(row) }))] as const;
+    })).then((entries) => setReferences(new Map(entries))).catch(() => undefined);
+  }, [referenceFields]);
 
   async function openRecord(row: Row | null, edit: boolean) {
     setError(""); setMessage(""); setPending([]); setAttachments([]); setHistory([]);
@@ -205,6 +218,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
     const field = def.fields.find((f) => f.name === name);
     if (field?.type === "select") return field.options.map((o) => ({ key: o, label: o }));
     if (field?.type === "department") return departments;
+    if (field?.type === "reference") return references.get(name) ?? [];
     return [];
   };
 
@@ -225,7 +239,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
           <form className="form-stack" onSubmit={save} key={`${row?.id ?? "new"}-${row?.version ?? 0}`}>
             <div className="form-row">
               {def.fields.map((field) => (
-                <FieldInput key={field.name} field={field} value={row?.[field.name]} disabled={!canWrite || busy} departments={departments} workers={workers} />
+                <FieldInput key={field.name} field={field} value={row?.[field.name]} disabled={!canWrite || busy} departments={departments} workers={workers} references={references} />
               ))}
             </div>
             {def.attachments ? (

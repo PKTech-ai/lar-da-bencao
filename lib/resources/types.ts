@@ -16,6 +16,7 @@ export type Field =
   | (Base & { type: "boolean" })
   | (Base & { type: "department" })
   | (Base & { type: "worker"; department?: string })
+  | (Base & { type: "reference"; resource: string; table: string })
   | (Base & { type: "phone" })
   | (Base & { type: "email" });
 
@@ -50,6 +51,8 @@ export type ResourceDef = {
   intro?: string;
   /** Arquivar em vez de excluir. Registros arquivados continuam no histórico. */
   archiveLabel?: string;
+  /** Colunas fixas deste cadastro (ex.: setor), aplicadas na lista e na inclusão. */
+  fixed?: Readonly<Record<string, string>>;
 };
 
 export const IMAGE_MIMES = ["image/jpeg", "image/png"] as const;
@@ -80,7 +83,11 @@ export function brDate(value: string | null | undefined) {
   return value ? String(value).slice(0, 10).split("-").reverse().join("/") : "—";
 }
 
-export function fieldDisplay(field: Field, value: unknown, lookups: { departments?: Map<string, string>; workers?: Map<string, string> } = {}) {
+export function fieldDisplay(
+  field: Field,
+  value: unknown,
+  lookups: { departments?: Map<string, string>; workers?: Map<string, string>; references?: Map<string, Map<string, string>> } = {}
+) {
   if (value === null || value === undefined || value === "") return "—";
   switch (field.type) {
     case "money": return formatMoney(value as number);
@@ -90,6 +97,7 @@ export function fieldDisplay(field: Field, value: unknown, lookups: { department
     case "multiselect": return (value as string[]).join(", ") || "—";
     case "department": return lookups.departments?.get(String(value)) ?? String(value);
     case "worker": return lookups.workers?.get(String(value)) ?? "Trabalhador";
+    case "reference": return lookups.references?.get(field.name)?.get(String(value)) ?? "Registro vinculado";
     default: return String(value);
   }
 }

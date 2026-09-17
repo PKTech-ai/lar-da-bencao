@@ -16,7 +16,11 @@ export const moduleCatalog: ModuleDef[] = [
   { key: "doutrina", href: "/sistema/doutrina", label: "Doutrina", flagKey: "module_doutrina", permissionResource: "department", department: "doutrina" },
   { key: "infancia", href: "/sistema/infancia", label: "Infância", flagKey: "module_infancia", permissionResource: "department", department: "infancia" },
   { key: "juventude", href: "/sistema/juventude", label: "Juventude", flagKey: "module_juventude", permissionResource: "department", department: "juventude" },
+  { key: "assistencia", href: "/sistema/assistencia", label: "Assistência Social", flagKey: "module_assistencia", permissionResource: "department", department: "assistencia_social" },
   { key: "patrimonio", href: "/sistema/patrimonio", label: "Patrimônio", flagKey: "module_patrimonio", permissionResource: "department", department: "patrimonio" },
+  { key: "eventos", href: "/sistema/eventos", label: "Eventos", flagKey: "module_eventos", permissionResource: "department", department: "eventos" },
+  { key: "divulgacao", href: "/sistema/divulgacao", label: "Divulgação", flagKey: "module_divulgacao", permissionResource: "department", department: "divulgacao" },
+  { key: "secretaria", href: "/sistema/secretaria", label: "Secretaria", flagKey: "module_secretaria", permissionResource: "secretaria" },
   { key: "presidencia", href: "/sistema/presidencia", label: "Presidência", flagKey: "module_presidencia", permissionResource: "presidencia" }
 ];
 
