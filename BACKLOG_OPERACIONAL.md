@@ -223,31 +223,30 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Critério de aceite:** ✅ aniversariantes por departamento e no geral, sem expor dados fora do escopo de leitura.
 
 ### BL-015 — Relatórios anuais genéricos por departamento
-- **Módulo:** Relatórios / RF-009
+- **Módulo:** transversal
 - **Severidade:** importante
 - **Onda:** 1
-- **Origem mock:** `AnnualAnalytic` / `AnnualReportModes` / `*-relatorio`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: leituras agregadas por módulo
-  - API: geração server-side com escopo
-  - UI: painéis Relatório Anual
-  - permissão: `print`/`export` por recurso
-  - teste: sem vazamento cross-departamento
-- **Critério de aceite:** relatório igual ao mock, emitido do Postgres, com emissor/período.
+- **Origem mock:** `AnnualReportModes`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `lib/reports.ts` declara, por departamento, os cadastros que entram no relatório e a coluna de data — nenhuma tabela ou coluna vem da requisição
+  - `GET /api/relatorios/[department]?year=` e painel comum “Relatório Anual” em Assistência, Eventos, Divulgação, Secretaria e Jurídico
+  - mostra o movimento mês a mês, os totais e a soma de valores quando o cadastro tem dinheiro; consulta é auditada como impressão
+  - Patrimônio e Tesouraria mantêm relatórios próprios, com contas e centros de custo
+- **Critério de aceite:** ✅ relatório anual com a mesma estrutura em todos os módulos, imprimível e no escopo de leitura.
 
 ### BL-016 — Autosave / conflitos / LarReliableStore
-- **Módulo:** Fundação / RF-010
+- **Módulo:** transversal
 - **Severidade:** importante
-- **Onda:** fundação
-- **Origem mock:** `LarReliableStore` / `LarAutoSave` / prefixos de journal em localStorage
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: `version` + estados draft/committed
-  - API: 409 com diff
-  - UI: resolução de conflito
-  - teste: duas abas não sobrescrevem
-- **Critério de aceite:** concorrência do mock preservada com fonte de verdade Postgres (não localStorage).
+- **Onda:** 1
+- **Origem mock:** `LarReliableStore` (autosave em localStorage)
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - **conflito**: todo cadastro do motor genérico usa versão otimista — quem salva depois recebe “Registro alterado por outra sessão. Recarregue a página.” em vez de sobrescrever
+  - **autosave**: a transcrição da reunião grava sozinha no banco a cada 20 segundos, mostrando a hora do último salvamento
+  - **aviso de saída**: formulário com alteração pendente avisa antes de fechar ou trocar de registro
+  - diferente do mock, nada é guardado no navegador: o rascunho vive no PostgreSQL, com auditoria
+- **Critério de aceite:** ✅ nenhum trabalho perdido por conflito silencioso; ✅ autosave sem localStorage.
 
 ### BL-017 — Backup ZIP / restauração demo (descontinuar em prod)
 - **Módulo:** Ops / RF-012

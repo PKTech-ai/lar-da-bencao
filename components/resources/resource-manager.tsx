@@ -99,6 +99,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   const needsDepartments = def.fields.some((f) => f.type === "department");
   const workerField = def.fields.find((f): f is Extract<Field, { type: "worker" }> => f.type === "worker");
@@ -141,7 +142,8 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
   }, [referenceFields]);
 
   async function openRecord(row: Row | null, edit: boolean) {
-    setError(""); setMessage(""); setPending([]); setAttachments([]); setHistory([]);
+    if (dirty && !window.confirm("Há alterações não salvas neste formulário. Descartar?")) return;
+    setError(""); setMessage(""); setPending([]); setAttachments([]); setHistory([]); setDirty(false);
     setEditing({ row, edit });
     if (row) {
       if (def.attachments) {
@@ -176,7 +178,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
         try { await uploadAttachment(item.file, def.attachments!.ownerType, id, undefined, item.kind); }
         catch (e) { failures.push(`${item.file.name}: ${(e as Error).message}`); }
       }
-      setEditing(null); setPending([]);
+      setEditing(null); setPending([]); setDirty(false);
       if (failures.length) throw new Error(`${def.singular} salvo, mas ${failures.length} anexo(s) falharam: ${failures.join("; ")}`);
       return `${def.singular} salvo${pending.length ? ` com ${pending.length} anexo(s) inspecionado(s)` : ""}.`;
     });
@@ -233,10 +235,10 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
         <section className="card" aria-label={row ? `${def.singular}` : `Novo ${def.singular}`}>
           <div className="toolbar">
             <h2>{row ? `${canWrite ? "Editar" : "Consultar"} — ${String(row[def.fields[0].name] ?? def.singular)}` : `Novo: ${def.singular}`}</h2>
-            <button type="button" className="button" onClick={() => setEditing(null)}>Fechar</button>
+            <button type="button" className="button" onClick={() => { if (!dirty || window.confirm("Há alterações não salvas. Fechar mesmo assim?")) { setEditing(null); setDirty(false); } }}>Fechar</button>
           </div>
           {row?.archived_at ? <div className="notice">Arquivado em {brDate(row.archived_at as string)} — {row.archive_reason}</div> : null}
-          <form className="form-stack" onSubmit={save} key={`${row?.id ?? "new"}-${row?.version ?? 0}`}>
+          <form className="form-stack" onSubmit={save} onChange={() => setDirty(true)} key={`${row?.id ?? "new"}-${row?.version ?? 0}`}>
             <div className="form-row">
               {def.fields.map((field) => (
                 <FieldInput key={field.name} field={field} value={row?.[field.name]} disabled={!canWrite || busy} departments={departments} workers={workers} references={references} />
@@ -276,7 +278,12 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
                 <p className="small muted">Até 15 MB por arquivo e {def.attachments.maxPerRecord} por registro. Os arquivos passam pela inspeção antimalware ao salvar.</p>
               </div>
             ) : null}
-            {canWrite ? <div className="row-actions"><button className="button primary" disabled={busy}>{busy ? "Salvando…" : "Salvar"}</button></div> : null}
+            {canWrite ? (
+              <div className="row-actions">
+                <button className="button primary" disabled={busy}>{busy ? "Salvando…" : "Salvar"}</button>
+                {dirty ? <span className="small muted" role="status">Alterações ainda não salvas.</span> : null}
+              </div>
+            ) : null}
           </form>
           {row ? (
             <details style={{ marginTop: 12 }}>

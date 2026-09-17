@@ -29,6 +29,8 @@ export function MeetingRecorder() {
   const [elapsed, setElapsed] = useState(0);
   const [transcript, setTranscript] = useState("");
   const [progress, setProgress] = useState(0);
+  const [savedAt, setSavedAt] = useState("");
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const recorder = useRef<MediaRecorder | null>(null);
@@ -42,8 +44,14 @@ export function MeetingRecorder() {
     void api<{ records: Meeting[] }>("/api/r/secretaria-reunioes").then((b) => setMeetings(b.records)).catch((e: Error) => setError(e.message));
   }, []);
 
+  function changeTranscript(value: string) {
+    setTranscript(value);
+    setDirty(true);
+  }
+
   function selectMeeting(id: string) {
     setMeetingId(id);
+    setDirty(false);
     setTranscript(meetings.find((m) => m.id === id)?.transcript ?? "");
     setAudios([]);
     if (id) void api<{ attachments: Audio[] }>(`/api/attachments?ownerType=meeting_audio&ownerId=${id}`).then((b) => setAudios(b.attachments)).catch(() => setAudios([]));
@@ -66,7 +74,10 @@ export function MeetingRecorder() {
     engine.onresult = (event) => {
       let text = "";
       for (let i = event.resultIndex; i < event.results.length; i += 1) if (event.results[i].isFinal) text += `${event.results[i][0].transcript} `;
-      if (text) setTranscript((current) => `${current}${current && !current.endsWith("\n") ? "\n" : ""}${text.trim()}`);
+      if (text) {
+        setTranscript((current) => `${current}${current && !current.endsWith("\n") ? "\n" : ""}${text.trim()}`);
+        setDirty(true);
+      }
     };
     engine.onerror = () => undefined;
     engine.start();
@@ -122,17 +133,35 @@ export function MeetingRecorder() {
     }
   }
 
-  function saveTranscript() {
+  async function saveTranscript(silent = false) {
     if (!meeting) return;
-    setError(""); setMessage("");
-    void postJson(`/api/r/secretaria-reunioes/${meeting.id}`, { ...meeting, transcript, version: meeting.version }, "PATCH")
-      .then(async () => {
-        const body = await api<{ records: Meeting[] }>("/api/r/secretaria-reunioes");
-        setMeetings(body.records);
-        setMessage("Transcrição salva na reunião.");
-      })
-      .catch((e: Error) => setError(e.message));
+    if (!silent) { setError(""); setMessage(""); }
+    try {
+      await postJson(`/api/r/secretaria-reunioes/${meeting.id}`, { ...meeting, transcript, version: meeting.version }, "PATCH");
+      const body = await api<{ records: Meeting[] }>("/api/r/secretaria-reunioes");
+      setMeetings(body.records);
+      setDirty(false);
+      setSavedAt(new Date().toLocaleTimeString("pt-BR"));
+      if (!silent) setMessage("Transcrição salva na reunião.");
+    } catch (caught) {
+      setError((caught as Error).message);
+    }
   }
+
+  // Autosave no banco (nunca no navegador) a cada 20 s com texto pendente.
+  useEffect(() => {
+    if (!dirty || !meetingId) return;
+    const timer = setTimeout(() => { void saveTranscript(true); }, 20_000);
+    return () => clearTimeout(timer);
+  });
+
+  // Avisa antes de sair com texto ainda não gravado.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   return (
     <div className="grid">
@@ -172,8 +201,11 @@ export function MeetingRecorder() {
           </section>
           <section className="card">
             <h3>Transcrição</h3>
-            <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={12} maxLength={100000} />
-            <div className="row-actions"><button type="button" className="button primary" onClick={saveTranscript}>Salvar transcrição na reunião</button></div>
+            <textarea value={transcript} onChange={(e) => changeTranscript(e.target.value)} rows={12} maxLength={100000} />
+            <div className="row-actions">
+              <button type="button" className="button primary" onClick={() => void saveTranscript()}>Salvar transcrição na reunião</button>
+              <span className="small muted" role="status">{dirty ? "Alterações ainda não salvas — o sistema grava sozinho em alguns segundos." : savedAt ? `Salvo às ${savedAt}.` : ""}</span>
+            </div>
             <p className="small muted">A transcrição ao vivo depende do reconhecimento de voz do navegador; onde não houver, digite as anotações aqui.</p>
           </section>
         </>
