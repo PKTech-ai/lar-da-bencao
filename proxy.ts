@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const publicPaths = ["/login", "/recuperar", "/auth/callback", "/auth/signout", "/api/auth/login", "/api/health", "/api/bootstrap"];
+// Rotas com autenticação própria (Bearer/segredo) também ficam fora do redirecionamento de login.
+const publicPaths = ["/login", "/recuperar", "/auth/callback", "/auth/signout", "/api/auth/login", "/api/health", "/api/bootstrap", "/api/maintenance"];
 
 export async function proxy(request: NextRequest) {
   if (process.env.VERCEL_ENV === "production" && process.env.APP_URL) {
@@ -35,6 +36,10 @@ export async function proxy(request: NextRequest) {
   const isStatic = pathname.startsWith("/_next/") || pathname === "/favicon.ico";
 
   if (!data.user && !isPublic && !isStatic) {
+    // APIs respondem 401 em JSON (fetch não deve receber a página de login).
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Autenticação necessária.", code: "UNAUTHENTICATED" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    }
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.searchParams.set("next", pathname);

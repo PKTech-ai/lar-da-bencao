@@ -29,7 +29,8 @@ export function FlagsClient() {
   async function toggle(flag: Flag) {
     const enabling = !flag.enabled;
     let uat: string | undefined;
-    if (enabling && flag.wave !== "fundacao") {
+    // Módulos de onda e a chave-mestra só ligam com referência de UAT (mesma regra do servidor).
+    if (enabling && (flag.wave !== "fundacao" || flag.key === "business_modules")) {
       const answer = window.prompt(`Referência do UAT aprovado para “${flag.description || flag.key}” (ata, data e responsável):`, flag.uat_reference ?? "");
       if (answer === null) return;
       uat = answer.trim();

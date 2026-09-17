@@ -21,8 +21,9 @@ Registro dos controles de identidade da v216 e da configuração que precisa est
 
 **Authentication → Sign In / Providers**
 - [ ] “Allow new users to sign up” **desligado** (somente convite)
+- [ ] Provedor **Email** continua **ligado** (é ele que permite o login com e-mail e senha)
 - [ ] Confirm email ligado
-- [ ] Senha: mínimo 10 caracteres; exigir letras minúsculas, maiúsculas, dígitos e símbolos
+- [ ] Senha: mínimo 14 caracteres (o app exige 14); exigir letras minúsculas, maiúsculas, dígitos e símbolos
 - [ ] “Prevent use of leaked passwords” ligado (se disponível no plano)
 
 **Authentication → Multi-Factor**
@@ -36,6 +37,13 @@ Registro dos controles de identidade da v216 e da configuração que precisa est
 
 **Authentication → Attack Protection**
 - [ ] CAPTCHA (Cloudflare Turnstile) — recomendado se houver tentativas diretas na API; exige ajustar o login para enviar o token
+
+**Authentication → Emails (templates)** — obrigatório: o convite e a recuperação usam `token_hash`
+- [ ] *Invite user*: conteúdo de `supabase/templates/invite.html`
+- [ ] *Reset password*: conteúdo de `supabase/templates/recovery.html`
+- [ ] *Reauthentication*: conteúdo de `supabase/templates/reauthentication.html`
+- [ ] Notificações de segurança ligadas: *Password changed*, *MFA factor enrolled*, *MFA factor unenrolled* (`supabase/templates/notify_*.html`)
+- [ ] “Secure password change” ligado (a troca de senha pede código enviado por e-mail quando necessário)
 
 **Authentication → Sessions**
 - [ ] Time-box de sessão: 12 h

@@ -19,6 +19,7 @@ export function AccountClient() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [needsNonce, setNeedsNonce] = useState(false);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/account", { cache: "no-store" });
@@ -63,8 +64,19 @@ export function AccountClient() {
         const password = String(values.get("password") ?? "");
         if (password.length < 14) throw new Error("A nova senha deve ter ao menos 14 caracteres.");
         if (password !== String(values.get("confirmation") ?? "")) throw new Error("As senhas não conferem.");
-        const result = await createClient().auth.updateUser({ password });
+        const supabase = createClient();
+        const nonce = String(values.get("nonce") ?? "").trim();
+        const result = await supabase.auth.updateUser(nonce ? { password, nonce } : { password });
+        if (result.error?.code === "reauthentication_needed" || result.error?.code === "reauthentication_not_valid") {
+          // Troca segura de senha: o Supabase envia um código por e-mail e exige esse código.
+          const sent = await supabase.auth.reauthenticate();
+          if (sent.error) throw sent.error;
+          setNeedsNonce(true);
+          setMessage("Enviamos um código de confirmação para o seu e-mail. Informe-o e confirme de novo.");
+          return;
+        }
         if (result.error) throw result.error;
+        setNeedsNonce(false);
         await fetch("/api/auth/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "password_changed" }) });
         setMessage("Senha alterada.");
       }
@@ -109,6 +121,7 @@ export function AccountClient() {
             {pending === "password" ? <div className="form-row">
               <label>Nova senha<input name="password" type="password" autoComplete="new-password" minLength={14} required /></label>
               <label>Confirme a nova senha<input name="confirmation" type="password" autoComplete="new-password" minLength={14} required /></label>
+              {needsNonce ? <label>Código recebido por e-mail<input name="nonce" inputMode="numeric" autoComplete="one-time-code" maxLength={10} required /></label> : null}
             </div> : null}
             {pending === "replace" ? <div className="notice">O autenticador atual será removido. Tenha o novo aparelho em mãos para ler o QR Code.</div> : null}
             <label>Código atual do autenticador<input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required /></label>

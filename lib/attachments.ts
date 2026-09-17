@@ -52,7 +52,8 @@ export function attachmentPermission(ownerType: string) {
     social_record: { resource: "attachments", department: "assistencia_social" },
     meeting_audio: { resource: "attachments", department: "secretaria" },
     legal_document: { resource: "attachments", department: "juridico" },
-    institutional_document: { resource: "attachments" },
+    // Estatuto/Regimento: leitura para todos os trabalhadores ativos; envio só pelo administrador.
+    institutional_document: { resource: "institucional" },
     // Materiais de estudo seguem a permissão do departamento: quem lê o departamento baixa o material.
     study_material_doutrina: { resource: "department", department: "doutrina" },
     study_material_infancia: { resource: "department", department: "infancia" },
@@ -68,7 +69,8 @@ export function attachmentPermission(ownerType: string) {
 
 export async function authorizeAttachment(actor: Actor, ownerType: string, action: "read" | "create" | "update" | "delete" | "download") {
   const permission = attachmentPermission(ownerType);
-  const effective = permission.resource === "department" && action === "download" ? "read" : action;
+  // Vínculos de negócio usam a permissão do próprio recurso: baixar = ler.
+  const effective = permission.resource !== "attachments" && action === "download" ? "read" : action;
   await assertPermission(actor, permission.resource, effective, permission.department);
   return permission;
 }

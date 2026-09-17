@@ -15,7 +15,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "scanner:local": "node scripts/local-scanner.mjs",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:local": "scripts/e2e-local.sh"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
@@ -28,6 +30,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.15.0",
     "@types/react": "^19.0.0",

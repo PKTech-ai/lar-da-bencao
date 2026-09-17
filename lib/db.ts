@@ -16,6 +16,9 @@ export function dbPool(): Pool {
     statement_timeout: 20_000,
     application_name: "lar-da-bencao-v216"
   });
+  // Conexões ociosas podem cair (reinício/manutenção do banco): registra e deixa o pool reconectar,
+  // em vez de o evento sem tratador derrubar o processo.
+  pool.on("error", (error) => console.error("[db] conexão ociosa encerrada:", error.message));
   attachDatabasePool(pool);
   globalThis.__larDbPool = pool;
   return pool;

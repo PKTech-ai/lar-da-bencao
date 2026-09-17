@@ -30,12 +30,15 @@ export function MfaForm() {
           if (alive) setFactor(existing);
           return;
         }
-        const stale = listed.data.all.find((item) => item.status === "unverified");
-        if (stale) {
+        // Cadastros não concluídos (outra aba, recarga) são descartados antes de um novo.
+        for (const stale of listed.data.all.filter((item) => item.status === "unverified")) {
           const removed = await supabase.auth.mfa.unenroll({ factorId: stale.id });
           if (removed.error) throw removed.error;
         }
-        const enrolled = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Lar da Bênção" });
+        if (!alive) return;
+        // Nome único por tentativa: o Auth recusa dois fatores com o mesmo nome.
+        const stamp = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "medium" }).format(new Date());
+        const enrolled = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `Lar da Bênção · ${stamp}` });
         if (enrolled.error) throw enrolled.error;
         if (alive) {
           setFactor(enrolled.data);

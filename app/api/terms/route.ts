@@ -3,7 +3,7 @@ import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { query } from "@/lib/db";
-import { errorResponse } from "@/lib/errors";
+import { AppError, errorResponse } from "@/lib/errors";
 import { CURRENT_TERMS_VERSION } from "@/lib/terms";
 
 const schema = z.object({ version: z.string().min(4).max(40) });
@@ -31,11 +31,12 @@ export async function POST(request: Request) {
     assertSameOrigin(request);
     actor = await requireActor({ requireMfa: false });
     const input = schema.parse(await request.json());
+    if (input.version !== CURRENT_TERMS_VERSION) throw new AppError("Os termos foram atualizados. Recarregue a página e leia a versão atual.", 409, "TERMS_OUTDATED");
     await query(
       `insert into app.terms_acceptances (user_id, terms_version)
        values ($1,$2)
        on conflict (user_id, terms_version) do nothing`,
-      [actor.id, input.version]
+      [actor.id, CURRENT_TERMS_VERSION]
     );
     await appendAudit(actor, {
       category: "Segurança",

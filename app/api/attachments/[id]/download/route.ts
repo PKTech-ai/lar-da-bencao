@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 type FileRow = { id: string; owner_type: string; filename: string; mime_type: string; size_bytes: string; status: string; chunk_count: number };
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const actor = await requireActor();
     const id = z.string().uuid().parse((await context.params).id);
@@ -36,10 +36,12 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       }
     });
     const encoded = encodeURIComponent(file.filename);
+    const inline = new URL(request.url).searchParams.get("inline") === "1" && ["application/pdf", "image/jpeg", "image/png"].includes(file.mime_type);
     return new Response(stream, { headers: {
       "Content-Type": file.mime_type,
       "Content-Length": file.size_bytes,
-      "Content-Disposition": `attachment; filename="anexo"; filename*=UTF-8''${encoded}`,
+      // `?inline=1` abre PDFs e imagens no navegador (visualização); demais tipos sempre como download.
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="anexo"; filename*=UTF-8''${encoded}`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff"
     }});
