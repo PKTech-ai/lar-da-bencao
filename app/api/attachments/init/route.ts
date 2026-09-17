@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
-import { allowedMimeTypes, authorizeAttachment, BANK_FILE_LIMIT, CHUNK_SIZE, COMMON_FILE_LIMIT, newUploadToken, safeFilename } from "@/lib/attachments";
+import { allowedMimeTypes, authorizeAttachment, BANK_FILE_LIMIT, CHUNK_SIZE, COMMON_FILE_LIMIT, newUploadToken, safeFilename, uploadTokenHash } from "@/lib/attachments";
 import { dbPool } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/csrf";
@@ -28,9 +28,9 @@ export async function POST(request: Request) {
     const result = await dbPool().query<{ id: string }>(
       `insert into app.attachments
        (owner_type,owner_id,department_key,filename,mime_type,size_bytes,sha256,chunk_count,upload_token_hash,uploaded_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,digest($9,'sha256'),$10)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        returning id`,
-      [input.ownerType, input.ownerId, permission.department ?? null, safeFilename(input.filename), input.mimeType, input.sizeBytes, input.sha256, chunkCount, token, actor.id]
+      [input.ownerType, input.ownerId, permission.department ?? null, safeFilename(input.filename), input.mimeType, input.sizeBytes, input.sha256, chunkCount, uploadTokenHash(token), actor.id]
     );
     const id = result.rows[0].id;
     await appendAudit(actor, { category: "Inclusão", action: "Início de upload de anexo", module: "Anexos", section: input.ownerType, entityType: "attachment", entityId: id, result: "success", details: `${safeFilename(input.filename)} · ${input.sizeBytes} bytes · ${chunkCount} parte(s).` });

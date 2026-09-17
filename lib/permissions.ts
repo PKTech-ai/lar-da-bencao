@@ -30,3 +30,16 @@ export async function assertPermission(
 ) {
   if (!(await hasPermission(actor, resource, action, department))) throw new AuthorizationError();
 }
+
+/** Para telas transversais (trabalhadores/admissões) quando o escopo é “qualquer departamento do ator”. */
+export async function hasAnyDepartmentPermission(actor: Actor, action: PermissionAction) {
+  if (await hasPermission(actor, "department", action)) return true;
+  for (const department of actor.departments) {
+    if (await hasPermission(actor, "department", action, department)) return true;
+  }
+  return false;
+}
+
+export async function assertAnyDepartmentPermission(actor: Actor, action: PermissionAction) {
+  if (!(await hasAnyDepartmentPermission(actor, action))) throw new AuthorizationError();
+}

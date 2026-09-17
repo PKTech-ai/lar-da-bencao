@@ -60,15 +60,20 @@ jobs:
       PGPASSWORD: postgres
     steps:
       - uses: actions/checkout@v4
-      - name: Preparar papéis equivalentes ao Supabase
-        run: |
-          psql -v ON_ERROR_STOP=1 <<'SQL'
-          create role anon;
-          create role authenticated;
-          create schema auth;
-          create table auth.users (id uuid primary key);
-          SQL
-      - name: Aplicar migração em banco vazio
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202609150001_initial.sql
-      - name: Validar privilégios e cadeia do Dedo-duro
-        run: psql -f supabase/verify_permissions.sql
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Aplicar todas as migrações em banco vazio e validar privilégios
+        run: scripts/db-test-setup.sh
+        env:
+          RUNTIME_PASSWORD: runtime_ci_password
+      - name: Integração com Postgres real (login de runtime, sem credencial de produção)
+        run: pnpm test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://lar_runtime:runtime_ci_password@localhost:5432/lar_test
+          TEST_OWNER_URL: postgresql://postgres:postgres@localhost:5432/lar_test

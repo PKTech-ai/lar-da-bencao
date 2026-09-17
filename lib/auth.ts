@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { query } from "@/lib/db";
 import { AuthenticationError, AuthorizationError } from "@/lib/errors";
+import { decodeAccessToken, isRecentTotp, isSessionRevoked, lastTotpAt, sessionAuthenticatedAt, sessionIdFromClaims } from "@/lib/sessions";
 
 export type Actor = {
   id: string;
@@ -11,6 +12,8 @@ export type Actor = {
   status: "active";
   departments: string[];
   sessionId: string | null;
+  /** Última confirmação TOTP desta sessão (segundos), para exigir reautenticação recente. */
+  totpAt?: number | null;
 };
 
 type ActorRow = {
@@ -21,17 +24,8 @@ type ActorRow = {
   role_key: string;
   status: string;
   departments: string[] | null;
+  sessions_valid_after: Date | null;
 };
-
-function sessionId(accessToken?: string) {
-  if (!accessToken) return null;
-  try {
-    const payload = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString("utf8")) as { session_id?: unknown };
-    return typeof payload.session_id === "string" ? payload.session_id : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function requireActor(options: { requireMfa?: boolean } = {}): Promise<Actor> {
   const supabase = await createClient();
@@ -47,7 +41,7 @@ export async function requireActor(options: { requireMfa?: boolean } = {}): Prom
   }
 
   const result = await query<ActorRow>(
-    `select u.id, u.auth_user_id, u.email, u.full_name, u.role_key, u.status,
+    `select u.id, u.auth_user_id, u.email, u.full_name, u.role_key, u.status, u.sessions_valid_after,
             coalesce(array_agg(ud.department_key) filter (where ud.department_key is not null), '{}') as departments
        from app.users u
        left join app.user_departments ud on ud.user_id = u.id
@@ -57,6 +51,10 @@ export async function requireActor(options: { requireMfa?: boolean } = {}): Prom
   );
   const row = result.rows[0];
   if (!row || row.status !== "active") throw new AuthorizationError("Conta institucional inativa ou sem vínculo.");
+  const claims = decodeAccessToken(currentSession.data.session?.access_token);
+  if (isSessionRevoked(sessionAuthenticatedAt(claims), row.sessions_valid_after)) {
+    throw new AuthenticationError("Sessão encerrada pela administração. Entre novamente.", "SESSION_REVOKED");
+  }
 
   return {
     id: row.id,
@@ -66,6 +64,14 @@ export async function requireActor(options: { requireMfa?: boolean } = {}): Prom
     role: row.role_key,
     status: "active",
     departments: row.departments ?? [],
-    sessionId: sessionId(currentSession.data.session?.access_token)
+    sessionId: sessionIdFromClaims(claims),
+    totpAt: lastTotpAt(claims)
   };
+}
+
+/** Operações sensíveis de MFA exigem código TOTP confirmado nos últimos minutos. */
+export function assertRecentTotp(actor: Actor) {
+  if (!isRecentTotp(actor.totpAt ?? null)) {
+    throw new AuthenticationError("Confirme o código do autenticador novamente para continuar.", "REAUTH_REQUIRED");
+  }
 }
