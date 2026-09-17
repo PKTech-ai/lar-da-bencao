@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   await supabase.auth.signOut({ scope: "local" });
   const login = new URL("/login", url.origin);
-  if (url.searchParams.get("motivo") === "sessao") login.searchParams.set("motivo", "sessao");
+  const reason = url.searchParams.get("motivo");
+  if (reason === "sessao" || reason === "bienio") login.searchParams.set("motivo", reason);
   return NextResponse.redirect(login);
 }

@@ -14,7 +14,7 @@ Stack escolhida (sem VPS): **Vercel** (Next.js) + **Supabase** (Auth + PostgreSQ
 1. Migrações, com a credencial de migração (owner), de uma máquina com `psql`:
    ```bash
    export MIGRATION_DATABASE_URL="postgresql://postgres:SENHA@db.<projeto>.supabase.co:5432/postgres"
-   scripts/migrate.sh --dry-run   # lista as pendentes (hoje: as 11 de supabase/migrations/)
+   scripts/migrate.sh --dry-run   # lista as pendentes (hoje: as 15 de supabase/migrations/)
    scripts/migrate.sh             # aplica em ordem, registra em public.lar_schema_migrations e roda verify_permissions.sql
    ```
    O script recusa migração já aplicada que tenha mudado de conteúdo. Não cole arquivos à mão no SQL Editor.
@@ -85,4 +85,4 @@ curl -X POST https://sistema.lardabencao.org/api/bootstrap \
 
 ## Observação
 
-Onda 2 (Assistência, Patrimônio, …) e onda 3 (Tesouraria, CF, Jurídico) permanecem no `BACKLOG_OPERACIONAL.md` até migração e UAT.
+As flags dos módulos das ondas 2 e 3 nascem **desligadas** (migração `202609171300`). Ligue cada uma somente com a referência do UAT daquele módulo, em `/sistema/modulos`.

@@ -9,10 +9,11 @@ const state = vi.hoisted(() => ({
   /** permissões do ator: "recurso:ação" ou "department:ação:departamento" */
   grants: new Set<string>(),
   actorDepartments: [] as string[],
+  role: "coordenador",
   seq: 0
 }));
 
-const actor = () => ({ id: "11111111-1111-4111-8111-111111111111", authUserId: "a", email: "a@x", name: "Ator", role: "x", status: "active" as const, departments: state.actorDepartments, sessionId: null });
+const actor = () => ({ id: "11111111-1111-4111-8111-111111111111", authUserId: "a", email: "a@x", name: "Ator", role: state.role, status: "active" as const, departments: state.actorDepartments, sessionId: null });
 
 function fakeQuery(text: string, values: unknown[] = []): { rows: unknown[]; rowCount?: number } {
   const sql = text.replace(/\s+/g, " ").trim();
@@ -57,6 +58,7 @@ function fakeQuery(text: string, values: unknown[] = []): { rows: unknown[]; row
     const w = state.workers.get(String(values[0]));
     return { rows: w && w.status === "active" && w.departments.includes(String(values[1])) ? [{ functions: w.functions }] : [] };
   }
+  if (sql.startsWith("select count(*)::int as count from app.departments")) return { rows: [{ count: 3 }] };
   throw new Error(`SQL não simulado: ${sql}`);
 }
 
@@ -78,7 +80,9 @@ vi.mock("@/lib/audit", () => ({ appendAudit: async (_: unknown, input: { action:
 vi.mock("@/lib/permissions", () => ({
   hasPermission: async (_: unknown, resource: string, action: string, department?: string) =>
     state.grants.has(`${resource}:${action}`) || (department ? state.grants.has(`${resource}:${action}:${department}`) : false),
-  assertPermission: async () => undefined
+  assertPermission: async () => undefined,
+  departmentsWithPermission: async (_: unknown, action: string) =>
+    ["doutrina", "infancia", "juventude"].filter((d) => state.grants.has(`department:${action}:${d}`))
 }));
 
 const { statusAfterEdit, normalizeFicha, validateDecision, fichaSchema, decisionSchema, assertSchedulableWorker } = await import("@/lib/workers");
@@ -91,10 +95,12 @@ const params = (id: string) => ({ params: Promise.resolve({ id }) });
 const coordinator = (department: string) => {
   state.grants = new Set([`department:read:${department}`, `department:create:${department}`, `department:update:${department}`]);
   state.actorDepartments = [department];
+  state.role = "coordenador";
 };
 const president = () => {
   state.grants = new Set(["presidencia:read", "presidencia:approve"]);
   state.actorDepartments = [];
+  state.role = "presidente";
 };
 const ficha = (overrides: object = {}) => ({ full_name: "Maria Teste", departments: ["doutrina"], functions: ["Passista"], ...overrides });
 

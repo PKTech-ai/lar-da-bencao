@@ -41,7 +41,12 @@ export async function owner<T>(work: (client: Client) => Promise<T>) {
   }
 }
 
-/** Cria um usuário institucional real (auth.users + app.users) para ser o ator das operações. */
+const DIRECTOR_ROLES = new Set(["presidente", "vice_presidente", "secretario", "tesoureiro", "conselheiro_fiscal"]);
+
+/**
+ * Cria um usuário institucional real (auth.users + app.users) para ser o ator das operações.
+ * Cargos da Diretoria só acessam com biênio vigente: recebem um biênio do ano corrente.
+ */
 export async function createActor(role = "administrador", departments: string[] = []) {
   const authId = randomUUID();
   const email = `${role}-${authId.slice(0, 8)}@teste.local`;
@@ -51,6 +56,13 @@ export async function createActor(role = "administrador", departments: string[] 
       "insert into app.users (auth_user_id, email, full_name, role_key, status) values ($1,$2,$3,$4,'active') returning id",
       [authId, email, `Teste ${role}`, role]
     );
+    if (DIRECTOR_ROLES.has(role)) {
+      const biennium = await client.query<{ id: string }>(
+        "insert into app.bienniums (label, starts_on, ends_on) values ($1, current_date - 30, current_date + 700) returning id",
+        [`Integração ${authId.slice(0, 8)}`]
+      );
+      await client.query("update app.users set biennium_id = $1 where id = $2", [biennium.rows[0].id, inserted.rows[0].id]);
+    }
     for (const d of departments) await client.query("insert into app.user_departments (user_id, department_key) values ($1,$2)", [inserted.rows[0].id, d]);
     return inserted.rows[0].id;
   });

@@ -16,8 +16,8 @@ describe("attachments", () => {
     expect(() => validateSignature("application/pdf", new TextEncoder().encode("<html>"))).toThrow("não corresponde");
   });
 
-  it("vincula anexos financeiros ao departamento de tesouraria", () => {
-    expect(attachmentPermission("bank_statement")).toEqual({ resource: "attachments", department: "tesouraria" });
+  it("vincula anexos financeiros à página da Tesouraria", () => {
+    expect(attachmentPermission("bank_statement")).toEqual({ resource: "tesouraria" });
     expect(() => attachmentPermission("unknown")).toThrow("não permitido");
   });
 });

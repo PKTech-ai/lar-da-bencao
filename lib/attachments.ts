@@ -45,16 +45,21 @@ export function validateSignature(mime: string, bytes: Uint8Array) {
 }
 
 export function attachmentPermission(ownerType: string) {
+  // Vínculos de negócio seguem a permissão da página dona (baixar = ler). `attachments` fica para testes técnicos.
   const mappings: Record<string, { resource: string; department?: string }> = {
-    treasury_proof: { resource: "attachments", department: "tesouraria" },
-    bank_statement: { resource: "attachments", department: "tesouraria" },
-    patrimony_asset: { resource: "attachments", department: "patrimonio" },
-    social_record: { resource: "attachments", department: "assistencia_social" },
-    meeting_audio: { resource: "attachments", department: "secretaria" },
-    legal_document: { resource: "attachments", department: "juridico" },
-    // Estatuto/Regimento: leitura para todos os trabalhadores ativos; envio só pelo administrador.
+    treasury_proof: { resource: "tesouraria" },
+    bank_statement: { resource: "tesouraria" },
+    patrimony_asset: { resource: "department", department: "patrimonio" },
+    social_record: { resource: "department", department: "assistencia_social" },
+    social_brecho_proof: { resource: "social_brecho" },
+    social_clube_maes_proof: { resource: "social_clube_maes" },
+    meeting_audio: { resource: "secretaria" },
+    meeting_document: { resource: "secretaria" },
+    legal_document: { resource: "department", department: "juridico" },
+    event_record: { resource: "department", department: "eventos" },
+    bookshop_proof: { resource: "department", department: "divulgacao" },
+    fiscal_council_document: { resource: "conselho_fiscal" },
     institutional_document: { resource: "institucional" },
-    // Materiais de estudo seguem a permissão do departamento: quem lê o departamento baixa o material.
     study_material_doutrina: { resource: "department", department: "doutrina" },
     study_material_infancia: { resource: "department", department: "infancia" },
     study_material_juventude: { resource: "department", department: "juventude" },

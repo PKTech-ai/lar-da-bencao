@@ -31,15 +31,27 @@ export async function assertPermission(
   if (!(await hasPermission(actor, resource, action, department))) throw new AuthorizationError();
 }
 
+/** Departamentos em que o ator tem a ação (considera perfil, página e vínculo). */
+export async function departmentsWithPermission(actor: Actor, action: PermissionAction): Promise<string[]> {
+  const result = await query<{ key: string }>(
+    "select key from app.departments d where d.active and app.has_permission($1, 'department', $2, d.key) order by key",
+    [actor.id, action]
+  );
+  return result.rows.map((row) => row.key);
+}
+
 /** Para telas transversais (trabalhadores/admissões) quando o escopo é “qualquer departamento do ator”. */
 export async function hasAnyDepartmentPermission(actor: Actor, action: PermissionAction) {
-  if (await hasPermission(actor, "department", action)) return true;
-  for (const department of actor.departments) {
-    if (await hasPermission(actor, "department", action, department)) return true;
-  }
-  return false;
+  return (await departmentsWithPermission(actor, action)).length > 0;
 }
 
 export async function assertAnyDepartmentPermission(actor: Actor, action: PermissionAction) {
   if (!(await hasAnyDepartmentPermission(actor, action))) throw new AuthorizationError();
+}
+
+export type PageLevel = "full" | "read" | null;
+
+export async function pageLevel(actor: Actor, page: string): Promise<PageLevel> {
+  const result = await query<{ level: PageLevel }>("select app.page_level($1, $2) as level", [actor.id, page]);
+  return result.rows[0]?.level ?? null;
 }

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { Actor } from "@/lib/auth";
 import { AppError, AuthorizationError } from "@/lib/errors";
-import { hasPermission } from "@/lib/permissions";
+import { query } from "@/lib/db";
+import { departmentsWithPermission, hasPermission } from "@/lib/permissions";
 import { DOCTRINE_FUNCTIONS, type WorkerStatus } from "@/lib/worker-constants";
 
 export { DOCTRINE_FUNCTIONS, workerStatusLabel, type WorkerStatus } from "@/lib/worker-constants";
@@ -80,20 +81,20 @@ export function todayInSaoPaulo(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(now);
 }
 
+/** Decisões da Diretoria (admissões, baixas): somente Administrador e Presidente com acesso total à Presidência. */
 export async function canDecideAdmissions(actor: Actor) {
+  if (!["administrador", "presidente"].includes(actor.role)) return false;
   return hasPermission(actor, "presidencia", "approve");
 }
 
 /** Departamentos do ator em que ele tem a ação; `null` quando vale para todos. */
 export async function departmentsWith(actor: Actor, action: "read" | "create" | "update"): Promise<string[] | null> {
-  if (await hasPermission(actor, "department", action)) return null;
+  // Secretaria e Presidência acompanham as fichas de todos os departamentos.
   if (await hasPermission(actor, "secretaria", action)) return null;
   if (action === "read" && (await hasPermission(actor, "presidencia", "read"))) return null;
-  const allowed: string[] = [];
-  for (const department of actor.departments) {
-    if (await hasPermission(actor, "department", action, department)) allowed.push(department);
-  }
-  return allowed;
+  const allowed = await departmentsWithPermission(actor, action);
+  const total = await query<{ count: number }>("select count(*)::int as count from app.departments where active");
+  return allowed.length === total.rows[0].count ? null : allowed;
 }
 
 /** Garante que o ator pode mexer na ficha que toca estes departamentos. */

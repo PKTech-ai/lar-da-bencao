@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useState } from "react";
 import { uploadAttachment } from "@/lib/upload-client";
 
@@ -72,7 +74,7 @@ export function DocumentsClient() {
           </article>
         ))}
       </div>
-      {canManage ? <p className="small muted">Os PDFs oficiais embutidos na versão 215 podem ser extraídos em <a href="/sistema/importacao">Importação v215</a>.</p> : null}
+      {canManage ? <p className="small muted">Os PDFs oficiais embutidos na versão 215 podem ser extraídos em <Link href="/sistema/importacao">Importação v215</Link>.</p> : null}
     </div>
   );
 }

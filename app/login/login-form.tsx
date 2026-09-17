@@ -35,6 +35,7 @@ export function LoginForm() {
   return (
     <form className="form-stack" onSubmit={submit}>
       {params.get("motivo") === "sessao" ? <div className="notice" role="status">Sua sessão foi encerrada. Entre novamente.</div> : null}
+      {params.get("motivo") === "bienio" ? <div className="notice" role="status">Seu acesso de Diretoria está fora do biênio vigente. Procure o Administrador do Sistema.</div> : null}
       <label>E-mail institucional<input name="email" type="email" autoComplete="username" required /></label>
       <label>Senha<input name="password" type="password" autoComplete="current-password" minLength={10} required /></label>
       {error ? <div className="error" role="alert">{error}</div> : null}

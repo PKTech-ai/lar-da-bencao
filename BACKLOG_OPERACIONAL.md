@@ -531,37 +531,44 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Severidade:** bloqueia uso
 - **Onda:** 2
 - **Origem mock:** `pat-inventario` / `PatrimonyAssets` `patrimonyAssets`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: bens, tombamento, documentos anexos
-  - API/UI CRUD + KPIs
-  - permissão: `patrimonio`
-  - teste: SHA/duplicidade de arquivo
-- **Critério de aceite:** inventário igual ao mock; anexos no Postgres.
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - motor de cadastros declarativos (`lib/resources/*`): campos, validação, SQL com colunas de lista permitida, versão otimista, arquivamento com motivo, histórico pelo Dedo-duro e anexos por tipo
+  - schema: `app.patrimony_assets` (migração `202609171300`), tombamento único mesmo entre arquivados (comparação sem espaços e sem caixa)
+  - API: `/api/r/patrimonio-bens` (lista/filtros/busca sem acento, inclusão, edição, arquivamento, histórico)
+  - UI: `/sistema/patrimonio` com fotos e notas fiscais (até 20 anexos por bem, 15 MB cada, inspeção antimalware), impressão e KPIs
+  - permissão: página `patrimonio` (acesso por página, `app.page_level`)
+  - teste: `lib/patrimonio.test.ts` + integração (duplicidade recusada, inclusão auditada)
+- **Critério de aceite:** ✅ inventário com os campos do mock; ✅ anexos no Postgres com tipo (foto/nota fiscal); ✅ duplicidade de tombamento recusada.
 
 ### BL-039 — Patrimônio — autorização de baixa (com Diretoria)
 - **Módulo:** patrimonio / diretoria
 - **Severidade:** bloqueia uso
 - **Onda:** 2
 - **Origem mock:** `PatrimonyDisposals` `patrimonyDisposalRequests` / `pat-baixas` `dir-baixas-patrimonio`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API workflow solicitação → decisão
-  - UI nos dois módulos
-  - permissão: patrimônio solicita; presidente/vice/admin decide
-  - teste: baixa na ficha só após autorização
-- **Critério de aceite:** fluxo de baixa idêntico ao mock; auditoria; Postgres.
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema: `app.patrimony_disposals` com numeração `PAT-BAIXA-AAAA-NNNN`, retrato do bem no momento do pedido e um pendente por bem (índice parcial)
+  - API: `POST /api/patrimonio/baixas` (solicita), `POST /api/patrimonio/baixas/[id]` (`decide` | `cancel`)
+  - UI: mesma aba nos dois módulos (`/sistema/patrimonio/baixas` e `/sistema/presidencia/baixas`), memorando para impressão
+  - permissão: Patrimônio solicita e cancela; decide apenas Administrador ou Presidente com acesso completo à Diretoria (regra do mock)
+  - regra: autorização bloqueada se o cadastro do bem mudou depois do memorando; ao autorizar, a baixa entra na ficha do bem na data decidida
+  - teste: integração (um pendente por bem, coordenador não decide, baixa registrada na ficha, decisão repetida recusada)
+- **Critério de aceite:** ✅ fluxo de baixa igual ao mock; ✅ auditoria nos dois lados; ✅ dados no Postgres.
 
 ### BL-040 — Patrimônio — escala de limpeza
 - **Módulo:** patrimonio
 - **Severidade:** importante
 - **Onda:** 2
 - **Origem mock:** `pat-limpeza` / `PatrimonyCleaning` `patrimonyCleaningRoster`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema/API/UI
-  - permissão/teste
-- **Critério de aceite:** escala de limpeza igual ao mock no Postgres.
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - schema: `app.cleaning_roster` (um registro por trabalhador em cada domingo) e `app.cleaning_conflict_decisions` (repetição no ano mantida conscientemente)
+  - API: `/api/patrimonio/limpeza` (período, inclusão em equipe, edição), `/gerar` (escala automática sem repetir trabalhador no ano) e `/conflitos`
+  - UI: `/sistema/patrimonio/limpeza` com período de até 12 meses, conferência de conflitos, impressão e totais da taxa
+  - regras do mock: só domingos, recesso até o primeiro domingo de março, taxa de serviço de R$ 50,00 com recebimento (PIX/Dinheiro/Transferência/Cartão), recebimento pago trava alterações até voltar a pendente com motivo, cancelamento exige motivo
+  - teste: `lib/patrimonio.test.ts` (calendário, taxa, edição) + integração (sábado e recesso recusados, repetição no ano, recebimento)
+- **Critério de aceite:** ✅ escala de limpeza igual ao mock no Postgres; ✅ taxa e pagamentos auditados.
 
 ### BL-041 — Eventos — agenda e itens
 - **Módulo:** eventos

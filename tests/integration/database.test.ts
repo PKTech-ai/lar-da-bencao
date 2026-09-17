@@ -93,7 +93,7 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
 
   it("revoga sessões no Auth e marca o corte na aplicação", async () => {
     const target = await createActor("trabalhador");
-    await owner((client) => client.query("insert into auth.sessions (user_id) values ($1), ($1)", [target.authUserId]));
+    await owner((client) => client.query("insert into auth.sessions (id, user_id) values (gen_random_uuid(), $1), (gen_random_uuid(), $1)", [target.authUserId]));
     const { revokeAllSessions } = await import("@/lib/sessions");
     const removed = await transaction((client) => revokeAllSessions(client, target.id, target.authUserId));
     expect(Number(removed)).toBe(2);
@@ -263,5 +263,101 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     const row = await query<{ status: string }>("select status from app.attachments where id=$1", [fileId]);
     expect(row.rows[0].status).toBe("deleted");
     expect((await query("select 1 from app.attachment_chunks where attachment_id=$1", [fileId])).rowCount).toBe(0);
+  });
+  it("acesso por página: biênio vencido corta o diretor e a exceção da matriz vale", async () => {
+    const effective = await createActor("membro_efetivo");
+    expect(await hasPermission(effective, "department", "read", "patrimonio")).toBe(false);
+    await owner((client) => client.query("insert into app.page_grant_overrides (role_key, page_key, level) values ('membro_efetivo','patrimonio','read')"));
+    try {
+      expect(await hasPermission(effective, "department", "read", "patrimonio")).toBe(true);
+      expect(await hasPermission(effective, "department", "update", "patrimonio")).toBe(false);
+    } finally {
+      await owner((client) => client.query("delete from app.page_grant_overrides where role_key='membro_efetivo'"));
+    }
+    // Presidente sem biênio vigente perde o acesso (15 dias de tolerância após o fim).
+    const outgoing = await createActor("presidente");
+    expect(await hasPermission(outgoing, "presidencia", "approve")).toBe(true);
+    await owner((client) => client.query(
+      "update app.bienniums set starts_on = current_date - 800, ends_on = current_date - 20 where id = (select biennium_id from app.users where id = $1)", [outgoing.id]
+    ));
+    expect(await hasPermission(outgoing, "presidencia", "approve")).toBe(false);
+    expect(await query<{ allowed: boolean }>("select app.user_access_allowed($1) as allowed", [outgoing.id]).then((r) => r.rows[0].allowed)).toBe(false);
+  });
+
+  it("patrimônio: cadastro, memorando de baixa e decisão da Diretoria", async () => {
+    const list = await import("@/app/api/r/[resource]/route");
+    const disposals = await import("@/app/api/patrimonio/baixas/route");
+    const decide = await import("@/app/api/patrimonio/baixas/[id]/route");
+    const patrimony = await createActor("coordenador", ["patrimonio"]);
+    current.actor = patrimony;
+    const resource = { params: Promise.resolve({ resource: "patrimonio-bens" }) };
+    const tombamento = `PAT-${randomUUID().slice(0, 8)}`;
+    const ficha = { tombamento, condition: "Usado", description: "Cadeira do salão", department_key: "patrimonio", entry_date: "2020-05-10", value_cents: 15000, location: "Salão", responsible: "Ana", notes: "" };
+    const created = await list.POST(json("POST", ficha), resource);
+    expect(created.status).toBe(201);
+    const assetId = (await created.json()).id as string;
+    // Tombamento repetido (com espaços e caixa diferente) é recusado.
+    const duplicated = await list.POST(json("POST", { ...ficha, tombamento: ` ${tombamento.toLowerCase()} ` }), resource);
+    expect(duplicated.status).toBe(409);
+
+    const version = (await query<{ version: number }>("select version from app.patrimony_assets where id=$1", [assetId])).rows[0].version;
+    const memo = await disposals.POST(json("POST", { asset_id: assetId, asset_version: version, request_date: "2026-09-10", reason: "Assento quebrado.", destination: "Descarte" }));
+    expect(memo.status).toBe(201);
+    const { id: memoId, number } = await memo.json();
+    expect(number).toMatch(/^PAT-BAIXA-2026-\d{4}$/);
+    // Um pendente por bem.
+    expect((await disposals.POST(json("POST", { asset_id: assetId, asset_version: version, request_date: "2026-09-11", reason: "Outro" }))).status).toBe(409);
+
+    // Coordenador do Patrimônio não decide.
+    const memoParams = { params: Promise.resolve({ id: memoId }) };
+    expect((await decide.POST(json("POST", { action: "decide", version: 1, decision: "approved", decision_date: "2026-09-12", disposal_date: "2026-09-12" }), memoParams)).status).toBe(403);
+
+    current.actor = president;
+    const approved = await decide.POST(json("POST", { action: "decide", version: 1, decision: "approved", decision_date: "2026-09-12", disposal_date: "2026-09-12", reference: "Ata 5/2026", notes: "" }), memoParams);
+    expect(approved.status).toBe(200);
+    const asset = await query<{ disposal_date: string }>("select to_char(disposal_date,'YYYY-MM-DD') as disposal_date from app.patrimony_assets where id=$1", [assetId]);
+    expect(asset.rows[0].disposal_date).toBe("2026-09-12");
+    expect((await query("select 1 from app.audit_events where entity_id=$1 and action like 'Diretoria autorizou%'", [memoId])).rowCount).toBe(1);
+    // Decisão repetida não passa.
+    expect((await decide.POST(json("POST", { action: "decide", version: 2, decision: "rejected", decision_date: "2026-09-13", notes: "x" }), memoParams)).status).toBe(409);
+  });
+
+  it("escala de limpeza: domingo, repetição no ano e taxa de serviço", async () => {
+    const roster = await import("@/app/api/patrimonio/limpeza/route");
+    const item = await import("@/app/api/patrimonio/limpeza/[id]/route");
+    const patrimony = await createActor("coordenador", ["patrimonio"]);
+    current.actor = patrimony;
+    const workerId = await owner(async (client) => {
+      const inserted = await client.query<{ id: string }>("insert into app.workers (full_name, status) values ($1,'active') returning id", [`Limpeza ${randomUUID().slice(0, 6)}`]);
+      await client.query("insert into app.worker_departments (worker_id, department_key) values ($1,'patrimonio')", [inserted.rows[0].id]);
+      return inserted.rows[0].id;
+    });
+    // Sábado é recusado; domingo de recesso também.
+    expect((await roster.POST(json("POST", { clean_date: "2026-03-07", worker_ids: [workerId], status: "scheduled" }))).status).toBe(400);
+    expect((await roster.POST(json("POST", { clean_date: "2026-01-04", worker_ids: [workerId], status: "scheduled" }))).status).toBe(400);
+    const first = await roster.POST(json("POST", { clean_date: "2026-03-08", worker_ids: [workerId], status: "scheduled" }));
+    expect(first.status).toBe(201);
+    const rosterId = (await first.json()).ids[0] as string;
+    // Mesmo trabalhador no mesmo domingo: recusado.
+    expect((await roster.POST(json("POST", { clean_date: "2026-03-08", worker_ids: [workerId], status: "scheduled" }))).status).toBe(409);
+    // Repetição no mesmo ano pede confirmação e depois é registrada.
+    const repeat = await roster.POST(json("POST", { clean_date: "2026-03-15", worker_ids: [workerId], status: "scheduled" }));
+    expect(repeat.status).toBe(409);
+    expect((await repeat.json()).code).toBe("CLEANING_REPEAT");
+    const kept = await roster.POST(json("POST", { clean_date: "2026-03-15", worker_ids: [workerId], status: "scheduled", keep_repeats: true }));
+    expect(kept.status).toBe(201);
+    expect((await query("select 1 from app.cleaning_conflict_decisions where worker_id=$1 and year=2026", [workerId])).rowCount).toBe(1);
+
+    // Taxa de serviço: R$ 50,00 e recebimento com data e forma.
+    const itemParams = { params: Promise.resolve({ id: rosterId }) };
+    const base = { clean_date: "2026-03-08", worker_id: workerId, status: "fee", keep_repeats: true };
+    expect((await item.PATCH(json("PATCH", { ...base, version: 1, payment_status: "paid", payment_date: "2026-03-09" }), itemParams)).status).toBe(400);
+    expect((await item.PATCH(json("PATCH", { ...base, version: 1, payment_status: "paid", payment_date: "2026-03-09", payment_method: "PIX", payment_reference: "e2e" }), itemParams)).status).toBe(200);
+    const row = await query<{ fee_cents: number; payment_status: string }>("select fee_cents, payment_status from app.cleaning_roster where id=$1", [rosterId]);
+    expect(row.rows[0]).toEqual({ fee_cents: 5000, payment_status: "paid" });
+    // Recebido trava alteração da escala até voltar para pendente com motivo.
+    expect((await item.PATCH(json("PATCH", { ...base, version: 2, status: "done", payment_status: "paid" }), itemParams)).status).toBe(400);
+    expect((await item.PATCH(json("PATCH", { ...base, version: 2, payment_status: "pending" }), itemParams)).status).toBe(400);
+    expect((await item.PATCH(json("PATCH", { ...base, version: 2, payment_status: "pending", reason: "Estorno do PIX." }), itemParams)).status).toBe(200);
   });
 });

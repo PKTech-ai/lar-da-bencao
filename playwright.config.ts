@@ -17,7 +17,9 @@ export default defineConfig({
     locale: "pt-BR",
     timezoneId: "America/Sao_Paulo",
     trace: process.env.E2E_TRACE ? "retain-on-failure" : "off",
-    screenshot: "only-on-failure"
+    screenshot: "only-on-failure",
+    // Contorno para macOS quando o Chromium não registra portas Mach (serviços do sistema degradados).
+    launchOptions: process.env.E2E_SINGLE_PROCESS ? { args: ["--single-process"] } : {}
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } }

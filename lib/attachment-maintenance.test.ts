@@ -20,7 +20,7 @@ describe("vínculos de anexos da onda 1", () => {
     expect(checks.calls).toEqual([
       ["department", "read", "infancia"],
       ["department", "create", "infancia"],
-      ["attachments", "download", "tesouraria"]
+      ["tesouraria", "read", undefined]
     ]);
   });
 });

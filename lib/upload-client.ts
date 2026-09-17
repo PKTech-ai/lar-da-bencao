@@ -6,13 +6,13 @@ const mimeByExtension: Record<string, string> = {
   csv: "text/csv", ofx: "application/x-ofx", webm: "audio/webm", ogg: "audio/ogg"
 };
 
-export async function uploadAttachment(file: File, ownerType: string, ownerId: string, onProgress?: (percent: number) => void) {
+export async function uploadAttachment(file: File, ownerType: string, ownerId: string, onProgress?: (percent: number) => void, kind?: string) {
   const mimeType = file.type || mimeByExtension[file.name.split(".").pop()?.toLowerCase() ?? ""] || "application/octet-stream";
   const digest = hex(await crypto.subtle.digest("SHA-256", await file.arrayBuffer()));
   const init = await fetch("/api/attachments/init", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ownerType, ownerId, filename: file.name, mimeType, sizeBytes: file.size, sha256: digest })
+    body: JSON.stringify({ ownerType, ownerId, filename: file.name, mimeType, sizeBytes: file.size, sha256: digest, kind })
   });
   const created = await init.json();
   if (!init.ok) throw new Error(created.error);

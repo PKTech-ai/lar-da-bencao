@@ -15,7 +15,9 @@ export const moduleCatalog: ModuleDef[] = [
   { key: "admissoes", href: "/sistema/admissoes", label: "Admissões", flagKey: "module_workers", permissionResource: "department" },
   { key: "doutrina", href: "/sistema/doutrina", label: "Doutrina", flagKey: "module_doutrina", permissionResource: "department", department: "doutrina" },
   { key: "infancia", href: "/sistema/infancia", label: "Infância", flagKey: "module_infancia", permissionResource: "department", department: "infancia" },
-  { key: "juventude", href: "/sistema/juventude", label: "Juventude", flagKey: "module_juventude", permissionResource: "department", department: "juventude" }
+  { key: "juventude", href: "/sistema/juventude", label: "Juventude", flagKey: "module_juventude", permissionResource: "department", department: "juventude" },
+  { key: "patrimonio", href: "/sistema/patrimonio", label: "Patrimônio", flagKey: "module_patrimonio", permissionResource: "department", department: "patrimonio" },
+  { key: "presidencia", href: "/sistema/presidencia", label: "Presidência", flagKey: "module_presidencia", permissionResource: "presidencia" }
 ];
 
 export const doutrinaSubnav = [

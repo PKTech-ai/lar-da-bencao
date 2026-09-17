@@ -24,7 +24,10 @@ export async function requirePageActor() {
     return actor;
   } catch (error) {
     if (error instanceof AuthenticationError) {
-      redirect(error.code === "MFA_REQUIRED" ? "/mfa" : error.code === "SESSION_REVOKED" ? "/auth/signout?motivo=sessao" : "/login");
+      redirect(error.code === "MFA_REQUIRED" ? "/mfa"
+        : error.code === "SESSION_REVOKED" ? "/auth/signout?motivo=sessao"
+        : error.code === "BIENNIUM_CLOSED" ? "/auth/signout?motivo=bienio"
+        : "/login");
     }
     throw error;
   }

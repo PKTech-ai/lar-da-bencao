@@ -1,7 +1,6 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import {
-  BOOTSTRAP_SECRET, CRON_SECRET, PASSWORD, acceptTerms, enrollMfa, expectHealthyPage, freshTotp, latestMail, linkFrom, login,
-  loginWithMfa, sql
+  BOOTSTRAP_SECRET, CRON_SECRET, PASSWORD, acceptTerms, enrollMfa, expectHealthyPage, freshTotp, latestMail, linkFrom, login, sql
 } from "./support";
 
 test.describe.configure({ mode: "serial" });
@@ -94,7 +93,7 @@ test("convite do coordenador chega por e-mail e completa senha, MFA e termos", a
   const mail = await latestMail(COORD, "Convite");
   await coord.goto(linkFrom(mail.HTML));
   await expect(coord.getByRole("heading", { name: "Defina sua senha" })).toBeVisible();
-  await coord.getByLabel("Nova senha").fill(PASSWORD);
+  await coord.getByLabel("Nova senha", { exact: true }).fill(PASSWORD);
   await coord.getByLabel("Confirme a senha").fill(PASSWORD);
   await coord.getByRole("button", { name: "Salvar e ativar MFA" }).click();
   state.coordSecret = (await enrollMfa(coord, used)).secret;
@@ -195,7 +194,7 @@ test("Minha conta: códigos novos e troca de senha exigem o código atual", asyn
   await expect(coord.locator("ul li code")).toHaveCount(10);
 
   await coord.getByRole("button", { name: "Alterar senha" }).click();
-  await coord.getByLabel("Nova senha").fill(`${PASSWORD}X`);
+  await coord.getByLabel("Nova senha", { exact: true }).fill(`${PASSWORD}X`);
   await coord.getByLabel("Confirme a nova senha").fill(`${PASSWORD}X`);
   await coord.getByLabel("Código atual do autenticador").fill(await freshTotp(state.coordSecret, used));
   await coord.getByRole("button", { name: "Confirmar" }).click();

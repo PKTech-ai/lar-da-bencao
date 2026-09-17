@@ -25,6 +25,7 @@ type ActorRow = {
   status: string;
   departments: string[] | null;
   sessions_valid_after: Date | null;
+  access_allowed: boolean;
 };
 
 export async function requireActor(options: { requireMfa?: boolean } = {}): Promise<Actor> {
@@ -41,7 +42,7 @@ export async function requireActor(options: { requireMfa?: boolean } = {}): Prom
   }
 
   const result = await query<ActorRow>(
-    `select u.id, u.auth_user_id, u.email, u.full_name, u.role_key, u.status, u.sessions_valid_after,
+    `select u.id, u.auth_user_id, u.email, u.full_name, u.role_key, u.status, u.sessions_valid_after, app.user_access_allowed(u.id) as access_allowed,
             coalesce(array_agg(ud.department_key) filter (where ud.department_key is not null), '{}') as departments
        from app.users u
        left join app.user_departments ud on ud.user_id = u.id
@@ -51,6 +52,9 @@ export async function requireActor(options: { requireMfa?: boolean } = {}): Prom
   );
   const row = result.rows[0];
   if (!row || row.status !== "active") throw new AuthorizationError("Conta institucional inativa ou sem vínculo.");
+  if (!row.access_allowed) {
+    throw new AuthenticationError("Seu acesso de Diretoria está fora do biênio vigente. Procure o Administrador do Sistema.", "BIENNIUM_CLOSED");
+  }
   const claims = decodeAccessToken(currentSession.data.session?.access_token);
   if (isSessionRevoked(sessionAuthenticatedAt(claims), row.sessions_valid_after)) {
     throw new AuthenticationError("Sessão encerrada pela administração. Entre novamente.", "SESSION_REVOKED");

@@ -27,6 +27,9 @@ No SQL Editor (role owner/migration):
    - `202609161350_education.sql`
    - `202609161400_legacy_import.sql`
    - `202609161410_pgcrypto_search_path.sql`
+   - `202609171000_institucional_e_limpeza.sql`
+   - `202609171100_acesso_por_pagina.sql`
+   - `202609171300_ondas_2_3_patrimonio.sql`
 2. Crie o login de runtime:
 
 ```sql
