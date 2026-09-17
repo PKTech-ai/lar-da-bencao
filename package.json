@@ -13,7 +13,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "scanner:local": "node scripts/local-scanner.mjs",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
@@ -34,7 +36,6 @@
     "eslint-config-next": "16.3.5",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
-    "vercel": "59.17.0",
     "vitest": "^4.0.0"
   },
   "packageManager": "pnpm@11.19.0"

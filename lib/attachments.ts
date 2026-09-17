@@ -15,6 +15,11 @@ export function sha256(data: Uint8Array | string) {
   return createHash("sha256").update(data).digest("hex");
 }
 
+/** Hash do token de upload calculado na aplicação (independe do search_path/pgcrypto da sessão). */
+export function uploadTokenHash(token: string) {
+  return createHash("sha256").update(token).digest();
+}
+
 export function newUploadToken() {
   return randomBytes(32).toString("base64url");
 }
@@ -48,6 +53,12 @@ export function attachmentPermission(ownerType: string) {
     meeting_audio: { resource: "attachments", department: "secretaria" },
     legal_document: { resource: "attachments", department: "juridico" },
     institutional_document: { resource: "attachments" },
+    // Materiais de estudo seguem a permissão do departamento: quem lê o departamento baixa o material.
+    study_material_doutrina: { resource: "department", department: "doutrina" },
+    study_material_infancia: { resource: "department", department: "infancia" },
+    study_material_juventude: { resource: "department", department: "juventude" },
+    evangelizando_photo_infancia: { resource: "department", department: "infancia" },
+    evangelizando_photo_juventude: { resource: "department", department: "juventude" },
     system_test: { resource: "attachments" }
   };
   const mapping = mappings[ownerType];
@@ -57,6 +68,7 @@ export function attachmentPermission(ownerType: string) {
 
 export async function authorizeAttachment(actor: Actor, ownerType: string, action: "read" | "create" | "update" | "delete" | "download") {
   const permission = attachmentPermission(ownerType);
-  await assertPermission(actor, permission.resource, action, permission.department);
+  const effective = permission.resource === "department" && action === "download" ? "read" : action;
+  await assertPermission(actor, permission.resource, effective, permission.department);
   return permission;
 }

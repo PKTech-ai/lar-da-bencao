@@ -8,6 +8,8 @@ export default defineConfig({
     }
   },
   test: {
-    environment: "node"
+    environment: "node",
+    // Testes contra Postgres real rodam à parte: `pnpm test:integration`.
+    exclude: ["**/node_modules/**", "**/.next/**", "tests/integration/**"]
   }
 });

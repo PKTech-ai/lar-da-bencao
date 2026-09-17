@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
-import { authorizeAttachment, CHUNK_SIZE, sha256, validateSignature } from "@/lib/attachments";
+import { authorizeAttachment, CHUNK_SIZE, sha256, uploadTokenHash, validateSignature } from "@/lib/attachments";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/csrf";
@@ -25,8 +25,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const result = await transaction(async (client) => {
       const found = await client.query<Attachment>(
         `select id,owner_type,mime_type,status,chunk_count,size_bytes::text,
-                upload_token_hash = digest($2,'sha256') as token_valid
-           from app.attachments where id=$1 for update`, [params.id, token]
+                upload_token_hash = $2 as token_valid
+           from app.attachments where id=$1 for update`, [params.id, uploadTokenHash(token)]
       );
       const file = found.rows[0];
       if (!file || !file.token_valid) throw new AppError("Upload não encontrado.", 404, "UPLOAD_NOT_FOUND");

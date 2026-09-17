@@ -18,13 +18,30 @@ export async function GET() {
   try {
     const actor = await requireActor(); await assertPermission(actor, "users", "admin");
     const [users, roles, departments] = await Promise.all([
-      dbPool().query(`select u.id,u.email,u.full_name,u.role_key,u.status,u.created_at,u.version,
+      dbPool().query(`select u.id,u.auth_user_id,u.email,u.full_name,u.role_key,u.status,u.created_at,u.version,
         coalesce(array_agg(ud.department_key) filter (where ud.department_key is not null),'{}') departments
         from app.users u left join app.user_departments ud on ud.user_id=u.id group by u.id order by u.full_name`),
       dbPool().query("select key,label from app.roles order by label"),
       dbPool().query("select key,label from app.departments where active order by label")
     ]);
-    return Response.json({ users: users.rows, roles: roles.rows, departments: departments.rows }, { headers: { "Cache-Control": "private, no-store" } });
+    // Situação no Auth (convite aceito? MFA ativo?) e último login confirmado pelo Dedo-duro.
+    const listed = await createAdminClient().auth.admin.listUsers({ page: 1, perPage: 1000 }).catch(() => null);
+    const authById = new Map((listed?.data?.users ?? []).map((u) => [u.id, u]));
+    const logins = await dbPool().query<{ actor_user_id: string; last_login: string }>(
+      "select actor_user_id, max(occurred_at) as last_login from app.audit_events where action = 'Login concluído com MFA' and result = 'success' group by actor_user_id"
+    );
+    const lastLogin = new Map(logins.rows.map((r) => [r.actor_user_id, r.last_login]));
+    const enriched = users.rows.map((u: { id: string; auth_user_id: string }) => {
+      const auth = authById.get(u.auth_user_id);
+      return {
+        ...u,
+        auth_known: Boolean(auth),
+        invite_pending: auth ? !auth.last_sign_in_at : null,
+        mfa_enabled: auth ? (auth.factors ?? []).some((f) => f.status === "verified") : null,
+        last_login: lastLogin.get(u.id) ?? null
+      };
+    });
+    return Response.json({ users: enriched, roles: roles.rows, departments: departments.rows }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return errorResponse(error); }
 }
 

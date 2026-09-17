@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const publicPaths = ["/login", "/recuperar", "/auth/callback", "/api/health", "/api/bootstrap"];
+const publicPaths = ["/login", "/recuperar", "/auth/callback", "/auth/signout", "/api/auth/login", "/api/health", "/api/bootstrap"];
 
 export async function proxy(request: NextRequest) {
   if (process.env.VERCEL_ENV === "production" && process.env.APP_URL) {

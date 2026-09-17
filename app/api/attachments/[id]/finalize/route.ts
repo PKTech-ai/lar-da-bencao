@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
-import { authorizeAttachment } from "@/lib/attachments";
+import { authorizeAttachment, uploadTokenHash } from "@/lib/attachments";
 import { transaction } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { AppError, errorResponse } from "@/lib/errors";
@@ -26,8 +26,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const verified = await transaction(async (client) => {
       const found = await client.query<Attachment>(
         `select id,owner_type,filename,mime_type,size_bytes::text,sha256,chunk_count,status,
-                upload_token_hash = digest($2,'sha256') as token_valid
-           from app.attachments where id=$1 for update`, [id, token]
+                upload_token_hash = $2 as token_valid
+           from app.attachments where id=$1 for update`, [id, uploadTokenHash(token)]
       );
       const file = found.rows[0];
       if (!file || !file.token_valid) throw new AppError("Upload não encontrado.", 404, "UPLOAD_NOT_FOUND");
@@ -53,17 +53,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       body,
       signal: AbortSignal.timeout(45_000)
     });
-    const scanBody = z.object({ clean: z.boolean(), engine: z.string().max(100).optional(), reason: z.string().max(500).optional() }).parse(await scan.json());
     if (!scan.ok) throw new AppError("O serviço de inspeção não concluiu a análise.", 503, "MALWARE_SCAN_UNAVAILABLE");
-    const status = scanBody.clean ? "active" : "quarantined";
+    const scanBody = z.object({ clean: z.boolean(), engine: z.string().max(100).optional(), reason: z.string().max(500).optional() })
+      .safeParse(await scan.json().catch(() => null));
+    if (!scanBody.success) throw new AppError("Resposta inválida do serviço de inspeção.", 503, "MALWARE_SCAN_UNAVAILABLE");
+    const verdict = scanBody.data;
+    const status = verdict.clean ? "active" : "quarantined";
     await transaction(async (client) => {
       await client.query(
         `update app.attachments set status=$2,scan_result=$3,scan_engine=$4,activated_at=case when $2='active' then now() else null end where id=$1`,
-        [id, status, scanBody.clean ? "clean" : scanBody.reason ?? "blocked", scanBody.engine ?? "external"]
+        [id, status, verdict.clean ? "clean" : verdict.reason ?? "blocked", verdict.engine ?? "external"]
       );
-      await appendAudit(actor!, { category: scanBody.clean ? "Inclusão" : "Segurança", action: scanBody.clean ? "Anexo ativado" : "Anexo bloqueado pela inspeção", module: "Anexos", section: attachment!.owner_type, entityType: "attachment", entityId: id, result: scanBody.clean ? "success" : "denied", details: attachment!.filename }, client);
+      await appendAudit(actor!, { category: verdict.clean ? "Inclusão" : "Segurança", action: verdict.clean ? "Anexo ativado" : "Anexo bloqueado pela inspeção", module: "Anexos", section: attachment!.owner_type, entityType: "attachment", entityId: id, result: verdict.clean ? "success" : "denied", details: attachment!.filename }, client);
     });
-    return Response.json({ id, status }, { status: scanBody.clean ? 200 : 422 });
+    return Response.json({ id, status }, { status: verdict.clean ? 200 : 422 });
   } catch (error) {
     if (actor && attachment) await appendAudit(actor, { category: "Segurança", action: "Falha na finalização do anexo", module: "Anexos", section: attachment.owner_type, entityType: "attachment", entityId: attachment.id, result: "failed", reasonCode: error instanceof AppError ? error.code : "INTERNAL_ERROR" }).catch(console.error);
     return errorResponse(error);

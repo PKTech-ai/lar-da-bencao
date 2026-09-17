@@ -1,6 +1,10 @@
 begin;
 
-create extension if not exists pgcrypto;
+-- No Supabase o pgcrypto já vive em `extensions`; em Postgres limpo ele é criado lá.
+-- As funções SECURITY DEFINER abaixo incluem `extensions` no search_path para achar digest().
+create schema if not exists extensions;
+set local search_path = public, extensions;
+create extension if not exists pgcrypto with schema extensions;
 create extension if not exists citext;
 create schema if not exists app;
 
@@ -173,7 +177,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = app, pg_temp
+set search_path = app, extensions, public, pg_temp
 as $$
   select exists (
     select 1
@@ -217,7 +221,7 @@ create or replace function app.append_audit_event(
 returns uuid
 language plpgsql
 security definer
-set search_path = app, pg_temp
+set search_path = app, extensions, public, pg_temp
 as $$
 declare
   v_id uuid := gen_random_uuid();
@@ -272,7 +276,7 @@ returns table(valid boolean, event_count bigint, broken_sequence bigint)
 language sql
 stable
 security definer
-set search_path = app, pg_temp
+set search_path = app, extensions, public, pg_temp
 as $$
   with ordered as (
     select e.*,
