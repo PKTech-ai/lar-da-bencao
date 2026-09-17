@@ -17,12 +17,15 @@ const createSchema = z.object({
 export async function GET() {
   try {
     const actor = await requireActor(); await assertPermission(actor, "users", "admin");
-    const [users, roles, departments] = await Promise.all([
-      dbPool().query(`select u.id,u.auth_user_id,u.email,u.full_name,u.role_key,u.status,u.created_at,u.version,
+    const [users, roles, departments, bienniums, workers] = await Promise.all([
+      dbPool().query(`select u.id,u.auth_user_id,u.email,u.full_name,u.role_key,u.status,u.created_at,u.version,u.biennium_id,u.worker_id,
+        app.user_access_allowed(u.id) as access_allowed,
         coalesce(array_agg(ud.department_key) filter (where ud.department_key is not null),'{}') departments
         from app.users u left join app.user_departments ud on ud.user_id=u.id group by u.id order by u.full_name`),
       dbPool().query("select key,label from app.roles order by label"),
-      dbPool().query("select key,label from app.departments where active order by label")
+      dbPool().query("select key,label from app.departments where active order by label"),
+      dbPool().query("select id,label,to_char(starts_on,'YYYY-MM-DD') as starts_on,to_char(ends_on,'YYYY-MM-DD') as ends_on,status from app.bienniums order by starts_on desc"),
+      dbPool().query("select id, full_name from app.workers where status='active' order by full_name")
     ]);
     // Situação no Auth (convite aceito? MFA ativo?) e último login confirmado pelo Dedo-duro.
     const listed = await createAdminClient().auth.admin.listUsers({ page: 1, perPage: 1000 }).catch(() => null);
@@ -41,7 +44,10 @@ export async function GET() {
         last_login: lastLogin.get(u.id) ?? null
       };
     });
-    return Response.json({ users: enriched, roles: roles.rows, departments: departments.rows }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json(
+      { users: enriched, roles: roles.rows, departments: departments.rows, bienniums: bienniums.rows, workers: workers.rows },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch (error) { return errorResponse(error); }
 }
 

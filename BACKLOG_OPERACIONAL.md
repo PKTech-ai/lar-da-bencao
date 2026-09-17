@@ -97,54 +97,54 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 
 ### BL-006 — Matriz de permissões editável com auditoria (paridade acesso)
 - **Módulo:** Controle de Acesso
-- **Severidade:** importante
+- **Severidade:** bloqueia uso
 - **Onda:** fundação
-- **Origem mock:** `page-acesso` / `AccessMatrixEditor` / `access-matrix` / `ACCESS_PROFILES` / `role_permissions` seed
-- **Estado v216:** parcial
-- **O que falta:**
-  - schema: versionamento histórico de `role_permissions` (hoje só seed estático)
-  - API: CRUD matriz + invalidate sessão/capacidades
-  - UI: painéis `access-matrix`, `access-biennium`, `access-dashboard` (hoje só usuários)
-  - permissão: exclusivo administrador
-  - teste: mudança entra em vigor sem redeploy; 403 em API
-- **Critério de aceite:** matriz no Postgres editável como no mock; auditoria; frontend só consulta capacidades efetivas.
+- **Origem mock:** `AccessMatrixEditor` / `ACCESS_PROFILES`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - modelo de acesso por página (`app.pages`, `app.page_grants`, `app.page_grant_overrides`), com paridade ao `ACCESS_PROFILES` do mock
+  - `/sistema/acesso` → “Matriz de acesso”: cada perfil em cada página, com o padrão do perfil e as exceções (completo, consulta, sem acesso)
+  - API `GET/PUT /api/acesso/matriz`; toda alteração vai ao Dedo-duro com autor, antes e depois
+  - a página “Controle de Acesso” nunca é concedida pela matriz; o Administrador enxerga tudo e não aparece nela
+  - decisão do servidor: `app.page_level_for(perfil, departamentos, página)` é a única fonte, usada por `app.has_permission`
+- **Critério de aceite:** ✅ matriz editável com exceções auditadas; ✅ o que a matriz mostra é o que o servidor aplica.
 
 ### BL-007 — Biênio / gestão vigente
-- **Módulo:** Controle de Acesso
-- **Severidade:** importante
+- **Módulo:** Controle de Acesso / Diretoria
+- **Severidade:** bloqueia uso
 - **Onda:** fundação
-- **Origem mock:** `access-biennium` / `accessBienniumState`
-- **Estado v216:** parcial
-- **O que falta:**
-  - schema: tabela `bienniums` (campo `users.biennium_id` existe sem entidade)
-  - API/UI: vigência bloqueia edição quando biênio encerrado
-  - teste: usuário fora do biênio não edita módulos
-- **Critério de aceite:** mesmas regras do mock: acesso vigente por biênio; suspensão automática documentada.
+- **Origem mock:** biênio da Diretoria
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.bienniums` com CRUD em `/sistema/acesso` → “Biênios” e vínculo do biênio na ficha do usuário
+  - `app.user_access_allowed`: cargos da Diretoria (presidente, vice, secretaria, tesouraria, conselho fiscal) só acessam dentro do biênio, com 15 dias de tolerância após o fim (fuso de São Paulo)
+  - fora do biênio a sessão cai em `/auth/signout?motivo=bienio` com aviso claro; a lista de usuários mostra “Fora do biênio”
+  - teste de integração: o presidente perde a permissão quando o biênio vence
+- **Critério de aceite:** ✅ cargo sem biênio vigente não acessa; ✅ o Administrador continua entrando para corrigir o cadastro.
 
 ### BL-008 — Central de sugestões e melhorias
-- **Módulo:** Controle de Acesso / institucional
-- **Severidade:** depois
-- **Onda:** 2
-- **Origem mock:** `Suggestions` / `developerSuggestions` / painel em `page-acesso`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: `suggestions`
-  - API/UI: CRUD + resposta admin
-  - permissão: criar (ativos); administrar (admin)
-  - teste: protocolo, filtros, paginação
-- **Critério de aceite:** sugestões por módulo no Postgres; admin acompanha; Dedo-duro nas respostas.
+- **Módulo:** transversal
+- **Severidade:** desejável
+- **Onda:** fundação
+- **Origem mock:** `Suggestions`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.suggestions` + `/sistema/sugestoes`: qualquer pessoa autenticada envia e acompanha as próprias
+  - envio anônimo esconde o nome da Diretoria (a autoria fica no banco para responsabilização; o Dedo-duro não repete o conteúdo)
+  - a Diretoria responde e muda a situação (recebida, em análise, respondida, arquivada)
+- **Critério de aceite:** ✅ sugestões no Postgres, com resposta da Diretoria e impressão.
 
 ### BL-009 — Testar acessos (simulação de perfil)
 - **Módulo:** Controle de Acesso
-- **Severidade:** depois
+- **Severidade:** desejável
 - **Onda:** fundação
-- **Origem mock:** `AccessTesting` / nav “Testar Acessos”
-- **Estado v216:** só HTML
-- **O que falta:**
-  - UI: modo impersonação **somente** em ambiente sintético (proibida em produção)
-  - permissão/ops: flag; audit obrigatório
-  - teste: produção não expõe a função
-- **Critério de aceite:** ferramenta de QA sem troca de perfil demo em produção (RF-001); ou descontinuada formalmente.
+- **Origem mock:** `AccessTesting`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - aba “Testar acessos” em `/sistema/acesso`, disponível apenas fora de produção
+  - simula perfil + departamentos com `app.page_level_for` — a mesma função que decide o acesso de verdade, sem abrir sessão de ninguém
+  - cada simulação fica registrada no Dedo-duro
+- **Critério de aceite:** ✅ conferência de acesso sem personificar usuário; ✅ indisponível em produção.
 
 ### BL-010 — Importação/migração ZIP v215
 - **Módulo:** Fundação / RF-005
@@ -267,16 +267,17 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 
 ### BL-018 — Home / Visão Geral operacional
 - **Módulo:** home
-- **Severidade:** importante
+- **Severidade:** bloqueia uso
 - **Onda:** 1
-- **Origem mock:** `page-home` / `OperationalVisual` / atalhos por permissão / pendências
-- **Estado v216:** placeholder
-- **O que falta:**
-  - API: KPIs e agenda a partir do Postgres
-  - UI: welcome 215 + módulos reais (não cards “Migração”)
-  - permissão: só módulos permitidos
-  - teste: usuário restrito não vê atalhos indevidos
-- **Critério de aceite:** home igual ao mock com dados reais do servidor.
+- **Origem mock:** `OperationalVisual` / memória institucional e cards por perfil
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `GET /api/home`: memória institucional (fundação, idade e próximo aniversário no fuso de São Paulo), indicadores e “Minha área”
+  - **cada indicador só aparece se a pessoa pode ler aquele módulo e se ele está ligado** — os KPIs fixos que mostravam números para todo mundo saíram
+  - os cards de “Migração” das ondas 2 e 3 saíram: a Visão Geral mostra apenas o que existe
+  - “Minha área”: ficha vinculada, escala de limpeza, eventos e contribuições da própria pessoa
+  - teste: `lib/home.test.ts` (idade e próximo aniversário, inclusive no dia)
+- **Critério de aceite:** ✅ home com memória institucional e cards por permissão; ✅ nenhum número fora do escopo de leitura.
 
 ### BL-019 — Estatuto e Regimento (documentos institucionais)
 - **Módulo:** documentos
@@ -292,17 +293,15 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Critério de aceite:** PDFs oficiais no Postgres; download autorizado; disponível a trabalhadores ativos.
 
 ### BL-020 — Organograma sintético e analítico
-- **Módulo:** organograma
-- **Severidade:** depois
+- **Módulo:** transversal
+- **Severidade:** desejável
 - **Onda:** 1
-- **Origem mock:** `page-organograma` / `data-org=org-sintetico|org-analitico`
-- **Estado v216:** só HTML
-- **O que falta:**
-  - schema: estrutura institucional versionada (ou conteúdo estático gerenciado)
-  - UI: duas vistas
-  - permissão: `institucional.read`
-  - teste: conteúdo coerente com Estatuto
-- **Critério de aceite:** organograma consultável como no mock; fonte centralizada.
+- **Origem mock:** página Organograma
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `/sistema/organograma`: Diretoria do biênio vigente e coordenação de cada departamento, a partir dos cadastros reais
+  - leitura liberada a todas as contas ativas (como no mock), com impressão
+- **Critério de aceite:** ✅ organograma montado a partir de usuários e departamentos, sem lista fixa no código.
 
 ### BL-021 — Doutrina — painel, trabalhadores, palestrantes, estudos
 - **Módulo:** doutrina
@@ -744,33 +743,31 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Critério de aceite:** ✅ eleições e documentos no Postgres, com as etapas e datas do mock.
 
 ### BL-054 — Trabalhadores por departamento (painéis `*-trabalhadores`)
-- **Módulo:** transversal departamentos
+- **Módulo:** transversal
 - **Severidade:** importante
 - **Onda:** 1
-- **Origem mock:** painéis trabalhadores em doutrina/infância/juventude/social/patrimônio/eventos/divulgação/secretaria/diretoria
-- **Estado v216:** só HTML
-- **O que falta:**
-  - reutilizar schema BL-013 com filtro por dept
-  - UI/impressão por módulo
-  - permissão scoped
-  - teste
-- **Critério de aceite:** lista/impressão de trabalhadores por departamento igual ao mock.
+- **Origem mock:** painéis `*-trabalhadores`
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - painel comum “Trabalhadores” nas páginas de Patrimônio, Assistência, Eventos, Divulgação e Jurídico
+  - lista por situação (ativos, aguardando a Diretoria, inativos), com funções, contato e data de aprovação; a ficha completa segue no cadastro único
+  - respeita o escopo: só aparecem os departamentos que a pessoa pode ler
+- **Critério de aceite:** ✅ cada departamento vê seus trabalhadores sem duplicar cadastro.
 
 ---
 
 ## Fundação já entregue (rastreio — gaps residuais)
 
 ### BL-055 — Dedo-duro: fechar paridade de filtros/impressão do mock
-- **Módulo:** acesso / auditoria / RF-006
+- **Módulo:** auditoria
 - **Severidade:** importante
-- **Onda:** fundação
-- **Origem mock:** `access-audit` / `accessControl.audit` slice(0,3000)
-- **Estado v216:** parcial
-- **O que falta:**
-  - UI: impressão dedicada (além de CSV)
-  - API: garantir categorias/módulos de todos os fluxos de negócio quando migrarem
-  - teste: imutabilidade + chain `verify_audit_chain`
-- **Critério de aceite:** experiência Dedo-duro ≥ mock; fonte só `audit_events`; sem edição/exclusão app.
+- **Onda:** 1
+- **Origem mock:** impressão e filtros da auditoria
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - botão “Imprimir” no Dedo-duro respeitando os filtros aplicados
+  - a própria impressão é auditada (`POST /api/audit/print`, categoria Impressão), com total e filtros usados
+- **Critério de aceite:** ✅ impressão disponível e registrada, como manda a política de auditoria.
 
 ### BL-056 — Anexos: scanner, retenção, GC órfãos, volume
 - **Módulo:** anexos / RF-004
@@ -909,15 +906,14 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 
 ### BL-066 — Configuração institucional sem redeploy (RF-012)
 - **Módulo:** administração
-- **Severidade:** depois
+- **Severidade:** importante
 - **Onda:** fundação
 - **Origem mock:** parâmetros embutidos no JS
-- **Estado v216:** parcial
-- **O que falta:**
-  - schema: settings versionados (anos, biênio, integrações)
-  - API/UI admin
-  - permissão/teste/auditoria
-- **Critério de aceite:** parâmetros editáveis sem alterar código; segredos só em cofre/env.
+- **Estado v216:** entregue (falta UAT)
+- **Entregue (2026-09-17):**
+  - `app.institution_settings` + `/sistema/instituicao` (somente Administrador): nome, fundação, CNPJ, endereço, telefone, e-mail e a frase da Casa
+  - a Visão Geral passa a ler esses dados em vez de texto fixo no código; alteração auditada e com versão otimista
+- **Critério de aceite:** ✅ parâmetros institucionais editáveis sem alterar código; ✅ segredos continuam apenas em variáveis de ambiente.
 
 ---
 

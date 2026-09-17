@@ -31,11 +31,21 @@ export function AuditClient({ canExport }: { canExport: boolean }) {
   }, [query]);
 
   useEffect(() => { const timer = setTimeout(() => void load(), 250); return () => clearTimeout(timer); }, [load]);
+  /** A impressão do Dedo-duro também entra no Dedo-duro. */
+  async function printAudit() {
+    const description = Object.entries(filters).filter(([, value]) => value).map(([key, value]) => `${key}=${value}`).join(" · ");
+    await fetch("/api/audit/print", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description, total: data?.total ?? 0 })
+    }).catch(() => undefined);
+    window.print();
+  }
+
   function change(key: keyof typeof filters, value: string) { setPage(1); setFilters((old) => ({ ...old, [key]: value })); }
 
   return (
     <section className="card">
-      <div className="toolbar"><strong>{data?.total ?? 0} evento(s)</strong>{canExport ? <a className="button" href={`/api/audit/export?${query}`}>Exportar CSV</a> : null}</div>
+      <div className="toolbar"><strong>{data?.total ?? 0} evento(s)</strong><span className="row-actions no-print"><button type="button" className="button" onClick={() => void printAudit()}>⎙ Imprimir</button>{canExport ? <a className="button" href={`/api/audit/export?${query}`}>Exportar CSV</a> : null}</span></div>
       <div className="filters">
         <label>Pesquisar<input value={filters.search} onChange={(e) => change("search", e.target.value)} placeholder="Usuário, módulo, ação ou detalhes" /></label>
         <label>Usuário<select value={filters.actor} onChange={(e) => change("actor", e.target.value)}><option value="">Todos</option>{data?.facets.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>

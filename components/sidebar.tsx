@@ -22,6 +22,10 @@ export function Sidebar({ actor, capabilities }: { actor: { name: string; role: 
     ["/sistema/auditoria", "Dedo-duro / Histórico", capabilities.audit],
     ["/sistema/anexos", "Anexos no banco", capabilities.attachments],
     ["/sistema/usuarios", "Usuários e permissões", capabilities.users],
+    ["/sistema/acesso", "Controle de Acesso", capabilities.users],
+    ["/sistema/instituicao", "Dados da instituição", capabilities.users],
+    ["/sistema/organograma", "Organograma", true],
+    ["/sistema/sugestoes", "Sugestões", true],
     ["/sistema/modulos", "Módulos e ondas", capabilities.moduleAdmin],
     ["/sistema/importacao", "Importação v215", capabilities.moduleAdmin]
   ] as const;

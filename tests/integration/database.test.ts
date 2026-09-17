@@ -407,7 +407,9 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect((await resource.POST(json("POST", { ...entry, account_code: "2.02.01", description: "Energia", amount_cents: 8990, fund_source: "Caixa" }), entries)).status).toBe(201);
 
     const summary = await (await monthRoute.GET(json("GET", undefined, `https://app.test/x?month=${month}`))).json();
-    expect(summary.totals).toMatchObject({ income: 15000, expense: 8990, closing: 6010 });
+    // O saldo anterior acumula meses passados do banco de teste; o resultado do mês é o que importa aqui.
+    expect(summary.totals).toMatchObject({ income: 15000, expense: 8990 });
+    expect(summary.totals.closing).toBe(summary.totals.opening + 6010);
     expect(summary.status).toBe("Aberto");
 
     // Envio exige fechamento antes.
