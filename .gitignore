@@ -16,3 +16,5 @@ __pycache__/
 Thumbs.db
 /tmp/
 /backups-pessoais/
+.vercel
+.env*
