@@ -2,6 +2,25 @@
 
 Stack escolhida (sem VPS): **Vercel** (Next.js) + **Supabase** (Auth + PostgreSQL). Adequada para ~20 usuários.
 
+## Plano do Supabase: grátis no piloto, Pro antes dos dados reais
+
+| | Free | Pro |
+|---|---|---|
+| Banco | 500 MB | 8 GB inclusos |
+| Backup | **sem PITR**; projeto **pausa após 7 dias sem uso** | PITR e backups diários |
+| Uso indicado aqui | UAT e piloto com **dados sintéticos** | operação com dados reais |
+
+Os anexos ficam no próprio PostgreSQL (fatiados em `app.attachment_chunks`), então o espaço acaba mais rápido do que
+parece: uns 400 MB de documentos já encostam no limite do Free. E sem PITR não há como voltar atrás de um erro de
+operação. Por isso:
+
+1. **Piloto/UAT**: projeto Free, dados sintéticos, sem nenhum dado pessoal real.
+2. **Antes do go-live**: subir para Pro, ligar PITR, testar uma restauração (`docs/BACKUP_RESTORE.md`) e só então
+   importar dados reais. As portas estão em `docs/GO_LIVE.md`.
+
+Se a Casa quiser adiar o Pro, o sistema continua funcionando — mas o go-live com dados reais fica bloqueado pela porta
+de backup, que é decisão da Diretoria, não do código.
+
 ## Pré-requisitos
 
 - Conta Vercel com o repositório `PKTech-ai/lar-da-bencao`

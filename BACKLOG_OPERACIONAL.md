@@ -871,27 +871,27 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Critério de aceite:** ⏳ zero vulnerabilidade crítica/alta pendente após pentest; ✅ testes de autorização positivos/negativos verdes.
 
 ### BL-063 — UAT, manual, treinamento, suporte e rollback por onda
-- **Módulo:** ops / RF-008 / RF-014 / RF-015
+- **Módulo:** processo
 - **Severidade:** bloqueia uso
-- **Onda:** ops
-- **Origem mock:** fluxos críticos por módulo
-- **Estado v216:** parcial (roteiro de UAT e rollback prontos; execução e manual pendentes)
-- **Entregue (2026-09-16):**
-  - `docs/UAT_ONDA1.md`: roteiro por módulo (fundação, trabalhadores/Diretoria, Doutrina, Infância/Juventude, importação) com assinaturas; a referência do UAT é exigida para liberar o módulo (BL-011)
-  - rollback por onda: desligar o módulo em Módulos e ondas; reversão da importação
-  - suporte: `docs/RUNBOOKS.md`; testes de integração por fluxo crítico (`pnpm test:integration`)
-- **Pendências:** executar e assinar o UAT; manual v216 (sem localStorage) e treinamento; piloto; testes E2E de navegador
-- **Critério de aceite:** ⏳ checklist §14 do PRD 100% verde antes de dados reais na onda.
+- **Onda:** fundação
+- **Origem mock:** N/A
+- **Estado v216:** artefatos prontos; execução com a Casa
+- **Pronto (2026-09-17):**
+  - `docs/UAT_ONDA1.md` e `docs/UAT_ONDAS_2_3.md`: roteiro módulo a módulo, com as regras que precisam ser vistas funcionando
+  - `docs/GO_LIVE.md`: cada porta de entrada dos dados reais, quem executa, como comprovar, ordem de liberação e plano de volta atrás
+  - rollback por onda já é código: desligar o módulo em `/sistema/modulos` (efeito imediato, dados preservados) e reverter importação v215
+- **Falta (não é código):** executar o UAT com os donos de cada módulo, registrar as referências ao ligar cada módulo e treinar as pessoas.
+- **Critério de aceite:** UAT das ondas executado e registrado; cada módulo ligado com a referência do respectivo UAT.
 
 ### BL-064 — Despublicar hosting estático antigo
 - **Módulo:** ops
 - **Severidade:** importante
-- **Onda:** ops
-- **Origem mock:** `dist/index.html` hospedado historicamente
-- **Estado v216:** furo ops
-- **O que falta:**
-  - ops: tirar do ar URL de teste estática quando domínio Vercel estiver ativo
-- **Critério de aceite:** único endpoint oficial = app Vercel; mock não recebe dados reais.
+- **Onda:** fundação
+- **Origem mock:** site estático da v215
+- **Estado v216:** dependente de quem hospeda hoje
+- **Pronto (2026-09-17):** a porta está no checklist de go-live (`docs/GO_LIVE.md` §1), com a evidência esperada (URL antiga fora do ar ou com aviso do sistema novo).
+- **Por que importa:** enquanto o HTML antigo estiver no ar, ele continua guardando dados no navegador de quem abrir, fora de qualquer auditoria — e as pessoas podem continuar usando o sistema errado.
+- **Critério de aceite:** URL antiga fora do ar (ou redirecionando), confirmada antes da entrada de dados reais.
 
 ### BL-065 — Acessibilidade AA nas jornadas críticas
 - **Módulo:** UI / RNF-007
