@@ -481,4 +481,26 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     const audit = await query("select 1 from app.audit_events where entity_type = 'whatsapp' and entity_id = $1 and action like '%enviada%'", [id]);
     expect(audit.rowCount).toBe(1);
   });
+  it("as tabelas dos cadastros batem com as definições do motor", async () => {
+    const { RESOURCE_LIST } = await import("@/lib/resources/registry");
+    const columns = await query<{ table_name: string; column_name: string }>(
+      "select table_name, column_name from information_schema.columns where table_schema = 'app'"
+    );
+    const byTable = new Map<string, Set<string>>();
+    for (const row of columns.rows) {
+      if (!byTable.has(row.table_name)) byTable.set(row.table_name, new Set());
+      byTable.get(row.table_name)!.add(row.column_name);
+    }
+    const missing: string[] = [];
+    for (const def of RESOURCE_LIST) {
+      const table = byTable.get(def.table);
+      if (!table) { missing.push(`${def.key}: tabela app.${def.table} não existe`); continue; }
+      for (const field of def.fields) if (!table.has(field.name)) missing.push(`${def.key}: coluna ${field.name}`);
+      for (const column of ["id", "archived_at", "archive_reason", "version", "created_at", "created_by", "updated_at", "updated_by"]) {
+        if (!table.has(column)) missing.push(`${def.key}: coluna padrão ${column}`);
+      }
+      for (const column of Object.keys(def.fixed ?? {})) if (!table.has(column)) missing.push(`${def.key}: coluna fixa ${column}`);
+    }
+    expect(missing).toEqual([]);
+  });
 });
