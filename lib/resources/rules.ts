@@ -84,15 +84,16 @@ RULES["tesouraria-doacoes"] = async ({ client, input }) => {
   await assertMonthOpen(client, String(input.received_at).slice(0, 7));
 };
 
-/** Análise do Conselho Fiscal: só sobre mês enviado pela Tesouraria, e um parecer por mês. */
+/** Análise do Conselho Fiscal: só sobre competência fechada (liberada) e um parecer por mês. */
 RULES["conselho-analises"] = async ({ client, input, before }) => {
+  if (before?.locked_at) throw new AppError("Esta decisão foi arquivada pelo Conselho Fiscal e não pode mais ser alterada.", 409, "COUNCIL_ARCHIVED");
   const month = String(input.reference_month);
-  const sent = await client.query<{ status: string }>("select status from app.treasury_months where reference_month = $1", [month]);
-  if (sent.rows[0]?.status !== "Enviado ao Conselho Fiscal") {
-    throw new AppError("Este mês ainda não foi enviado pela Tesouraria ao Conselho Fiscal.");
+  const released = await client.query<{ status: string }>("select status from app.treasury_months where reference_month = $1", [month]);
+  if (released.rows[0]?.status !== "Fechado") {
+    throw new AppError("Esta competência ainda não foi fechada pela Tesouraria, então não está na pauta do Conselho Fiscal.");
   }
   const duplicated = await client.query(
-    "select 1 from app.fiscal_reviews where reference_month = $1 and ($2::uuid is null or id <> $2)",
+    "select 1 from app.fiscal_reviews where reference_month = $1 and archived_at is null and ($2::uuid is null or id <> $2)",
     [month, before?.id ?? null]
   );
   if (duplicated.rowCount) throw new AppError("Já existe uma análise registrada para este mês.", 409, "DUPLICATE");

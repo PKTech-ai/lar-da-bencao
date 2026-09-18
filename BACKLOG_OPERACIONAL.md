@@ -712,9 +712,10 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Origem mock:** `treasury-fiscal` / `fiscalReviews` `cashClosingChecks`
 - **Estado v216:** entregue (falta UAT)
 - **Entregue (2026-09-17):**
-  - situação do mês em `app.treasury_months`: Aberto → Fechado → Enviado ao Conselho Fiscal
-  - enviar exige mês fechado; mês enviado não reabre sem devolução do Conselho
-  - teste de integração cobre os três passos e os bloqueios
+  - situação do mês em `app.treasury_months`: **fechar já libera** o relatório ao Conselho Fiscal, como no mock (não há passo separado de envio)
+  - reabrir é possível enquanto o Conselho não decidiu, exige motivo e retira o parecer em análise da pauta (ele fica arquivado no histórico, em vez de ser apagado como no mock)
+  - depois de “Deferido” ou “Indeferido”, ou com a decisão arquivada, o caixa não reabre
+  - teste de integração cobre fechar, reabrir com parecer em análise, decidir e a recusa de reabertura
 - **Critério de aceite:** ✅ envio mensal ao CF registrado dos dois lados, sem alterar lançamentos.
 
 ### BL-052 — Conselho Fiscal — análise, parecer, histórico, anexos
@@ -724,8 +725,9 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Origem mock:** `cf-analise` `cf-parecer` `cf-historico` / `CouncilFiscalProofs`
 - **Estado v216:** entregue (falta UAT)
 - **Entregue (2026-09-17):**
-  - `app.fiscal_reviews`: um parecer por mês, situação (em análise, aprovado, com ressalvas, reprovado), conselheiros presentes, análise e parecer
-  - só aceita mês que a Tesouraria enviou; o Conselho não altera lançamento nenhum
+  - `app.fiscal_reviews`: um parecer vigente por competência, com a decisão do mock (Em análise → Deferido ou Indeferido), conselheiros presentes, análise e parecer
+  - só aceita competência já fechada pela Tesouraria; o Conselho não altera lançamento nenhum
+  - arquivar a decisão trava o parecer (não muda mais) e impede a reabertura do caixa
   - parecer assinado e documentos anexados (`fiscal_council_document`)
   - teste de integração: Tesouraria não escreve no parecer; parecer duplicado é recusado
 - **Critério de aceite:** ✅ análise e parecer no Postgres, com histórico e anexos; ✅ separação de poderes preservada.

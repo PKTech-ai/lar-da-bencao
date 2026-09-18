@@ -34,12 +34,22 @@ export function TreasuryMonthPanel() {
   const load = useCallback(() => api<Summary>(`/api/tesouraria/mes?month=${month}`).then(setData).catch((e: Error) => setError(e.message)), [month]);
   useEffect(() => { void load(); }, [load]);
 
-  function act(action: "close" | "reopen" | "send") {
-    const notes = action === "reopen" ? window.prompt("Motivo da reabertura do mês:") ?? "" : "";
-    if (action === "reopen" && notes.trim().length < 3) return;
+  function act(action: "close" | "reopen") {
+    let notes = "";
+    if (action === "close" && !window.confirm("Fechar o mês libera o relatório para o Conselho Fiscal e bloqueia novos lançamentos nesta competência. Continuar?")) return;
+    if (action === "reopen") {
+      if (!window.confirm("Reabrir o caixa retira o relatório da análise do Conselho Fiscal. Continuar?")) return;
+      notes = window.prompt("Motivo da reabertura do caixa:") ?? "";
+      if (notes.trim().length < 3) return;
+    }
     setBusy(true); setError(""); setMessage("");
-    void postJson<{ status: string }>("/api/tesouraria/mes", { month, action, notes })
-      .then(async (result) => { await load(); setMessage(`Mês ${monthLabel(month)}: ${result.status.toLowerCase()}.`); })
+    void postJson<{ status: string; pulledReview: boolean }>("/api/tesouraria/mes", { month, action, notes })
+      .then(async (result) => {
+        await load();
+        setMessage(`Caixa de ${monthLabel(month)}: ${result.status.toLowerCase()}.`
+          + (action === "close" ? " O relatório está disponível para o Conselho Fiscal." : "")
+          + (result.pulledReview ? " O parecer em análise saiu da pauta e ficou no histórico." : ""));
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setBusy(false));
   }
@@ -57,15 +67,13 @@ export function TreasuryMonthPanel() {
           <button type="button" className="button" onClick={() => window.print()}>⎙ Imprimir</button>
           {data?.capabilities.close ? (
             <div className="row-actions">
-              {data.status === "Aberto" ? <button type="button" className="button primary" onClick={() => act("close")} disabled={busy}>Fechar o mês</button> : null}
-              {data.status === "Fechado" ? <>
-                <button type="button" className="button primary" onClick={() => act("send")} disabled={busy}>Enviar ao Conselho Fiscal</button>
-                <button type="button" className="button" onClick={() => act("reopen")} disabled={busy}>Reabrir</button>
-              </> : null}
+              {data.status === "Aberto"
+                ? <button type="button" className="button primary" onClick={() => act("close")} disabled={busy}>Fechar o mês e liberar ao Conselho Fiscal</button>
+                : <button type="button" className="button" onClick={() => act("reopen")} disabled={busy}>Reabrir o caixa</button>}
             </div>
           ) : null}
         </div>
-        {data?.status !== "Aberto" ? <p className="notice">Mês {data?.status?.toLowerCase()}: os lançamentos ficam preservados e não podem ser alterados.</p> : null}
+        {data?.status === "Fechado" ? <p className="notice">Competência fechada e liberada ao Conselho Fiscal: os lançamentos ficam preservados e não podem ser alterados. Reabrir só é possível enquanto o Conselho não decidir.</p> : null}
       </section>
       <div className="grid cards">
         <article className="card kpi"><span className="small">Saldo anterior</span><b>{formatMoney(data?.totals.opening ?? 0)}</b></article>

@@ -133,7 +133,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_conselho_fiscal",
     access: { resource: "conselho_fiscal" },
     sections: [
-      { slug: "", label: "Análises e Pareceres", resource: "conselho-analises" }
+      { slug: "", label: "Análises e Pareceres", panel: "conselho-analises" }
     ]
   },
   {

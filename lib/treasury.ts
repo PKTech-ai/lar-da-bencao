@@ -25,7 +25,12 @@ export async function monthStatus(client: Pick<PoolClient, "query">, month: stri
 
 export async function assertMonthOpen(client: Pick<PoolClient, "query">, month: string) {
   const status = await monthStatus(client, month);
-  if (status !== "Aberto") throw new AppError(`O caixa de ${month.split("-").reverse().join("/")} está ${status.toLowerCase()}. Reabra o mês para alterar lançamentos.`, 409, "MONTH_CLOSED");
+  if (status !== "Aberto") {
+    throw new AppError(
+      `O caixa de ${month.split("-").reverse().join("/")} está fechado e já foi liberado ao Conselho Fiscal. Reabra o mês para alterar lançamentos.`,
+      409, "MONTH_CLOSED"
+    );
+  }
 }
 
 export async function assertPostingAccount(client: Pick<PoolClient, "query">, code: string) {
@@ -100,41 +105,84 @@ export async function monthSummary(month: string) {
   };
 }
 
-const closeSchema = z.object({ month: monthSchema, action: z.enum(["close", "reopen", "send"]), notes: z.string().trim().max(2000).optional().default("") });
+const closeSchema = z.object({ month: monthSchema, action: z.enum(["close", "reopen"]), notes: z.string().trim().max(2000).optional().default("") });
 
-/** Fecha, reabre ou envia o mês ao Conselho Fiscal (cada passo fica no Dedo-duro). */
+/**
+ * Fecha ou reabre o mês (regra do mock v215):
+ * fechar libera o relatório ao Conselho Fiscal na mesma hora; reabrir só é possível enquanto o
+ * Conselho não decidiu, e tira o relatório da análise — o parecer em andamento vai para o histórico.
+ */
 export async function changeMonthStatus(actor: Actor, body: unknown) {
   const input = closeSchema.parse(body);
   const summary = await monthSummary(input.month);
   return transaction(async (client) => {
     const current = await monthStatus(client, input.month);
-    const next = input.action === "close" ? "Fechado" : input.action === "reopen" ? "Aberto" : "Enviado ao Conselho Fiscal";
+    const next = input.action === "close" ? "Fechado" : "Aberto";
     if (input.action === "close" && current !== "Aberto") throw new AppError("Este mês já foi fechado.", 409, "ALREADY_CLOSED");
-    if (input.action === "send" && current !== "Fechado") throw new AppError("Feche o mês antes de enviar ao Conselho Fiscal.", 409, "NOT_CLOSED");
-    if (input.action === "reopen" && current === "Enviado ao Conselho Fiscal") {
-      throw new AppError("O mês já foi enviado ao Conselho Fiscal. Peça a devolução antes de reabrir.", 409, "SENT_TO_COUNCIL");
+    if (input.action === "reopen") {
+      if (current === "Aberto") throw new AppError("Este mês já está aberto.", 409, "ALREADY_OPEN");
+      if (input.notes.trim().length < 3) throw new AppError("Informe o motivo da reabertura do caixa.");
+      const decided = await client.query<{ status: string; locked_at: string | null }>(
+        "select status, locked_at from app.fiscal_reviews where reference_month = $1 and archived_at is null",
+        [input.month]
+      );
+      const review = decided.rows[0];
+      if (review?.locked_at) throw new AppError("Esta competência já foi arquivada após decisão do Conselho Fiscal e não pode ser reaberta.", 409, "COUNCIL_ARCHIVED");
+      if (review && ["Deferido", "Indeferido"].includes(review.status)) {
+        throw new AppError("Esta competência já recebeu decisão do Conselho Fiscal. Para preservar o histórico, o caixa não pode ser reaberto.", 409, "COUNCIL_DECIDED");
+      }
     }
-    if (input.action === "reopen" && current === "Aberto") throw new AppError("Este mês já está aberto.", 409, "ALREADY_OPEN");
+    // Parecer ainda em análise sai da pauta do Conselho quando o caixa muda de situação.
+    const pulled = await client.query<{ id: string }>(
+      `update app.fiscal_reviews set archived_at = now(), archived_by = $2,
+              archive_reason = 'Caixa da competência reaberto ou fechado novamente pela Tesouraria.', version = version + 1
+        where reference_month = $1 and archived_at is null and status = 'Em análise' returning id`,
+      [input.month, actor.id]
+    );
     await client.query(
-      `insert into app.treasury_months (reference_month, status, opening_cents, closing_cents, income_cents, expense_cents, notes, closed_by, closed_at, sent_by, sent_at)
-       values ($1, $2, $3, $4, $5, $6, $7, case when $2 = 'Aberto' then null else $8::uuid end, case when $2 = 'Aberto' then null else now() end,
-               case when $2 = 'Enviado ao Conselho Fiscal' then $8::uuid else null end, case when $2 = 'Enviado ao Conselho Fiscal' then now() else null end)
+      `insert into app.treasury_months (reference_month, status, opening_cents, closing_cents, income_cents, expense_cents, notes,
+                                        closed_by, closed_at, released_by, released_at, reopened_at, reopen_reason)
+       values ($1, $2, $3, $4, $5, $6, $7,
+               case when $2 = 'Fechado' then $8::uuid end, case when $2 = 'Fechado' then now() end,
+               case when $2 = 'Fechado' then $8::uuid end, case when $2 = 'Fechado' then now() end,
+               case when $2 = 'Aberto' then now() end, case when $2 = 'Aberto' then $7 else '' end)
        on conflict (reference_month) do update set status = excluded.status, opening_cents = excluded.opening_cents, closing_cents = excluded.closing_cents,
             income_cents = excluded.income_cents, expense_cents = excluded.expense_cents,
             notes = case when excluded.notes = '' then app.treasury_months.notes else excluded.notes end,
             closed_by = excluded.closed_by, closed_at = excluded.closed_at,
-            sent_by = coalesce(excluded.sent_by, app.treasury_months.sent_by), sent_at = coalesce(excluded.sent_at, app.treasury_months.sent_at),
+            released_by = excluded.released_by, released_at = excluded.released_at,
+            reopened_at = excluded.reopened_at, reopen_reason = excluded.reopen_reason,
             version = app.treasury_months.version + 1`,
       [input.month, next, summary.totals.opening, summary.totals.closing, summary.totals.income, summary.totals.expense, input.notes, actor.id]
     );
     await appendAudit(actor, {
       category: "Edição",
-      action: input.action === "close" ? "Fechamento do caixa mensal" : input.action === "reopen" ? "Reabertura do caixa mensal" : "Envio do caixa ao Conselho Fiscal",
+      action: input.action === "close" ? "Fechamento do caixa mensal e liberação ao Conselho Fiscal" : "Reabertura do caixa mensal",
       module: MODULE, section: "Caixa Mensal", entityType: "tesouraria-mes", entityId: input.month,
-      details: `${input.month} · entradas ${summary.totals.income / 100} · saídas ${summary.totals.expense / 100} · saldo ${summary.totals.closing / 100}${input.notes ? ` · ${input.notes}` : ""}`,
+      details: `${input.month} · entradas ${summary.totals.income / 100} · saídas ${summary.totals.expense / 100} · saldo ${summary.totals.closing / 100}`
+        + `${input.notes ? ` · ${input.notes}` : ""}${pulled.rowCount ? " · parecer em análise retirado da pauta" : ""}`,
       before: { status: current }, after: { status: next }
     }, client);
-    return { status: next };
+    return { status: next, pulledReview: Boolean(pulled.rowCount) };
+  });
+}
+
+/** Arquiva a decisão do Conselho Fiscal: trava alterações e impede reabrir o caixa. */
+export async function lockFiscalReview(actor: Actor, id: string) {
+  return transaction(async (client) => {
+    const found = await client.query<{ reference_month: string; status: string; locked_at: string | null }>(
+      "select reference_month, status, locked_at from app.fiscal_reviews where id = $1 and archived_at is null for update",
+      [id]
+    );
+    const review = found.rows[0];
+    if (!review) throw new AppError("Parecer não encontrado.", 404, "NOT_FOUND");
+    if (review.locked_at) throw new AppError("Esta decisão já está arquivada.", 409, "ALREADY_ARCHIVED");
+    if (!["Deferido", "Indeferido"].includes(review.status)) throw new AppError("Registre a decisão (deferido ou indeferido) antes de arquivar.", 409, "NOT_DECIDED");
+    await client.query("update app.fiscal_reviews set locked_at = now(), locked_by = $2, version = version + 1 where id = $1", [id, actor.id]);
+    await appendAudit(actor, {
+      category: "Edição", action: "Decisão do Conselho Fiscal arquivada", module: "Conselho Fiscal", section: "Análise mensal",
+      entityType: "conselho-analises", entityId: id, details: `${review.reference_month} · ${review.status}`
+    }, client);
   });
 }
 

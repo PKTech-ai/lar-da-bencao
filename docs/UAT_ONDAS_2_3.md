@@ -59,15 +59,18 @@ Antes de começar, o Administrador precisa ter feito, em `/sistema/acesso` e `/s
 - [ ] Comprovante por lançamento
 - [ ] Contribuições do mês e vínculo com a ficha do trabalhador
 - [ ] Mantenedores e doações recebidas; mantenedor encerrado não recebe doação
-- [ ] Fechar o mês: lançar depois disso é recusado (mensagem clara)
-- [ ] Reabrir com motivo; depois de enviado ao Conselho Fiscal, reabrir exige devolução
+- [ ] Fechar o mês **libera o relatório ao Conselho Fiscal** na mesma hora; lançar depois disso é recusado (mensagem clara)
+- [ ] Reabrir com motivo enquanto o Conselho não decidiu — o parecer em análise sai da pauta e fica no histórico
+- [ ] Depois de “Deferido” ou “Indeferido”, o caixa não reabre mais
 - [ ] Importar extrato OFX e CSV; reimportar o mesmo arquivo não duplica linhas
 - [ ] Conciliar com valor diferente é recusado; “deixar fora” exige motivo; desfazer funciona
 - [ ] Relatório anual bate com o caixa mensal
 
 ## Conselho Fiscal (`module_conselho_fiscal`)
-- [ ] Mês só aparece para análise depois de enviado pela Tesouraria
-- [ ] Um parecer por mês; segundo parecer é recusado
+- [ ] Competência só entra na pauta depois de fechada pela Tesouraria
+- [ ] Decisão é “Deferido” ou “Indeferido” (antes disso, “Em análise”)
+- [ ] Um parecer vigente por competência; segundo parecer é recusado
+- [ ] Arquivar a decisão trava o parecer e impede a reabertura do caixa
 - [ ] Parecer assinado anexado; o Conselho não consegue alterar lançamento nenhum
 
 ## Jurídico (`module_juridico`)

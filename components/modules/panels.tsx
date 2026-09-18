@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { BirthdaysPanel } from "@/components/modules/aniversariantes";
+import { FiscalReviewsPanel } from "@/components/modules/conselho-fiscal";
 import { BookLoansPanel, BookshopSummary } from "@/components/modules/divulgacao-livraria";
 import { MeetingRecorder } from "@/components/modules/secretaria-gravador";
 import { AnnualReport } from "@/components/modules/relatorio-anual";
@@ -58,6 +59,7 @@ export function ModulePanel({ name }: { name: string }) {
       text="As fichas aguardando decisão ficam no cadastro único de Trabalhadores, com o histórico de cada admissão." />;
     case "sugestoes-atalho": return <Shortcut href="/sistema/sugestoes" label="Sugestões e elogios"
       text="Mensagens enviadas pelas pessoas da Casa, com a resposta da Diretoria." />;
+    case "conselho-analises": return <FiscalReviewsPanel />;
     case "presidencia-painel": return <PresidenciaPainel />;
     default: return <p className="notice">Painel em preparação.</p>;
   }

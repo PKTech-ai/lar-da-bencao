@@ -390,7 +390,7 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect(both.capabilities).toEqual({ create: true, update: true, delete: true });
     expect(both.records.some((r: { description: string }) => r.description === "Bazar de setembro")).toBe(true);
   });
-  it("tesouraria: lançamento, fechamento do mês e envio ao Conselho Fiscal", async () => {
+  it("tesouraria: lançamento, fechamento do mês e liberação ao Conselho Fiscal", async () => {
     const resource = await import("@/app/api/r/[resource]/route");
     const monthRoute = await import("@/app/api/tesouraria/mes/route");
     const treasurer = await createActor("tesoureiro");
@@ -412,25 +412,54 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect(summary.totals.closing).toBe(summary.totals.opening + 6010);
     expect(summary.status).toBe("Aberto");
 
-    // Envio exige fechamento antes.
-    expect((await monthRoute.POST(json("POST", { month, action: "send" }))).status).toBe(409);
+    // O Conselho só recebe a competência depois do fechamento (que já libera, como no mock).
+    const reviews = { params: Promise.resolve({ resource: "conselho-analises" }) };
+    const review = { reference_month: month, status: "Em análise", review_date: todayIso(), reviewers: "Conselho", analysis: "Conferindo", opinion: "" };
+    const council = await createActor("conselheiro_fiscal");
+    current.actor = council;
+    expect((await resource.POST(json("POST", review), reviews)).status).toBe(400);
+
+    current.actor = treasurer;
     expect((await monthRoute.POST(json("POST", { month, action: "close" }))).status).toBe(200);
     // Mês fechado não recebe lançamento novo.
     const blocked = await resource.POST(json("POST", { ...entry, description: "Atrasado" }), entries);
     expect(blocked.status).toBe(409);
     expect((await blocked.json()).code).toBe("MONTH_CLOSED");
-    expect((await monthRoute.POST(json("POST", { month, action: "send" }))).status).toBe(200);
-    // Depois de enviado, só com devolução do Conselho.
-    expect((await monthRoute.POST(json("POST", { month, action: "reopen", notes: "Correção" }))).status).toBe(409);
 
-    // O Conselho Fiscal registra o parecer; a Tesouraria não entra nessa aba.
-    const reviews = { params: Promise.resolve({ resource: "conselho-analises" }) };
-    const review = { reference_month: month, status: "Aprovado com ressalvas", review_date: todayIso(), reviewers: "Conselho", analysis: "Conferido", opinion: "Aprovado com ressalvas." };
+    // A Tesouraria não escreve parecer; o Conselho sim, e só um por competência.
     expect((await resource.POST(json("POST", review), reviews)).status).toBe(403);
-    current.actor = await createActor("conselheiro_fiscal");
-    expect((await resource.POST(json("POST", review), reviews)).status).toBe(201);
-    // Um parecer por mês.
+    current.actor = council;
+    const created = await resource.POST(json("POST", review), reviews);
+    expect(created.status).toBe(201);
+    const reviewId = (await created.json()).id as string;
     expect((await resource.POST(json("POST", review), reviews)).status).toBe(409);
+
+    // Com parecer só "em análise", a Tesouraria ainda reabre — e o parecer sai da pauta.
+    current.actor = treasurer;
+    const reopened = await monthRoute.POST(json("POST", { month, action: "reopen", notes: "Faltou um comprovante." }));
+    expect(reopened.status).toBe(200);
+    expect(await reopened.json()).toMatchObject({ status: "Aberto", pulledReview: true });
+    expect((await query("select 1 from app.fiscal_reviews where id=$1 and archived_at is not null", [reviewId])).rowCount).toBe(1);
+
+    // Depois da decisão do Conselho, o caixa não reabre mais.
+    expect((await monthRoute.POST(json("POST", { month, action: "close" }))).status).toBe(200);
+    current.actor = council;
+    const decided = await resource.POST(json("POST", { ...review, status: "Deferido", opinion: "Contas em ordem." }), reviews);
+    expect(decided.status).toBe(201);
+    const decidedId = (await decided.json()).id as string;
+    current.actor = treasurer;
+    const refused = await monthRoute.POST(json("POST", { month, action: "reopen", notes: "Tentativa depois da decisão." }));
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).code).toBe("COUNCIL_DECIDED");
+
+    // Arquivar a decisão trava o parecer.
+    const archive = await import("@/app/api/conselho/pareceres/[id]/arquivar/route");
+    current.actor = council;
+    expect((await archive.POST(json("POST", {}), { params: Promise.resolve({ id: decidedId }) })).status).toBe(200);
+    const item = await import("@/app/api/r/[resource]/[id]/route");
+    const change = await item.PATCH(json("PATCH", { ...review, status: "Indeferido", version: 2 }), { params: Promise.resolve({ resource: "conselho-analises", id: decidedId }) });
+    expect(change.status).toBe(409);
+    expect((await change.json()).code).toBe("COUNCIL_ARCHIVED");
   });
 
   it("extrato bancário: importação sem repetir linhas e conciliação pelo valor", async () => {

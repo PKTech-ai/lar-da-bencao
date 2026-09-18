@@ -10,18 +10,19 @@ export const fiscalReviews: ResourceDef = {
   section: "Análise mensal",
   flag: "module_conselho_fiscal",
   scope: { resource: "conselho_fiscal" },
-  intro: "Análise do caixa mensal enviado pela Tesouraria. O parecer fica no histórico e não altera os lançamentos.",
+  intro: "Análise do caixa mensal liberado pela Tesouraria. O parecer fica no histórico e não altera lançamento nenhum. Arquivar a decisão trava alterações e impede a reabertura do caixa.",
   rules: "conselho-analises",
   orderBy: "r.reference_month desc",
   search: ["analysis", "opinion", "reviewers"],
   filters: [{ name: "status", label: "Situação" }],
   fields: [
-    { name: "reference_month", label: "Mês analisado", type: "month", required: true },
-    { name: "status", label: "Situação", type: "select", options: ["Em análise", "Aprovado", "Aprovado com ressalvas", "Reprovado"], required: true },
+    { name: "reference_month", label: "Competência analisada", type: "month", required: true },
+    { name: "status", label: "Decisão", type: "select", options: ["Em análise", "Deferido", "Indeferido"], required: true },
     { name: "review_date", label: "Data da análise", type: "date", required: true, notFuture: true },
     { name: "reviewers", label: "Conselheiros presentes", type: "text", max: 300, wide: true },
     { name: "analysis", label: "Análise", type: "textarea", max: 8000, wide: true, hideInList: true },
-    { name: "opinion", label: "Parecer", type: "textarea", max: 8000, wide: true, hideInList: true }
+    { name: "opinion", label: "Parecer", type: "textarea", max: 8000, wide: true, hideInList: true },
+    { name: "locked_at", label: "Decisão arquivada em", type: "date", readOnly: true, hideInList: true, help: "Depois de arquivada, a decisão não muda mais e o caixa não reabre." }
   ],
   attachments: { ownerType: "fiscal_council_document", kinds: [DOC_KIND("opinion", "Parecer assinado e documentos")], maxPerRecord: 10 }
 };
