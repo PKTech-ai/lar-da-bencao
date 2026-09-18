@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     const filters = listSchema.parse({ status: params.get("status") ?? undefined, department: params.get("department") ?? undefined });
     const result = await query(
       `select w.id, w.full_name, w.email, w.phone, w.birth_date, w.status, w.functions, w.available_days,
+              w.contribution_cents::text as contribution_cents, w.contribution_due_day,
               w.origin_department, w.requested_at, w.approved_at, w.version,
               coalesce(array_agg(wd.department_key order by wd.department_key) filter (where wd.department_key is not null), '{}') as departments,
               (select row_to_json(d) from (
@@ -62,13 +63,13 @@ export async function POST(request: Request) {
       const inserted = await client.query<{ id: string }>(
         `insert into app.workers (full_name, email, phone, birth_date, naturality, marital_status, profession, address,
             filled_date, volunteer_service, accepts_volunteer_law, image_authorization, functions, available_days,
-            origin_department, notes, status, created_by, updated_by)
-         values ($1,$2,$3,nullif($4,'')::date,$5,$6,$7,$8,coalesce(nullif($9,'')::date,$10::date),$11,$12,$13,$14,$15,$16,$17,'pending',$18,$18)
+            origin_department, notes, contribution_cents, contribution_due_day, status, created_by, updated_by)
+         values ($1,$2,$3,nullif($4,'')::date,$5,$6,$7,$8,coalesce(nullif($9,'')::date,$10::date),$11,$12,$13,$14,$15,$16,$17,$19,$20,'pending',$18,$18)
          returning id`,
         [input.full_name, input.email || null, input.phone || null, input.birth_date ?? "", input.naturality || null,
           input.marital_status || null, input.profession || null, input.address || null, input.filled_date ?? "", todayInSaoPaulo(),
           input.volunteer_service, input.accepts_volunteer_law, input.image_authorization, input.functions, input.available_days,
-          origin, input.notes, author.id]
+          origin, input.notes, author.id, input.contribution_cents, input.contribution_due_day]
       );
       const workerId = inserted.rows[0].id;
       for (const department of input.departments) {

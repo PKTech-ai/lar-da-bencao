@@ -123,8 +123,9 @@ export async function myArea(actor: Actor) {
       : Promise.resolve({ rows: [] }),
     flags.get("module_tesouraria")
       ? query(
-        `select reference_month, to_char(received_at,'YYYY-MM-DD') as received_at, amount_cents::text, kind
-           from app.treasury_contributions where worker_id = $1 and archived_at is null order by received_at desc limit 12`,
+        `select reference_month, to_char(paid_date,'YYYY-MM-DD') as received_at, paid_cents::text as amount_cents,
+                expected_cents::text, payment_method
+           from app.treasury_contributions where worker_id = $1 order by reference_month desc limit 12`,
         [workerId]
       )
       : Promise.resolve({ rows: [] })

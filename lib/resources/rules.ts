@@ -68,13 +68,6 @@ RULES["tesouraria-lancamentos"] = async ({ client, input, before }) => {
   if (before?.entry_date) await assertMonthOpen(client, String(before.entry_date).slice(0, 7));
 };
 
-/** Contribuição: o mês de referência precisa estar aberto. */
-RULES["tesouraria-contribuicoes"] = async ({ client, input, before }) => {
-  const { assertMonthOpen } = await import("@/lib/treasury");
-  await assertMonthOpen(client, String(input.reference_month));
-  if (before?.reference_month && before.reference_month !== input.reference_month) await assertMonthOpen(client, String(before.reference_month));
-};
-
 /** Doação recebida: mantenedor ativo e mês aberto. */
 RULES["tesouraria-doacoes"] = async ({ client, input }) => {
   const { assertMonthOpen } = await import("@/lib/treasury");

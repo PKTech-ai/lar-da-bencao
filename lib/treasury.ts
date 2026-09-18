@@ -3,10 +3,12 @@ import type { PoolClient } from "pg";
 import { z } from "zod";
 import type { Actor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
-import { query, transaction } from "@/lib/db";
+import { dbPool, query, transaction } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { todayInSaoPaulo } from "@/lib/workers";
 import { requireFlag } from "@/lib/feature-flags";
 import { assertPermission, hasPermission, type PermissionAction } from "@/lib/permissions";
+import { PAYMENT_METHODS as PAYMENT_METHOD_VALUES } from "@/lib/resources/defs/tesouraria";
 
 export const TREASURY_FLAG = "module_tesouraria";
 const MODULE = "Tesouraria";
@@ -79,19 +81,24 @@ export async function monthSummary(month: string) {
       [first]
     ),
     query<{ balance: string }>(
-      `select coalesce(sum(case when a.nature = 'Receita' then e.amount_cents when a.nature = 'Despesa' then -e.amount_cents else 0 end), 0)::text as balance
-         from app.treasury_entries e join app.financial_accounts a on a.code = e.account_code
-        where e.archived_at is null and e.entry_date < $1::date`,
+      `select (coalesce((select sum(case when a.nature = 'Receita' then e.amount_cents when a.nature = 'Despesa' then -e.amount_cents else 0 end)
+                          from app.treasury_entries e join app.financial_accounts a on a.code = e.account_code
+                         where e.archived_at is null and e.entry_date < $1::date), 0)
+            + coalesce((select sum(c.paid_cents) from app.treasury_contributions c where c.reference_month < to_char($1::date, 'YYYY-MM')), 0))::text as balance`,
       [first]
     ),
     query("select * from app.treasury_months where reference_month = $1", [month]),
-    query<{ total: string; count: number }>(
-      `select coalesce(sum(amount_cents), 0)::text as total, count(*)::int as count from app.treasury_contributions
-        where archived_at is null and reference_month = $1`,
+    query<{ total: string; count: number; expected: string; paid_count: number }>(
+      `select coalesce(sum(paid_cents), 0)::text as total, count(*)::int as count,
+              coalesce(sum(expected_cents), 0)::text as expected,
+              count(*) filter (where paid_cents > 0)::int as paid_count
+         from app.treasury_contributions where reference_month = $1`,
       [month]
     )
   ]);
-  const income = Number(totals.rows[0].income);
+  // A contribuição recebida entra como receita do mês (conta 1.01.01), sem lançamento manual — regra do mock.
+  const contributionsPaid = Number(contributions.rows[0].total);
+  const income = Number(totals.rows[0].income) + contributionsPaid;
   const expense = Number(totals.rows[0].expense);
   const opening = Number(previous.rows[0].balance);
   return {
@@ -99,9 +106,16 @@ export async function monthSummary(month: string) {
     status: (statusRow.rows[0]?.status as string) ?? "Aberto",
     monthRecord: statusRow.rows[0] ?? null,
     totals: { income, expense, transfers: Number(totals.rows[0].transfers), entries: totals.rows[0].entries, opening, closing: opening + income - expense },
-    byGroup: byGroup.rows,
-    byCenter: byCenter.rows,
-    contributions: { total: Number(contributions.rows[0].total), count: contributions.rows[0].count }
+    byGroup: contributionsPaid
+      ? [{ nature: "Receita", account_group: "Contribuições", code: "1.01.01", name: "Contribuição Mensal (automático)", total: String(contributionsPaid), entries: contributions.rows[0].paid_count }, ...byGroup.rows]
+      : byGroup.rows,
+    byCenter: contributionsPaid
+      ? [{ cost_center: "Institucional / Administração", nature: "Receita", total: String(contributionsPaid) }, ...byCenter.rows]
+      : byCenter.rows,
+    contributions: {
+      total: contributionsPaid, count: contributions.rows[0].count,
+      expected: Number(contributions.rows[0].expected), paidCount: contributions.rows[0].paid_count
+    }
   };
 }
 
@@ -182,6 +196,76 @@ export async function lockFiscalReview(actor: Actor, id: string) {
     await appendAudit(actor, {
       category: "Edição", action: "Decisão do Conselho Fiscal arquivada", module: "Conselho Fiscal", section: "Análise mensal",
       entityType: "conselho-analises", entityId: id, details: `${review.reference_month} · ${review.status}`
+    }, client);
+  });
+}
+
+/**
+ * Grade do mês: todo trabalhador ativo aparece, com o valor combinado na ficha e o que já entrou.
+ * (No mock, a grade nasce dos trabalhadores aprovados e ativos.)
+ */
+export async function contributionsForMonth(month: string) {
+  monthSchema.parse(month);
+  const result = await query(
+    `select w.id as worker_id, w.full_name, w.contribution_cents::text as ficha_cents, w.contribution_due_day,
+            c.id, coalesce(c.expected_cents, w.contribution_cents)::text as expected_cents,
+            coalesce(c.paid_cents, 0)::text as paid_cents, to_char(c.paid_date,'YYYY-MM-DD') as paid_date,
+            c.payment_method, c.reference, c.notes, coalesce(c.version, 0) as version
+       from app.workers w
+       left join app.treasury_contributions c on c.worker_id = w.id and c.reference_month = $1
+      where w.status = 'active'
+      order by w.full_name`,
+    [month]
+  );
+  return { month, status: await monthStatus(dbPool(), month), rows: result.rows };
+}
+
+export const contributionSchema = z.object({
+  reference_month: monthSchema,
+  worker_id: z.string().uuid(),
+  expected_cents: z.number().int().min(0).max(99_999_999_999),
+  paid_cents: z.number().int().min(0).max(99_999_999_999),
+  paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
+  payment_method: z.enum(PAYMENT_METHOD_VALUES).optional().or(z.literal("")),
+  reference: z.string().trim().max(120).optional().default(""),
+  notes: z.string().trim().max(1000).optional().default("")
+});
+
+/** Registra (ou corrige) o recebimento da contribuição de uma pessoa no mês. */
+export async function saveContribution(actor: Actor, body: unknown) {
+  const input = contributionSchema.parse(body);
+  const today = todayInSaoPaulo();
+  if (input.paid_cents > 0) {
+    if (!input.paid_date || input.paid_date > today) throw new AppError("Informe a data do recebimento, até hoje.");
+    if (!input.payment_method) throw new AppError("Informe a forma de recebimento.");
+  }
+  return transaction(async (client) => {
+    await assertMonthOpen(client, input.reference_month);
+    const worker = await client.query<{ full_name: string; status: string }>(
+      "select full_name, status from app.workers where id = $1", [input.worker_id]
+    );
+    if (!worker.rows[0]) throw new AppError("Trabalhador não encontrado.", 404, "NOT_FOUND");
+    if (worker.rows[0].status !== "active") throw new AppError("Só trabalhador ativo entra na grade de contribuições.");
+    const before = await client.query<{ paid_cents: string }>(
+      "select paid_cents::text from app.treasury_contributions where reference_month = $1 and worker_id = $2",
+      [input.reference_month, input.worker_id]
+    );
+    await client.query(
+      `insert into app.treasury_contributions (reference_month, worker_id, expected_cents, paid_cents, paid_date, payment_method, reference, notes, created_by, updated_by)
+       values ($1,$2,$3,$4,nullif($5,'')::date,nullif($6,''),$7,$8,$9,$9)
+       on conflict (reference_month, worker_id) do update set expected_cents = excluded.expected_cents, paid_cents = excluded.paid_cents,
+            paid_date = excluded.paid_date, payment_method = excluded.payment_method, reference = excluded.reference,
+            notes = excluded.notes, updated_by = excluded.updated_by, updated_at = now(), version = app.treasury_contributions.version + 1`,
+      [input.reference_month, input.worker_id, input.expected_cents, input.paid_cents, input.paid_date ?? "", input.payment_method ?? "",
+        input.reference, input.notes, actor.id]
+    );
+    await appendAudit(actor, {
+      category: before.rowCount ? "Edição" : "Inclusão",
+      action: input.paid_cents > 0 ? "Contribuição recebida" : "Contribuição sem recebimento no mês",
+      module: MODULE, section: "Contribuições", entityType: "tesouraria-contribuicao", entityId: `${input.reference_month}:${input.worker_id}`,
+      details: `${worker.rows[0].full_name} · ${input.reference_month} · combinado ${input.expected_cents / 100} · recebido ${input.paid_cents / 100}`,
+      before: before.rowCount ? { paid_cents: Number(before.rows[0].paid_cents) } : null,
+      after: { paid_cents: input.paid_cents, paid_date: input.paid_date || null, payment_method: input.payment_method || null }
     }, client);
   });
 }

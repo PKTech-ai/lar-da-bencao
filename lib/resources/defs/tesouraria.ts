@@ -44,34 +44,6 @@ export const treasuryEntries: ResourceDef = {
   attachments: { ownerType: "treasury_proof", kinds: [DOC_KIND("proof", "Comprovante do lançamento")], maxPerRecord: 10 }
 };
 
-export const treasuryContributions: ResourceDef = {
-  key: "tesouraria-contribuicoes",
-  table: "treasury_contributions",
-  title: "Contribuições",
-  singular: "Contribuição",
-  module: "Tesouraria",
-  section: "Contribuições",
-  flag: FLAG,
-  scope: SCOPE,
-  intro: "Contribuições mensais e eventuais das pessoas associadas. Cada recebimento gera o comprovante do contribuinte.",
-  rules: "tesouraria-contribuicoes",
-  orderBy: "r.received_at desc, r.contributor",
-  search: ["contributor", "reference", "notes"],
-  filters: [{ name: "kind", label: "Tipo" }, { name: "payment_method", label: "Forma" }],
-  fields: [
-    { name: "contributor", label: "Contribuinte", type: "text", max: 160, required: true },
-    { name: "worker_id", label: "Trabalhador vinculado", type: "worker", hideInList: true, help: "Quando a pessoa também for trabalhadora da Casa." },
-    { name: "kind", label: "Tipo", type: "select", options: ["Mensal", "Eventual"], required: true },
-    { name: "reference_month", label: "Mês de referência", type: "month", required: true },
-    { name: "received_at", label: "Data do recebimento", type: "date", required: true, notFuture: true },
-    { name: "amount_cents", label: "Valor recebido", type: "money", required: true },
-    { name: "payment_method", label: "Forma de recebimento", type: "select", options: PAYMENT_METHODS, required: true },
-    { name: "reference", label: "Documento / referência", type: "text", max: 120, hideInList: true },
-    { name: "notes", label: "Observações", type: "textarea", max: 1000, wide: true, hideInList: true }
-  ],
-  attachments: { ownerType: "treasury_proof", kinds: [DOC_KIND("proof", "Comprovante")], maxPerRecord: 5 }
-};
-
 export const treasurySupporters: ResourceDef = {
   key: "tesouraria-mantenedores",
   table: "treasury_supporters",

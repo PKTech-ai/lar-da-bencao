@@ -414,6 +414,27 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
 
     // O Conselho só recebe a competência depois do fechamento (que já libera, como no mock).
     const reviews = { params: Promise.resolve({ resource: "conselho-analises" }) };
+    // Contribuição da grade entra como receita do mês, sem lançamento manual.
+    const contributions = await import("@/app/api/tesouraria/contribuicoes/route");
+    const contributor = await owner(async (client) => {
+      const inserted = await client.query<{ id: string }>(
+        "insert into app.workers (full_name, status, contribution_cents, contribution_due_day) values ($1,'active',5000,5) returning id",
+        [`Contribuinte ${randomUUID().slice(0, 6)}`]
+      );
+      return inserted.rows[0].id;
+    });
+    const grid = await (await contributions.GET(json("GET", undefined, `https://app.test/x?month=${month}`))).json();
+    expect(grid.rows.find((r: { worker_id: string }) => r.worker_id === contributor)).toMatchObject({ expected_cents: "5000", paid_cents: "0" });
+    // Recebido exige data e forma.
+    expect((await contributions.POST(json("POST", { reference_month: month, worker_id: contributor, expected_cents: 5000, paid_cents: 5000 }))).status).toBe(400);
+    expect((await contributions.POST(json("POST", {
+      reference_month: month, worker_id: contributor, expected_cents: 5000, paid_cents: 5000,
+      paid_date: `${month}-05`, payment_method: "PIX", reference: "", notes: ""
+    }))).status).toBe(200);
+    const withContribution = await (await monthRoute.GET(json("GET", undefined, `https://app.test/x?month=${month}`))).json();
+    expect(withContribution.totals.income).toBe(20000);
+    expect(withContribution.contributions).toMatchObject({ total: 5000, paidCount: 1 });
+
     const review = { reference_month: month, status: "Em análise", review_date: todayIso(), reviewers: "Conselho", analysis: "Conferindo", opinion: "" };
     const council = await createActor("conselheiro_fiscal");
     current.actor = council;

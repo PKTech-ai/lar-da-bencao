@@ -116,7 +116,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     sections: [
       { slug: "", label: "Caixa Mensal", panel: "tesouraria-mes" },
       { slug: "lancamentos", label: "Lançamentos", resource: "tesouraria-lancamentos" },
-      { slug: "contribuicoes", label: "Contribuições", resource: "tesouraria-contribuicoes" },
+      { slug: "contribuicoes", label: "Contribuições", panel: "tesouraria-contribuicoes" },
       { slug: "mantenedores", label: "Mantenedores", resource: "tesouraria-mantenedores" },
       { slug: "doacoes", label: "Doações recebidas", resource: "tesouraria-doacoes" },
       { slug: "extrato", label: "Extrato e Conciliação", panel: "tesouraria-extrato" },

@@ -25,6 +25,8 @@ export const fichaSchema = z.object({
   image_authorization: z.boolean().default(false),
   functions: z.array(z.enum(DOCTRINE_FUNCTIONS)).max(DOCTRINE_FUNCTIONS.length).default([]),
   available_days: z.array(z.number().int().min(0).max(6)).max(7).default([0, 1, 3, 4, 5, 6]),
+  contribution_cents: z.number().int().min(0).max(99_999_999_999).default(0),
+  contribution_due_day: z.number().int().min(1).max(31).nullable().default(null),
   departments: z.array(z.string().regex(/^[a-z_]+$/)).min(1, "Selecione pelo menos um departamento.").max(12),
   notes: optionalText(2000)
 });

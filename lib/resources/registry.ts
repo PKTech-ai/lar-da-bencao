@@ -7,7 +7,7 @@ import { bookLoans, bookSales, bookStock, books } from "@/lib/resources/defs/div
 import { events, eventItems, eventReviews, eventShifts } from "@/lib/resources/defs/eventos";
 import { patrimonyAssets } from "@/lib/resources/defs/patrimonio";
 import { meetings } from "@/lib/resources/defs/secretaria";
-import { treasuryContributions, treasuryDonations, treasuryEntries, treasurySupporters } from "@/lib/resources/defs/tesouraria";
+import { treasuryDonations, treasuryEntries, treasurySupporters } from "@/lib/resources/defs/tesouraria";
 import type { ResourceDef } from "@/lib/resources/types";
 
 const ALL: ResourceDef[] = [
@@ -17,7 +17,7 @@ const ALL: ResourceDef[] = [
   meetings,
   socialFamilies, socialVolunteers, basketSupporters, ranchoDeliveries, hygieneKits, socialActivities, childrenCoffeeDonors,
   brechoLedger, clubeMaesLedger, clubPeople, clubDeliveries, socialPlanning,
-  treasuryEntries, treasuryContributions, treasurySupporters, treasuryDonations,
+  treasuryEntries, treasurySupporters, treasuryDonations,
   fiscalReviews, elections
 ];
 

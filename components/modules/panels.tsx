@@ -9,6 +9,7 @@ import { MeetingRecorder } from "@/components/modules/secretaria-gravador";
 import { AnnualReport } from "@/components/modules/relatorio-anual";
 import { DepartmentWorkers } from "@/components/modules/trabalhadores-departamento";
 import { PresidenciaPainel } from "@/components/modules/presidencia-painel";
+import { ContributionsPanel } from "@/components/modules/tesouraria-contribuicoes";
 import { TreasuryAccountsPanel, TreasuryMonthPanel, TreasuryReportPanel, TreasuryStatementPanel } from "@/components/modules/tesouraria";
 import { WhatsappQueue } from "@/components/modules/whatsapp";
 import { DisposalsPanel } from "@/components/modules/patrimonio-baixas";
@@ -41,6 +42,7 @@ export function ModulePanel({ name }: { name: string }) {
     case "aniversariantes-eventos": return <BirthdaysPanel department="eventos" />;
     case "aniversariantes-divulgacao": return <BirthdaysPanel department="divulgacao" />;
     case "tesouraria-mes": return <TreasuryMonthPanel />;
+    case "tesouraria-contribuicoes": return <ContributionsPanel />;
     case "tesouraria-extrato": return <TreasuryStatementPanel />;
     case "tesouraria-contas": return <TreasuryAccountsPanel />;
     case "tesouraria-relatorio": return <TreasuryReportPanel />;

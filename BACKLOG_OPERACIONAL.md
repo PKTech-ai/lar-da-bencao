@@ -648,8 +648,10 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
 - **Estado v216:** entregue (falta UAT)
 - **Entregue (2026-09-17):**
   - `app.financial_accounts` com o plano de contas do mock (54 contas, natureza e grupo; sintéticas não recebem lançamento)
-  - `app.treasury_contributions`: contribuinte, vínculo com a ficha do trabalhador, tipo, mês de referência, valor em centavos, forma e comprovante
-  - abas “Plano de Contas” e “Contribuições” em `/sistema/tesouraria`, com impressão
+  - contribuição como no mock: a **ficha do trabalhador** guarda o valor mensal combinado e o dia previsto, e `app.treasury_contributions` é a grade (competência × pessoa) com combinado, recebido, data e forma
+  - a contribuição recebida entra no caixa do mês como receita da conta 1.01.01, **sem lançamento manual** (regra do mock)
+  - abas “Plano de Contas” e “Contribuições” em `/sistema/tesouraria`, com totais de combinado, recebido e a receber, e impressão
+  - competência fechada não aceita alteração de recebimento
 - **Critério de aceite:** ✅ contribuições e plano de contas no Postgres, em centavos inteiros; ✅ impressão disponível.
 
 ### BL-047 — Tesouraria — caixa mensal e comprovantes

@@ -57,7 +57,9 @@ Antes de começar, o Administrador precisa ter feito, em `/sistema/acesso` e `/s
 ## Tesouraria (`module_tesouraria`)
 - [ ] Lançar entrada e saída usando o plano de contas; conta sintética é recusada
 - [ ] Comprovante por lançamento
-- [ ] Contribuições do mês e vínculo com a ficha do trabalhador
+- [ ] Ficha do trabalhador com valor mensal combinado e dia previsto
+- [ ] Grade de contribuições do mês: todo trabalhador ativo aparece com o combinado; marcar “recebido” exige data e forma
+- [ ] A contribuição recebida aparece no caixa do mês como receita (Contribuição Mensal), sem lançamento manual
 - [ ] Mantenedores e doações recebidas; mantenedor encerrado não recebe doação
 - [ ] Fechar o mês **libera o relatório ao Conselho Fiscal** na mesma hora; lançar depois disso é recusado (mensagem clara)
 - [ ] Reabrir com motivo enquanto o Conselho não decidiu — o parecer em análise sai da pauta e fica no histórico

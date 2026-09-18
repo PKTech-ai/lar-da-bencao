@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { parseMoney } from "@/lib/resources/types";
 import { DOCTRINE_FUNCTIONS, WEEKDAYS } from "@/lib/worker-constants";
 
 export type Option = { key: string; label: string };
@@ -10,6 +11,7 @@ export type FichaValues = {
   naturality: string | null; marital_status: string | null; profession: string | null; address: string | null;
   filled_date: string | null; volunteer_service: string; accepts_volunteer_law: boolean; image_authorization: boolean;
   functions: string[]; available_days: number[]; departments: string[]; notes: string;
+  contribution_cents?: string | number | null; contribution_due_day?: number | null;
 };
 
 const dateOnly = (value: string | null | undefined) => (value ? String(value).slice(0, 10) : "");
@@ -33,7 +35,10 @@ export function readFicha(form: HTMLFormElement) {
     functions: values.getAll("functions").map(String),
     available_days: values.getAll("available_days").map(Number),
     departments: values.getAll("departments").map(String),
-    notes: text("notes")
+    notes: text("notes"),
+    // Contribuição combinada da pessoa (a Tesouraria acompanha mês a mês).
+    contribution_cents: text("contribution_cents") ? parseMoney(text("contribution_cents")) : 0,
+    contribution_due_day: text("contribution_due_day") ? Number(text("contribution_due_day")) : null
   };
 }
 
@@ -102,6 +107,16 @@ export function WorkerFichaForm({
           <label key={day}><input type="checkbox" name="available_days" value={index} defaultChecked={(initial?.available_days ?? [0, 1, 3, 4, 5, 6]).includes(index)} />{day}</label>
         ))}
       </fieldset>
+      <div className="form-row">
+        <label>Contribuição mensal combinada
+          <input name="contribution_cents" inputMode="decimal" maxLength={20} placeholder="Ex.: 50,00"
+            defaultValue={initial?.contribution_cents ? (Number(initial.contribution_cents) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : ""} />
+          <span className="small muted">Deixe em branco se a pessoa não contribui com valor fixo.</span>
+        </label>
+        <label>Dia previsto
+          <input name="contribution_due_day" type="number" min={1} max={31} defaultValue={initial?.contribution_due_day ?? ""} />
+        </label>
+      </div>
       <label>Serviço voluntário<textarea name="volunteer_service" rows={2} maxLength={2000} defaultValue={initial?.volunteer_service ?? ""} placeholder="Descrição das atividades voluntárias" /></label>
       <fieldset className="check-grid">
         <legend>Termos</legend>
