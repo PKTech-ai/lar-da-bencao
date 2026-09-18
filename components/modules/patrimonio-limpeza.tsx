@@ -45,7 +45,8 @@ export function CleaningPanel() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
-  useEffect(() => { void api<{ workers: Worker[] }>("/api/lookup/workers?department=patrimonio").catch(() => api<{ workers: Worker[] }>("/api/lookup/workers")).then((b) => setWorkers(b.workers)).catch(() => undefined); }, []);
+  // A limpeza é de toda a Casa: a consulta traz os trabalhadores ativos que o perfil pode ver.
+  useEffect(() => { void api<{ workers: Worker[] }>("/api/lookup/workers").then((b) => setWorkers(b.workers)).catch(() => undefined); }, []);
 
   const visible = useMemo(() => {
     const needle = q.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

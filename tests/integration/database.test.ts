@@ -503,4 +503,35 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     }
     expect(missing).toEqual([]);
   });
+  it("consulta de trabalhadores respeita o escopo de leitura", async () => {
+    const lookup = await import("@/app/api/lookup/workers/route");
+    const [doutrinaWorker, infanciaWorker] = await owner(async (client) => {
+      const created: string[] = [];
+      for (const department of ["doutrina", "infancia"]) {
+        const inserted = await client.query<{ id: string }>(
+          "insert into app.workers (full_name, status) values ($1,'active') returning id",
+          [`Escopo ${department} ${randomUUID().slice(0, 6)}`]
+        );
+        await client.query("insert into app.worker_departments (worker_id, department_key) values ($1,$2)", [inserted.rows[0].id, department]);
+        created.push(inserted.rows[0].id);
+      }
+      return created;
+    });
+
+    // Coordenador só da Doutrina não enxerga a ficha da Infância.
+    current.actor = await createActor("coordenador", ["doutrina"]);
+    const scoped = await (await lookup.GET(json("GET", undefined, "https://app.test/api/lookup/workers"))).json();
+    const scopedIds = scoped.workers.map((w: { id: string }) => w.id);
+    expect(scopedIds).toContain(doutrinaWorker);
+    expect(scopedIds).not.toContain(infanciaWorker);
+    // Nem espiando outro departamento pela consulta.
+    expect((await lookup.GET(json("GET", undefined, "https://app.test/api/lookup/workers?department=infancia"))).status).toBe(403);
+
+    // Quem organiza a limpeza precisa da Casa inteira.
+    current.actor = await createActor("coordenador", ["patrimonio"]);
+    const houseWide = await (await lookup.GET(json("GET", undefined, "https://app.test/api/lookup/workers"))).json();
+    const houseIds = houseWide.workers.map((w: { id: string }) => w.id);
+    expect(houseIds).toContain(doutrinaWorker);
+    expect(houseIds).toContain(infanciaWorker);
+  });
 });
