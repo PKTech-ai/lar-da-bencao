@@ -18,7 +18,10 @@ export async function POST(request: Request) {
   let authId: string | undefined;
   try {
     if (!authorized(request)) throw new AppError("Não autorizado.", 401, "UNAUTHORIZED");
-    const input = schema.parse(await request.json());
+    const body = await request.json();
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) { console.error("BOOTSTRAP_DEBUG", JSON.stringify(body), JSON.stringify(parsed.error.issues)); throw parsed.error; }
+    const input = parsed.data;
     await transaction(async (client) => {
       await client.query("select pg_advisory_xact_lock(709217)");
       const count = await client.query<{ count: string }>("select count(*)::text as count from app.users");
