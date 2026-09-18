@@ -214,24 +214,24 @@ test("um bem vira memorando de baixa e a Diretoria autoriza", async () => {
   await admin.goto("/sistema/patrimonio");
   await admin.getByRole("button", { name: "+ Novo" }).click();
   await admin.getByLabel("Número de tombamento *").fill("PAT-E2E-001");
-  await admin.getByLabel("Descrição").fill("Cadeira do salão");
-  await admin.getByLabel("Novo / usado *").selectOption("Usado");
+  await admin.getByLabel("Situação (novo/usado) *").selectOption("Usado");
+  await admin.getByLabel("Descrição do bem *").fill("Cadeira do salão");
   await admin.getByLabel("Departamento *").selectOption("patrimonio");
-  await admin.getByLabel("Data de entrada *").fill("2020-05-10");
-  await admin.getByLabel("Valor cadastrado *").fill("150,00");
+  await admin.getByLabel("Data da entrada *").fill("2020-05-10");
+  await admin.getByLabel("Valor do bem *").fill("150,00");
   await admin.getByRole("button", { name: "Salvar" }).click();
   await expect(admin.getByText("Bem patrimonial salvo")).toBeVisible();
 
   await admin.goto("/sistema/patrimonio/baixas");
   await admin.getByRole("button", { name: "Solicitar baixa" }).click();
-  await admin.getByLabel("Bem a baixar *").selectOption({ label: "PAT-E2E-001 — Cadeira do salão" });
+  await admin.getByLabel("Bem a baixar *").selectOption({ index: 1 });
   await admin.getByLabel("Motivo / justificativa da baixa *").fill("Assento quebrado, sem conserto.");
   await admin.getByRole("button", { name: "Gerar memorando e encaminhar" }).click();
   await expect(admin.getByText(/Memorando PAT-BAIXA-\d{4}-\d{4} gerado/)).toBeVisible();
 
   await admin.goto("/sistema/presidencia/baixas");
   await admin.getByRole("button", { name: "Analisar" }).first().click();
-  await admin.getByLabel("Decisão *").selectOption("approved");
+  await admin.getByRole("combobox", { name: "Decisão *", exact: true }).selectOption("approved");
   await admin.getByRole("button", { name: "Registrar decisão" }).click();
   await expect(admin.getByText("Baixa autorizada e registrada na ficha do bem")).toBeVisible();
   const [asset] = await sql<{ disposal_date: string | null }>("select disposal_date from app.patrimony_assets where tombamento = 'PAT-E2E-001'");
