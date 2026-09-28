@@ -12,7 +12,7 @@ const OTP_TYPES = new Set<EmailOtpType>(["invite", "recovery", "email", "email_c
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const target = safeInternalPath(url.searchParams.get("next"), "/mfa");
+  const target = safeInternalPath(url.searchParams.get("next"), "/sistema");
   const supabase = await createClient();
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;

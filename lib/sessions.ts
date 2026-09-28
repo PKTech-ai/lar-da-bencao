@@ -30,23 +30,6 @@ export function sessionAuthenticatedAt(claims: AccessTokenClaims | null): number
   return typeof claims.iat === "number" ? claims.iat : null;
 }
 
-/** Momento (s) da última confirmação TOTP nesta sessão, pelo `amr` do JWT. */
-export function lastTotpAt(claims: AccessTokenClaims | null): number | null {
-  if (!claims || !Array.isArray(claims.amr)) return null;
-  const stamps = claims.amr
-    .filter((entry): entry is { method: string; timestamp: number } =>
-      Boolean(entry) && typeof entry === "object" && (entry as { method?: unknown }).method === "totp"
-      && typeof (entry as { timestamp?: unknown }).timestamp === "number")
-    .map((entry) => entry.timestamp);
-  return stamps.length ? Math.max(...stamps) : null;
-}
-
-export const REAUTH_WINDOW_SECONDS = 5 * 60;
-
-export function isRecentTotp(totpAt: number | null, nowMs = Date.now(), windowSeconds = REAUTH_WINDOW_SECONDS) {
-  return totpAt !== null && nowMs / 1000 - totpAt <= windowSeconds;
-}
-
 export function isSessionRevoked(authenticatedAt: number | null, validAfter: Date | string | null) {
   if (!validAfter) return false;
   if (authenticatedAt === null) return true;

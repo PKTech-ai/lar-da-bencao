@@ -47,9 +47,8 @@ export async function proxy(request: NextRequest) {
   }
 
   if (data.user && pathname === "/login") {
-    const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     const target = request.nextUrl.clone();
-    target.pathname = assurance.data?.currentLevel === "aal2" ? "/sistema" : "/mfa";
+    target.pathname = "/sistema";
     target.search = "";
     return NextResponse.redirect(target);
   }

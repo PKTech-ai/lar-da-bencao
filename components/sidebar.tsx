@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Brand } from "@/components/brand";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { createClient } from "@/lib/supabase/client";
 
 export type NavCapability = {
@@ -55,6 +56,7 @@ export function Sidebar({ actor, capabilities }: { actor: { name: string; role: 
         <small>{actor.role} · {actor.email}</small>
         <button className="button" type="button" onClick={() => void logout("local")}>Sair deste aparelho</button>
         <button className="button" type="button" style={{ marginTop: 8 }} onClick={() => void logout("global")}>Sair de todos os aparelhos</button>
+        <ThemeToggle />
       </div>
     </aside>
   );

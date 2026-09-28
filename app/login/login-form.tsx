@@ -23,7 +23,12 @@ export function LoginForm() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Não foi possível entrar.");
-      router.replace(body.next ?? "/mfa");
+      await fetch("/api/auth/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "login_success" })
+      });
+      router.replace(body.next ?? "/sistema");
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível entrar.");

@@ -27,11 +27,11 @@ export async function GET() {
       dbPool().query("select id,label,to_char(starts_on,'YYYY-MM-DD') as starts_on,to_char(ends_on,'YYYY-MM-DD') as ends_on,status from app.bienniums order by starts_on desc"),
       dbPool().query("select id, full_name from app.workers where status='active' order by full_name")
     ]);
-    // Situação no Auth (convite aceito? MFA ativo?) e último login confirmado pelo Dedo-duro.
+    // Situação no Auth (convite aceito?) e último login confirmado pelo Dedo-duro.
     const listed = await createAdminClient().auth.admin.listUsers({ page: 1, perPage: 1000 }).catch(() => null);
     const authById = new Map((listed?.data?.users ?? []).map((u) => [u.id, u]));
     const logins = await dbPool().query<{ actor_user_id: string; last_login: string }>(
-      "select actor_user_id, max(occurred_at) as last_login from app.audit_events where action = 'Login concluído com MFA' and result = 'success' group by actor_user_id"
+      "select actor_user_id, max(occurred_at) as last_login from app.audit_events where action = 'Login concluído' and result = 'success' group by actor_user_id"
     );
     const lastLogin = new Map(logins.rows.map((r) => [r.actor_user_id, r.last_login]));
     const enriched = users.rows.map((u: { id: string; auth_user_id: string }) => {
@@ -40,7 +40,6 @@ export async function GET() {
         ...u,
         auth_known: Boolean(auth),
         invite_pending: auth ? !auth.last_sign_in_at : null,
-        mfa_enabled: auth ? (auth.factors ?? []).some((f) => f.status === "verified") : null,
         last_login: lastLogin.get(u.id) ?? null
       };
     });

@@ -30,7 +30,7 @@ export default async function DashboardPage() {
   const tools = [
     { href: "/sistema/auditoria", label: "Dedo-duro", text: "Auditoria append-only, filtros, impressão e exportação controlada.", visible: audit },
     { href: "/sistema/anexos", label: "Anexos privados", text: "Arquivos fracionados e guardados no PostgreSQL.", visible: attachments },
-    { href: "/sistema/usuarios", label: "Usuários e permissões", text: "Contas individuais, perfis, departamentos e MFA.", visible: users },
+    { href: "/sistema/usuarios", label: "Usuários e permissões", text: "Contas individuais, perfis e departamentos.", visible: users },
     { href: "/sistema/acesso", label: "Controle de Acesso", text: "Matriz por página, exceções registradas e biênios da Diretoria.", visible: users }
   ].filter((item) => item.visible);
 

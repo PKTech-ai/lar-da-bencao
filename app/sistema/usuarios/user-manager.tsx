@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 type Option = { key: string; label: string };
-type User = { id: string; email: string; full_name: string; role_key: string; status: string; departments: string[]; version: number; invite_pending: boolean | null; mfa_enabled: boolean | null; last_login: string | null; biennium_id: string | null; worker_id: string | null; access_allowed: boolean };
+type User = { id: string; email: string; full_name: string; role_key: string; status: string; departments: string[]; version: number; invite_pending: boolean | null; last_login: string | null; biennium_id: string | null; worker_id: string | null; access_allowed: boolean };
 type Biennium = { id: string; label: string; starts_on: string; ends_on: string; status: string };
 type Payload = { users: User[]; roles: Option[]; departments: Option[]; bienniums: Biennium[]; workers: { id: string; full_name: string }[] };
 
@@ -19,7 +19,7 @@ export function UserManager() {
   function departments(form: HTMLFormElement) { return [...form.querySelectorAll<HTMLInputElement>('input[name="departments"]:checked')].map((item) => item.value); }
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError(""); setMessage(""); const form = event.currentTarget, values = new FormData(form);
-    try { const response = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: values.get("email"), name: values.get("name"), role: values.get("role"), status: values.get("status"), departments: departments(form) }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error); form.reset(); setMessage("Convite enviado. O usuário deverá criar a senha e ativar o MFA."); await load(); }
+    try { const response = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: values.get("email"), name: values.get("name"), role: values.get("role"), status: values.get("status"), departments: departments(form) }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error); form.reset(); setMessage("Convite enviado. O usuário deverá criar a senha."); await load(); }
     catch (caught) { setError(caught instanceof Error ? caught.message : "Falha ao convidar."); } finally { setBusy(false); }
   }
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -57,21 +57,6 @@ export function UserManager() {
     }
   }
 
-  async function resetMfa(user: User) {
-    if (!window.confirm(`Redefinir o MFA de ${user.full_name}? Os códigos de recuperação serão invalidados, as sessões encerradas e o usuário cadastrará um novo autenticador no próximo acesso.`)) return;
-    setBusy(true); setError(""); setMessage("");
-    try {
-      const response = await fetch(`/api/users/${user.id}/mfa/reset`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
-      setMessage("MFA redefinido. O usuário cadastrará um novo autenticador no próximo acesso.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Falha ao redefinir MFA.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const fields = (user?: User) => <>
     <label>Nome completo<input name="name" defaultValue={user?.full_name} required minLength={3} maxLength={160} /></label>
     {!user ? <label>E-mail<input name="email" type="email" required /></label> : null}
@@ -100,6 +85,6 @@ export function UserManager() {
     <section className="card"><h2>Convidar usuário</h2><form className="form-stack" onSubmit={create}>{fields()}<button className="button primary" disabled={busy}>Enviar convite</button></form></section>
     {editing ? <section className="card"><div className="toolbar"><h2>Editar acesso</h2><button className="button" onClick={() => setEditing(null)}>Cancelar</button></div><form className="form-stack" key={editing.id} onSubmit={save}>{fields(editing)}<button className="button primary" disabled={busy}>Salvar alteração</button></form></section> : null}
     {error ? <div className="error" role="alert">{error}</div> : null}{message ? <div className="success">{message}</div> : null}
-    <section className="card"><h2>Contas institucionais</h2><div className="table-wrap"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Departamentos</th><th>Situação</th><th>Acesso</th><th>Ação</th></tr></thead><tbody>{data.users.map((user) => <tr key={user.id}><td><strong>{user.full_name}</strong><br/><span className="muted">{user.email}</span></td><td>{data.roles.find((role) => role.key === user.role_key)?.label ?? user.role_key}</td><td>{user.departments.map((key) => data.departments.find((d) => d.key === key)?.label ?? key).join(", ") || "—"}</td><td>{user.status}{user.access_allowed === false ? <><br /><span className="status blocked">Fora do biênio</span></> : null}</td><td className="small">{user.invite_pending ? <span className="status building">Convite pendente</span> : user.mfa_enabled === false ? <span className="status danger">Sem MFA</span> : user.mfa_enabled ? <span className="status ready">MFA ativo</span> : "—"}<br />{user.last_login ? `Último acesso: ${new Date(user.last_login).toLocaleString("pt-BR")}` : "Nunca acessou"}</td><td><button className="button" onClick={() => setEditing(user)}>Editar</button>{user.invite_pending ? <> <button className="button" disabled={busy} onClick={() => void resendInvite(user)}>Reenviar convite</button></> : null} <button className="button danger" disabled={busy} onClick={() => void revokeSessions(user.id)}>Encerrar sessões</button> <button className="button danger" disabled={busy} onClick={() => void resetMfa(user)}>Redefinir MFA</button></td></tr>)}</tbody></table></div></section>
+    <section className="card"><h2>Contas institucionais</h2><div className="table-wrap"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Departamentos</th><th>Situação</th><th>Acesso</th><th>Ação</th></tr></thead><tbody>{data.users.map((user) => <tr key={user.id}><td><strong>{user.full_name}</strong><br/><span className="muted">{user.email}</span></td><td>{data.roles.find((role) => role.key === user.role_key)?.label ?? user.role_key}</td><td>{user.departments.map((key) => data.departments.find((d) => d.key === key)?.label ?? key).join(", ") || "—"}</td><td>{user.status}{user.access_allowed === false ? <><br /><span className="status blocked">Fora do biênio</span></> : null}</td><td className="small">{user.invite_pending ? <span className="status building">Convite pendente</span> : null}<br />{user.last_login ? `Último acesso: ${new Date(user.last_login).toLocaleString("pt-BR")}` : "Nunca acessou"}</td><td><button className="button" onClick={() => setEditing(user)}>Editar</button>{user.invite_pending ? <> <button className="button" disabled={busy} onClick={() => void resendInvite(user)}>Reenviar convite</button></> : null} <button className="button danger" disabled={busy} onClick={() => void revokeSessions(user.id)}>Encerrar sessões</button></td></tr>)}</tbody></table></div></section>
   </div>;
 }

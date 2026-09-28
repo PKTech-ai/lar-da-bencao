@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function TermosPage() {
   const actor = await requireActor().catch(() => null);
   if (!actor) redirect("/login");
-  // Quem já aceitou esta versão não precisa aceitar de novo (ex.: ao recadastrar o autenticador).
+  // Quem já aceitou esta versão não precisa aceitar de novo.
   const accepted = await query("select 1 from app.terms_acceptances where user_id = $1 and terms_version = $2", [actor.id, CURRENT_TERMS_VERSION])
     .catch(() => ({ rowCount: 0 }));
   if (accepted.rowCount) redirect("/sistema");

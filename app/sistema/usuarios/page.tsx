@@ -8,7 +8,7 @@ export default async function UsersPage() {
   if (!(await hasPermission(actor, "users", "admin"))) redirect("/sistema");
   return (
     <>
-      <header className="page-heading"><div><h1>Usuários e permissões</h1><p>Contas individuais, vínculo institucional e acesso aplicado no servidor.</p></div><span className="production-badge">MFA obrigatório</span></header>
+      <header className="page-heading"><div><h1>Usuários e permissões</h1><p>Contas individuais, vínculo institucional e acesso aplicado no servidor.</p></div></header>
       <UserManager />
     </>
   );

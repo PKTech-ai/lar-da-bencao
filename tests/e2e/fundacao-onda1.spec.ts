@@ -1,14 +1,12 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import {
-  BOOTSTRAP_SECRET, CRON_SECRET, PASSWORD, acceptTerms, enrollMfa, expectHealthyPage, freshTotp, latestMail, linkFrom, login, sql
+  BOOTSTRAP_SECRET, CRON_SECRET, PASSWORD, acceptTerms, expectHealthyPage, latestMail, linkFrom, login, sql
 } from "./support";
 
 test.describe.configure({ mode: "serial" });
 
 const ADMIN = "admin.e2e@lar.local";
 const COORD = "coord.e2e@lar.local";
-const used = new Set<string>();
-const state = { adminSecret: "", adminCodes: [] as string[], coordSecret: "" };
 let adminContext: BrowserContext;
 let admin: Page;
 let coordContext: BrowserContext;
@@ -50,18 +48,12 @@ test("rotas protegidas exigem login", async ({ page, request }) => {
   await expect(page).toHaveURL(/\/login\?next=%2Fsistema%2Fusuarios/);
 });
 
-test("administrador: login, MFA com códigos de recuperação e termos", async () => {
+test("administrador: login e termos", async () => {
   await login(admin, ADMIN, "senha-errada-123456");
   await expect(admin.locator(".error[role=alert]")).toHaveText("E-mail ou senha inválidos.");
   await login(admin, ADMIN);
-  await expect(admin).toHaveURL(/\/mfa/);
-  const { secret, codes } = await enrollMfa(admin, used);
-  state.adminSecret = secret;
-  state.adminCodes = codes;
   await acceptTerms(admin);
   await expect(admin.getByText("Ambiente local — somente dados sintéticos").first()).toBeVisible();
-  const mail = await latestMail(ADMIN, "Novo autenticador");
-  expect(mail.HTML).toContain("Um novo autenticador foi cadastrado");
 });
 
 test("módulos nascem desligados e só liberam com UAT", async () => {
@@ -78,7 +70,7 @@ test("módulos nascem desligados e só liberam com UAT", async () => {
   expect(flags[0].uat_reference).toBe("UAT E2E local");
 });
 
-test("convite do coordenador chega por e-mail e completa senha, MFA e termos", async () => {
+test("convite do coordenador chega por e-mail e completa senha e termos", async () => {
   await admin.goto("/sistema/usuarios");
   const form = admin.locator("form", { hasText: "Enviar convite" });
   await form.getByLabel("Nome completo").fill("Coordenadora E2E");
@@ -95,8 +87,7 @@ test("convite do coordenador chega por e-mail e completa senha, MFA e termos", a
   await expect(coord.getByRole("heading", { name: "Defina sua senha" })).toBeVisible();
   await coord.getByLabel("Nova senha", { exact: true }).fill(PASSWORD);
   await coord.getByLabel("Confirme a senha").fill(PASSWORD);
-  await coord.getByRole("button", { name: "Salvar e ativar MFA" }).click();
-  state.coordSecret = (await enrollMfa(coord, used)).secret;
+  await coord.getByRole("button", { name: "Salvar senha" }).click();
   await acceptTerms(coord);
   const nav = coord.getByRole("navigation", { name: "Módulos principais" });
   await expect(nav.getByRole("link", { name: "Doutrina" })).toBeVisible();
@@ -238,33 +229,21 @@ test("um bem vira memorando de baixa e a Diretoria autoriza", async () => {
   expect(asset.disposal_date).not.toBeNull();
 });
 
-test("Minha conta: códigos novos e troca de senha exigem o código atual", async () => {
+test("Minha conta: troca de senha", async () => {
   await coord.goto("/sistema/conta");
-  await coord.getByRole("button", { name: "Gerar novos códigos de recuperação" }).click();
-  await coord.getByLabel("Código atual do autenticador").fill("000000");
-  await coord.getByRole("button", { name: "Confirmar" }).click();
-  await expect(coord.locator(".error[role=alert]")).toContainText("inválido");
-  await coord.getByLabel("Código atual do autenticador").fill(await freshTotp(state.coordSecret, used));
-  await coord.getByRole("button", { name: "Confirmar" }).click();
-  await expect(coord.getByText("Novos códigos emitidos")).toBeVisible();
-  await expect(coord.locator("ul li code")).toHaveCount(10);
-
   await coord.getByRole("button", { name: "Alterar senha" }).click();
   await coord.getByLabel("Nova senha", { exact: true }).fill(`${PASSWORD}X`);
   await coord.getByLabel("Confirme a nova senha").fill(`${PASSWORD}X`);
-  await coord.getByLabel("Código atual do autenticador").fill(await freshTotp(state.coordSecret, used));
   await coord.getByRole("button", { name: "Confirmar" }).click();
   const nonceField = coord.getByLabel("Código recebido por e-mail");
   await expect(coord.getByText("Senha alterada.").or(nonceField)).toBeVisible();
   if (await nonceField.isVisible()) {
     const mail = await latestMail(COORD, "Código de confirmação");
     await nonceField.fill(mail.Text.match(/\b\d{6}\b/)![0]);
-    await coord.getByLabel("Código atual do autenticador").fill(await freshTotp(state.coordSecret, used));
     await coord.getByRole("button", { name: "Confirmar" }).click();
     await expect(coord.getByText("Senha alterada.")).toBeVisible();
   }
   expect((await latestMail(COORD, "Sua senha foi alterada")).HTML).toContain("Sua senha foi alterada");
-  await sql("select 1");
 });
 
 test("Encerrar sessões derruba o coordenador na hora", async () => {
@@ -279,22 +258,6 @@ test("Encerrar sessões derruba o coordenador na hora", async () => {
   expect(revoked[0].count).toBe("0");
 });
 
-test("código de recuperação substitui o autenticador perdido", async () => {
-  const context = await adminContext.browser()!.newContext();
-  const page = await context.newPage();
-  await login(page, ADMIN);
-  await expect(page).toHaveURL(/\/mfa/);
-  await page.getByLabel("Código de recuperação").fill(state.adminCodes[0].toLowerCase());
-  await page.getByRole("button", { name: "Usar código de recuperação" }).click();
-  await expect(page.getByText("Código aceito. Cadastre agora o novo autenticador")).toBeVisible();
-  const { secret } = await enrollMfa(page, used);
-  state.adminSecret = secret;
-  await expect(page).toHaveURL(/\/sistema$/);
-  const events = await sql<{ action: string }>("select action from app.audit_events where action = 'Uso de código de recuperação MFA' and result = 'success'");
-  expect(events).toHaveLength(1);
-  await context.close();
-});
-
 test("login bloqueia após 5 tentativas sem revelar se a conta existe", async ({ page }) => {
   for (let i = 0; i < 5; i += 1) {
     await login(page, "ninguem.e2e@lar.local", `errada-${i}-000000`);
@@ -307,7 +270,7 @@ test("login bloqueia após 5 tentativas sem revelar se a conta existe", async ({
 test("Dedo-duro registra as jornadas e a cadeia continua íntegra", async () => {
   const actions = await sql<{ action: string }>("select distinct action from app.audit_events");
   const names = actions.map((a) => a.action);
-  for (const expected of ["Inicialização do Administrador", "Login concluído com MFA", "Convite de usuário", "Liberação de módulo",
+  for (const expected of ["Inicialização do Administrador", "Login concluído", "Convite de usuário", "Liberação de módulo",
     "Ficha de trabalhador enviada para aprovação", "Aprovação de trabalhador", "Geração de escala", "Matrícula de evangelizando",
     "Chamada dominical", "Revogação de sessões", "Falha de login", "Login bloqueado por excesso de tentativas"]) {
     expect(names, expected).toContain(expected);
