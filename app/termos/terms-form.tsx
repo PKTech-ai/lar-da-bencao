@@ -34,7 +34,7 @@ export function TermsForm() {
       <div className="notice">
         <p>Ao continuar, você confirma que:</p>
         <ul>
-          <li>usará apenas a conta individual atribuída (sem compartilhar senha ou MFA);</li>
+          <li>usará apenas a conta individual atribuída (sem compartilhar senha);</li>
           <li>tratará dados de trabalhadores, famílias e menores com confidencialidade;</li>
           <li>compreende que ações sensíveis são registradas no Dedo-duro.</li>
         </ul>

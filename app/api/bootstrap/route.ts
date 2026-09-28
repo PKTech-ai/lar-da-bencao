@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         category: "Segurança", action: "Inicialização do Administrador", module: "Controle de Acesso", section: "Bootstrap", entityType: "user", entityId: inserted.rows[0].id, result: "success", details: "Primeiro Administrador criado. O segredo de bootstrap deve ser rotacionado."
       }, client);
     });
-    return Response.json({ status: "created", message: "Administrador criado. Entre no sistema e ative o MFA imediatamente." }, { status: 201 });
+    return Response.json({ status: "created", message: "Administrador criado. Entre no sistema com o e-mail e a senha cadastrados." }, { status: 201 });
   } catch (error) {
     if (authId) await createAdminClient().auth.admin.deleteUser(authId).catch(console.error);
     return errorResponse(error);

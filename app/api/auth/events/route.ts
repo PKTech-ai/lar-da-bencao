@@ -10,9 +10,9 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const input = schema.parse(await request.json());
-    const actor = await requireActor({ requireMfa: input.event !== "password_changed" });
+    const actor = await requireActor();
     const action = input.event === "login_success"
-      ? "Login concluído com MFA"
+      ? "Login concluído"
       : input.event === "logout"
         ? "Encerramento da sessão neste aparelho"
         : input.event === "logout_global"

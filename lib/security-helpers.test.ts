@@ -4,10 +4,10 @@ import { safeInternalPath } from "@/lib/navigation";
 
 describe("safeInternalPath", () => {
   it("preserva somente caminhos internos", () => {
-    expect(safeInternalPath("/sistema?aba=1", "/mfa")).toBe("/sistema?aba=1");
-    expect(safeInternalPath("//malicioso.test", "/mfa")).toBe("/mfa");
-    expect(safeInternalPath("/\\malicioso.test", "/mfa")).toBe("/mfa");
-    expect(safeInternalPath("https://malicioso.test", "/mfa")).toBe("/mfa");
+    expect(safeInternalPath("/sistema?aba=1", "/sistema")).toBe("/sistema?aba=1");
+    expect(safeInternalPath("//malicioso.test", "/sistema")).toBe("/sistema");
+    expect(safeInternalPath("/\\malicioso.test", "/sistema")).toBe("/sistema");
+    expect(safeInternalPath("https://malicioso.test", "/sistema")).toBe("/sistema");
   });
 });
 

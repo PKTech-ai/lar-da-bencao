@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { query } from "@/lib/db";
 import { AuthenticationError, AuthorizationError } from "@/lib/errors";
-import { decodeAccessToken, isRecentTotp, isSessionRevoked, lastTotpAt, sessionAuthenticatedAt, sessionIdFromClaims } from "@/lib/sessions";
+import { decodeAccessToken, isSessionRevoked, sessionAuthenticatedAt, sessionIdFromClaims } from "@/lib/sessions";
 
 export type Actor = {
   id: string;
@@ -12,8 +12,6 @@ export type Actor = {
   status: "active";
   departments: string[];
   sessionId: string | null;
-  /** Última confirmação TOTP desta sessão (segundos), para exigir reautenticação recente. */
-  totpAt?: number | null;
 };
 
 type ActorRow = {
@@ -28,18 +26,11 @@ type ActorRow = {
   access_allowed: boolean;
 };
 
-export async function requireActor(options: { requireMfa?: boolean } = {}): Promise<Actor> {
+export async function requireActor(): Promise<Actor> {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) throw new AuthenticationError();
   const currentSession = await supabase.auth.getSession();
-
-  if (options.requireMfa !== false) {
-    const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (assurance.error || assurance.data.currentLevel !== "aal2") {
-      throw new AuthenticationError("Confirme o segundo fator para continuar.", "MFA_REQUIRED");
-    }
-  }
 
   const result = await query<ActorRow>(
     `select u.id, u.auth_user_id, u.email, u.full_name, u.role_key, u.status, u.sessions_valid_after, app.user_access_allowed(u.id) as access_allowed,
@@ -68,14 +59,6 @@ export async function requireActor(options: { requireMfa?: boolean } = {}): Prom
     role: row.role_key,
     status: "active",
     departments: row.departments ?? [],
-    sessionId: sessionIdFromClaims(claims),
-    totpAt: lastTotpAt(claims)
+    sessionId: sessionIdFromClaims(claims)
   };
-}
-
-/** Operações sensíveis de MFA exigem código TOTP confirmado nos últimos minutos. */
-export function assertRecentTotp(actor: Actor) {
-  if (!isRecentTotp(actor.totpAt ?? null)) {
-    throw new AuthenticationError("Confirme o código do autenticador novamente para continuar.", "REAUTH_REQUIRED");
-  }
 }

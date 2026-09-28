@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { decodeAccessToken, isRecentTotp, isSessionRevoked, lastTotpAt, sessionAuthenticatedAt, sessionIdFromClaims } from "@/lib/sessions";
+import { decodeAccessToken, isSessionRevoked, sessionAuthenticatedAt, sessionIdFromClaims } from "@/lib/sessions";
 
 const token = (claims: object) => `h.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.s`;
 
@@ -14,15 +14,6 @@ describe("claims de sessão", () => {
     expect(sessionAuthenticatedAt(decodeAccessToken(token({ iat: 42 })))).toBe(42);
     expect(decodeAccessToken("lixo")).toBeNull();
     expect(sessionAuthenticatedAt(null)).toBeNull();
-  });
-
-  it("reautenticação usa a última confirmação TOTP", () => {
-    const claims = decodeAccessToken(token({ amr: [{ method: "password", timestamp: 100 }, { method: "totp", timestamp: 500 }, { method: "totp", timestamp: 900 }] }));
-    expect(lastTotpAt(claims)).toBe(900);
-    expect(lastTotpAt(decodeAccessToken(token({ amr: [{ method: "password", timestamp: 1 }] })))).toBeNull();
-    expect(isRecentTotp(900, 900_000 + 300_000)).toBe(true);
-    expect(isRecentTotp(900, 900_000 + 301_000)).toBe(false);
-    expect(isRecentTotp(null)).toBe(false);
   });
 
   it("recusa sessões autenticadas antes da revogação", () => {

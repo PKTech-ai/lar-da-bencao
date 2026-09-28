@@ -1,4 +1,3 @@
-import { createHmac } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import { Client } from "pg";
 
@@ -7,29 +6,6 @@ export const MAILPIT = process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:54324";
 export const BOOTSTRAP_SECRET = process.env.E2E_BOOTSTRAP_SECRET ?? "local_bootstrap_secret_00000000000000000000000000";
 export const CRON_SECRET = process.env.E2E_CRON_SECRET ?? "local_cron_secret_000000000000000000000000";
 export const PASSWORD = "Senha-Forte-E2e-2026!";
-
-/** TOTP (RFC 6238) a partir da chave manual exibida na ativação. */
-export function totp(secret: string, offsetSteps = 0) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  let bits = "";
-  for (const char of secret.replace(/=+$/, "").toUpperCase()) bits += alphabet.indexOf(char).toString(2).padStart(5, "0");
-  const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)));
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000) + offsetSteps));
-  const hmac = createHmac("sha1", key).update(counter).digest();
-  const offset = hmac[hmac.length - 1] & 0xf;
-  return String((hmac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
-}
-
-/** Aguarda a próxima janela de 30 s (o Auth recusa reuso do mesmo código). */
-export async function freshTotp(secret: string, used: Set<string>) {
-  for (let i = 0; i < 40; i += 1) {
-    const code = totp(secret);
-    if (!used.has(code)) { used.add(code); return code; }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  throw new Error("Sem novo código TOTP");
-}
 
 export async function sql<T = Record<string, unknown>>(text: string, values: unknown[] = []) {
   const client = new Client({ connectionString: OWNER_URL });
@@ -60,19 +36,6 @@ export function linkFrom(html: string) {
   return match[1].replace(/&amp;/g, "&");
 }
 
-/** Ativação do MFA na tela /mfa: lê a chave manual, confirma e guarda os códigos de recuperação. */
-export async function enrollMfa(page: Page, used: Set<string>) {
-  await expect(page.getByRole("heading", { name: "Confirmação em duas etapas" })).toBeVisible();
-  const secret = await page.getByLabel("Chave manual").inputValue();
-  await page.getByLabel("Código de 6 dígitos").fill(await freshTotp(secret, used));
-  await page.getByRole("button", { name: "Confirmar e entrar" }).click();
-  await expect(page.getByText("Guarde estes códigos agora")).toBeVisible();
-  const codes = await page.locator("ul li code").allTextContents();
-  expect(codes).toHaveLength(10);
-  await page.getByRole("button", { name: "Já salvei — continuar" }).click();
-  return { secret, codes };
-}
-
 export async function acceptTerms(page: Page) {
   await expect(page.getByRole("heading", { name: "Termos de uso institucional" })).toBeVisible();
   await page.getByRole("button", { name: "Li e aceito" }).click();
@@ -84,14 +47,6 @@ export async function login(page: Page, email: string, password = PASSWORD) {
   await page.getByLabel("E-mail institucional").fill(email);
   await page.getByLabel("Senha").fill(password);
   await page.getByRole("button", { name: "Continuar" }).click();
-}
-
-export async function loginWithMfa(page: Page, email: string, secret: string, used: Set<string>) {
-  await login(page, email);
-  await expect(page).toHaveURL(/\/mfa/);
-  await page.getByLabel("Código de 6 dígitos").fill(await freshTotp(secret, used));
-  await page.getByRole("button", { name: "Confirmar e entrar" }).click();
-  await expect(page).toHaveURL(/\/(sistema|termos)/);
 }
 
 /** Nenhuma tela pode cair no erro genérico. */

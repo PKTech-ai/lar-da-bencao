@@ -10,7 +10,7 @@ const schema = z.object({ version: z.string().min(4).max(40) });
 
 export async function GET() {
   try {
-    const actor = await requireActor({ requireMfa: false });
+    const actor = await requireActor();
     const result = await query<{ accepted_at: string }>(
       "select accepted_at from app.terms_acceptances where user_id=$1 and terms_version=$2",
       [actor.id, CURRENT_TERMS_VERSION]
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   let actor = null;
   try {
     assertSameOrigin(request);
-    actor = await requireActor({ requireMfa: false });
+    actor = await requireActor();
     const input = schema.parse(await request.json());
     if (input.version !== CURRENT_TERMS_VERSION) throw new AppError("Os termos foram atualizados. Recarregue a página e leia a versão atual.", 409, "TERMS_OUTDATED");
     await query(

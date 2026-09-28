@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       });
       throw new AppError(GENERIC_FAILURE, 401, "INVALID_CREDENTIALS");
     }
-    return Response.json({ next: "/mfa" }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ next: "/sistema" }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }
