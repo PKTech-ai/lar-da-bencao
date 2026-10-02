@@ -553,6 +553,69 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     }
     expect(missing).toEqual([]);
   });
+  it("cadastro online: envio público cai na fila, Administrador aplica e o expurgo remove os antigos", async () => {
+    const publicRoute = await import("@/app/api/public/worker-submissions/route");
+    const list = await import("@/app/api/workers/submissions/route");
+    const review = await import("@/app/api/workers/submissions/[id]/route");
+    const ip = `198.51.100.${Math.floor(Math.random() * 250)}`;
+    const send = (body: object) => publicRoute.POST(new Request("https://app.test/api/public/worker-submissions", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-real-ip": ip, "user-agent": "vitest" }, body: JSON.stringify(body)
+    }));
+    const name = `Cadastro Online ${randomUUID().slice(0, 8)}`;
+    const form = {
+      full_name: name, phone: "(51) 99876-5432", birth_date: "1980-03-15", departments: ["doutrina"], functions: ["Passista"],
+      available_days: [3], accepts_volunteer_law: true, privacy_acknowledged: true, contribution_cents: 99999
+    };
+
+    // A flag nasce desligada: formulário fechado.
+    await owner((client) => client.query("update app.feature_flags set enabled = false where key = 'public_worker_form'"));
+    expect((await send(form)).status).toBe(404);
+    await owner((client) => client.query("update app.feature_flags set enabled = true where key = 'public_worker_form'"));
+
+    const before = await query<{ count: number }>("select count(*)::int as count from app.workers");
+    expect((await send(form)).status).toBe(201);
+    expect((await send({ ...form, departments: ["doutrina", "infancia"] })).status).toBe(201);
+    expect((await query<{ count: number }>("select count(*)::int as count from app.workers")).rows[0].count).toBe(before.rows[0].count);
+
+    current.actor = coordinator;
+    expect((await list.GET()).status).toBe(403);
+    current.actor = admin;
+    const queue = (await (await list.GET()).json()).submissions.filter((s: { payload: { full_name: string } }) => s.payload.full_name === name);
+    expect(queue).toHaveLength(2);
+    expect(queue[0].payload).not.toHaveProperty("contribution_cents");
+
+    const post = (id: string, body: object) => review.POST(json("POST", body), { params: Promise.resolve({ id }) });
+    const created = await (await post(queue[0].id, { action: "create" })).json();
+    expect(created).toMatchObject({ result: "created", status: "pending" });
+    // Simula a aprovação da Diretoria para conferir a volta para pendente.
+    await owner((client) => client.query("update app.workers set status = 'active' where id = $1", [created.worker_id]));
+
+    // O segundo envio agora encontra a ficha criada e, ao mudar departamentos, devolve para a Diretoria.
+    const again = (await (await list.GET()).json()).submissions.find((s: { id: string }) => s.id === queue[1].id);
+    expect(again.suggestions[0]).toMatchObject({ worker_id: created.worker_id });
+    const applied = await (await post(queue[1].id, { action: "apply", worker_id: created.worker_id, version: 1 })).json();
+    expect(applied).toMatchObject({ result: "updated", status: "pending", resubmitted: true });
+    const row = await query<{ status: string; version: number; departments: string[] }>(
+      `select w.status, w.version, array(select department_key from app.worker_departments where worker_id = w.id order by 1) as departments
+         from app.workers w where w.id = $1`,
+      [created.worker_id]
+    );
+    expect(row.rows[0]).toEqual({ status: "pending", version: 2, departments: ["doutrina", "infancia"] });
+    expect((await post(queue[1].id, { action: "discard", note: "repetido" })).status).toBe(409);
+
+    // Limite por IP: os dois envios acima contam; o sexto da mesma conexão é recusado.
+    for (let i = 0; i < 3; i += 1) expect((await send(form)).status).toBe(201);
+    expect((await send(form)).status).toBe(429);
+
+    // Expurgo: só envios já tratados e antigos.
+    await owner((client) => client.query("update app.worker_submissions set reviewed_at = now() - interval '91 days' where id = $1", [queue[0].id]));
+    const purged = await query(
+      "delete from app.worker_submissions where status in ('applied','discarded') and reviewed_at < now() - make_interval(days => $1)",
+      [90]
+    );
+    expect(purged.rowCount).toBe(1);
+  });
+
   it("consulta de trabalhadores respeita o escopo de leitura", async () => {
     const lookup = await import("@/app/api/lookup/workers/route");
     const [doutrinaWorker, infanciaWorker] = await owner(async (client) => {

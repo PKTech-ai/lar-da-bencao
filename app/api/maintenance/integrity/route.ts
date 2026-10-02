@@ -3,6 +3,7 @@ import { appendAudit } from "@/lib/audit";
 import { dbPool, transaction } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { sweepAttachments } from "@/lib/attachment-maintenance";
+import { SUBMISSION_RETENTION_DAYS } from "@/lib/worker-submissions";
 
 function validSecret(request: Request) {
   const expected = Buffer.from(`Bearer ${serverEnv().CRON_SECRET}`);
@@ -30,6 +31,12 @@ export async function GET(request: Request) {
     await client.query("delete from app.auth_attempts where created_at < now() - interval '2 days'");
     return stale.rowCount ?? 0;
   });
-  await appendAudit(null, { category: "Segurança", action: "Verificação diária de integridade", module: "Sistema", section: "Auditoria e anexos", result: "success", details: `${result.event_count} evento(s) íntegros; ${removed} upload(s) incompleto(s) removido(s); ${sweep.orphans} anexo(s) órfão(s) descartado(s); ${sweep.quarantinePurged} quarentena(s) antiga(s) sem binário.` });
-  return Response.json({ status: "ok", auditEvents: Number(result.event_count), staleUploadsRemoved: removed, ...sweep });
+  // Cadastros online já tratados (aplicados ou descartados) saem da fila depois do prazo de retenção.
+  const submissions = await dbPool().query(
+    "delete from app.worker_submissions where status in ('applied','discarded') and reviewed_at < now() - make_interval(days => $1)",
+    [SUBMISSION_RETENTION_DAYS]
+  );
+  const submissionsPurged = submissions.rowCount ?? 0;
+  await appendAudit(null, { category: "Segurança", action: "Verificação diária de integridade", module: "Sistema", section: "Auditoria e anexos", result: "success", details: `${result.event_count} evento(s) íntegros; ${removed} upload(s) incompleto(s) removido(s); ${sweep.orphans} anexo(s) órfão(s) descartado(s); ${sweep.quarantinePurged} quarentena(s) antiga(s) sem binário; ${submissionsPurged} cadastro(s) online antigo(s) expurgado(s).` });
+  return Response.json({ status: "ok", auditEvents: Number(result.event_count), staleUploadsRemoved: removed, submissionsPurged, ...sweep });
 }
