@@ -21,6 +21,20 @@ Executar **em ambiente local com dados sintéticos** (ou importação de demonst
 - [ ] Afastar/reativar; impressão da ficha só para aprovado
 - [ ] Trabalhador de outro departamento não vê a ficha
 
+## Cadastro online de trabalhadores (`public_worker_form` — Administrador)
+- [ ] Com a flag desligada, `/cadastro/trabalhador` abre sem login e mostra “Formulário fechado”
+- [ ] Ligar “Cadastro online de trabalhadores” em Módulos e ondas (exige a referência deste UAT)
+- [ ] Pelo celular, sem login: preencher e enviar; a confirmação não mostra nenhum dado; conferir a leitura nos temas claro e escuro
+- [ ] Sem telefone com DDD, sem nascimento, sem departamento ou sem os aceites, o envio é recusado
+- [ ] O envio **não** aparece em Trabalhadores; aparece em Trabalhadores → Cadastros online (só o Administrador vê o botão e a tela)
+- [ ] “Criar nova ficha” → ficha PENDENTE — AGUARDANDO DIRETORIA, sem contribuição nem observações
+- [ ] Novo envio da mesma pessoa → a ficha aparece em “Fichas parecidas”; a tabela mostra o que muda; “Atualizar esta ficha” mantém contribuição e observações
+- [ ] Atualizar mudando departamentos ou funções de ficha aprovada → volta para PENDENTE
+- [ ] Descartar exige motivo; o envio some da fila
+- [ ] Dedo-duro: envio anônimo sem dados pessoais; criação, atualização e descarte com o Administrador como ator
+- [ ] Seis envios seguidos da mesma conexão: o sexto é recusado (“Muitos envios”)
+- [ ] QR code: o endereço exibido é o do domínio oficial; abrir pelo celular **antes** de imprimir o cartaz
+
 ## Doutrina (Coordenação da Doutrina)
 - [ ] Palestrantes externos: cadastrar, editar, inativar (some das opções da escala)
 - [ ] Biblioteca: pasta, subpasta, estudo com PDF, download por trabalhador da Doutrina, retirar/restaurar

@@ -6,7 +6,7 @@ import { query, transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
 import {
-  assertWorkerScope, departmentsWith, fichaSchema, normalizeFicha, statusAfterEdit, type WorkerStatus
+  assertWorkerScope, departmentsWith, fichaSchema, normalizeFicha, statusAfterEdit, updateWorkerFicha, type WorkerStatus
 } from "@/lib/workers";
 
 const patchSchema = fichaSchema.extend({
@@ -83,24 +83,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         status = raw.active ? "active" : "inactive";
       }
 
-      await client.query(
-        `update app.workers set full_name=$2, email=$3, phone=$4, birth_date=nullif($5,'')::date, naturality=$6,
-            marital_status=$7, profession=$8, address=$9, filled_date=coalesce(nullif($10,'')::date, filled_date),
-            volunteer_service=$11, accepts_volunteer_law=$12, image_authorization=$13, functions=$14, available_days=$15,
-            notes=$16, status=$17, contribution_cents=$20, contribution_due_day=$21,
-            requested_at=case when $18 then now() else requested_at end,
-            approved_at=case when $18 then null else approved_at end,
-            updated_by=$19, updated_at=now(), version=version+1
-          where id=$1`,
-        [id, input.full_name, input.email || null, input.phone || null, input.birth_date ?? "", input.naturality || null,
-          input.marital_status || null, input.profession || null, input.address || null, input.filled_date ?? "",
-          input.volunteer_service, input.accepts_volunteer_law, input.image_authorization, input.functions, input.available_days,
-          input.notes, status, resubmitted, author.id, input.contribution_cents, input.contribution_due_day]
-      );
-      await client.query("delete from app.worker_departments where worker_id=$1", [id]);
-      for (const department of input.departments) {
-        await client.query("insert into app.worker_departments(worker_id, department_key) values ($1,$2)", [id, department]);
-      }
+      await updateWorkerFicha(client, id, input, { status, resubmitted, authorId: author.id });
       await appendAudit(author, {
         category: "Edição",
         action: resubmitted ? "Ficha reenviada para análise da Diretoria" : status !== before.status ? (status === "active" ? "Trabalhador reativado" : "Trabalhador afastado") : "Atualização de ficha de trabalhador",

@@ -120,3 +120,53 @@ export async function assertSchedulableWorker(db: Queryable, workerId: string, d
   if (!row) throw new AppError("Trabalhador sem aprovação da Diretoria ou fora deste departamento.", 409, "WORKER_NOT_APPROVED");
   if (fn && !row.functions.includes(fn)) throw new AppError(`Trabalhador sem a função ${fn} na ficha.`, 409, "WORKER_FUNCTION_MISSING");
 }
+
+/**
+ * Insere a ficha e os vínculos de departamento. Toda ficha nasce pendente, aguardando a Diretoria.
+ * Usada pelo cadastro interno e pela revisão dos cadastros online.
+ */
+export async function insertWorker(db: Queryable, input: Ficha, options: { origin: string; authorId: string }) {
+  const inserted = await db.query(
+    `insert into app.workers (full_name, email, phone, birth_date, naturality, marital_status, profession, address,
+        filled_date, volunteer_service, accepts_volunteer_law, image_authorization, functions, available_days,
+        origin_department, notes, contribution_cents, contribution_due_day, status, created_by, updated_by)
+     values ($1,$2,$3,nullif($4,'')::date,$5,$6,$7,$8,coalesce(nullif($9,'')::date,$10::date),$11,$12,$13,$14,$15,$16,$17,$19,$20,'pending',$18,$18)
+     returning id`,
+    [input.full_name, input.email || null, input.phone || null, input.birth_date ?? "", input.naturality || null,
+      input.marital_status || null, input.profession || null, input.address || null, input.filled_date ?? "", todayInSaoPaulo(),
+      input.volunteer_service, input.accepts_volunteer_law, input.image_authorization, input.functions, input.available_days,
+      options.origin, input.notes, options.authorId, input.contribution_cents, input.contribution_due_day]
+  );
+  const workerId = (inserted.rows[0] as { id: string }).id;
+  for (const department of input.departments) {
+    await db.query("insert into app.worker_departments(worker_id, department_key) values ($1,$2)", [workerId, department]);
+  }
+  return workerId;
+}
+
+/** Grava a ficha editada e troca os vínculos de departamento; `resubmitted` devolve a ficha para a Diretoria. */
+export async function updateWorkerFicha(
+  db: Queryable,
+  id: string,
+  input: Ficha,
+  options: { status: WorkerStatus; resubmitted: boolean; authorId: string }
+) {
+  await db.query(
+    `update app.workers set full_name=$2, email=$3, phone=$4, birth_date=nullif($5,'')::date, naturality=$6,
+        marital_status=$7, profession=$8, address=$9, filled_date=coalesce(nullif($10,'')::date, filled_date),
+        volunteer_service=$11, accepts_volunteer_law=$12, image_authorization=$13, functions=$14, available_days=$15,
+        notes=$16, status=$17, contribution_cents=$20, contribution_due_day=$21,
+        requested_at=case when $18 then now() else requested_at end,
+        approved_at=case when $18 then null else approved_at end,
+        updated_by=$19, updated_at=now(), version=version+1
+      where id=$1`,
+    [id, input.full_name, input.email || null, input.phone || null, input.birth_date ?? "", input.naturality || null,
+      input.marital_status || null, input.profession || null, input.address || null, input.filled_date ?? "",
+      input.volunteer_service, input.accepts_volunteer_law, input.image_authorization, input.functions, input.available_days,
+      input.notes, options.status, options.resubmitted, options.authorId, input.contribution_cents, input.contribution_due_day]
+  );
+  await db.query("delete from app.worker_departments where worker_id=$1", [id]);
+  for (const department of input.departments) {
+    await db.query("insert into app.worker_departments(worker_id, department_key) values ($1,$2)", [id, department]);
+  }
+}
