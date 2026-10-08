@@ -40,15 +40,20 @@ export function HomeClient({ firstName }: { firstName: string }) {
   return (
     <div className="grid">
       {error ? <div className="error" role="alert">{error}</div> : null}
-      <section className="card">
-        <strong>Olá, {firstName}.</strong>
-        <p className="muted">{home?.institution.motto}</p>
-        {memory ? (
-          <p className="small">
-            Casa fundada em {brDate(memory.foundedOn)} · {memory.age} anos ·
-            {memory.daysToAnniversary === 0 ? " hoje é o aniversário da Casa." : ` próximo aniversário em ${brDate(memory.nextAnniversary)} (${memory.daysToAnniversary} dia(s)).`}
-          </p>
-        ) : null}
+      <section className="card lar-welcome">
+        <div>
+          <p className="op-eyebrow">Seja bem-vindo</p>
+          <h2>Ao Lar da Bênção</h2>
+          <p>{home?.institution.motto || "Uma Casa de estudo, acolhimento e caridade."}</p>
+          <p className="small muted">Olá, {firstName}.</p>
+          {memory ? (
+            <p className="small">
+              Casa fundada em {brDate(memory.foundedOn)} · {memory.age} anos ·
+              {memory.daysToAnniversary === 0 ? " hoje é o aniversário da Casa." : ` próximo aniversário em ${brDate(memory.nextAnniversary)} (${memory.daysToAnniversary} dia(s)).`}
+            </p>
+          ) : null}
+        </div>
+        <img className="lar-welcome-emblem" src="/marca-lar-da-bencao.png" alt="" />
       </section>
 
       {pending.length ? (

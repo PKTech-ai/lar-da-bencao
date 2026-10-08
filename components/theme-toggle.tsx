@@ -5,7 +5,7 @@ import { useLayoutEffect, useState } from "react";
 function currentTheme() {
   const saved = localStorage.getItem("theme");
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "light";
 }
 
 export function ThemeToggle() {

@@ -40,7 +40,7 @@ export default async function DashboardPage() {
         <div>
           <p className="op-eyebrow">LAR DA BÊNÇÃO</p>
           <h1>Visão Geral</h1>
-          <p>O que está sob sua responsabilidade hoje.</p>
+          <p>Acesse cada departamento pelo seu próprio módulo.</p>
         </div>
         {runtimeEnvironment().production ? <span className="production-badge">{runtimeEnvironment().label}</span> : <span className="status building">{runtimeEnvironment().label}</span>}
       </header>
