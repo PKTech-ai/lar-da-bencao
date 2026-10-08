@@ -18,7 +18,7 @@ export default async function TermosPage() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <Brand />
+        <Brand prominent />
         <h1>Termos de uso institucional</h1>
         <p className="muted">Obrigatório no primeiro acesso após autenticação.</p>
         <TermsForm />

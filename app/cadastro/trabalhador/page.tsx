@@ -17,7 +17,7 @@ export default async function CadastroTrabalhadorPage() {
   return (
     <main className="auth-shell">
       <section className="auth-card" aria-labelledby="cadastro-title">
-        <Brand />
+        <Brand prominent />
         <h1 id="cadastro-title">Cadastro de trabalhador</h1>
         {open ? (
           <>

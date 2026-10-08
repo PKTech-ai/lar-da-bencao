@@ -1,7 +1,13 @@
-export function Brand() {
+export function Brand({ prominent = false }: { prominent?: boolean }) {
   return (
-    <div className="brand-lockup">
-      <span className="brand-mark" aria-hidden="true">LB</span>
+    <div className={prominent ? "brand-lockup brand-lockup-prominent" : "brand-lockup"}>
+      <img
+        className="brand-logo"
+        src="/marca-lar-da-bencao.png"
+        alt="Centro Espírita Filantrópico Lar da Bênção"
+        width={801}
+        height={840}
+      />
       <div>
         <strong>Lar da Bênção</strong>
         <small>Luz, amor e caridade cristã</small>
