@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { sessionInitials, sessionShowsRole } from "@/lib/home-dashboard";
 import { createClient } from "@/lib/supabase/client";
 
-export function SystemBar({ actor, environmentLabel }: { actor: { name: string; role: string }; environmentLabel: string | null }) {
+export function SystemBar({ actor, roleLabel }: { actor: { name: string; role: string }; roleLabel: string }) {
   const router = useRouter();
-  const initials = actor.name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("");
+  const initials = sessionInitials(actor.name) || "LB";
+  const showRole = sessionShowsRole(actor.name, roleLabel);
 
   async function logout(scope: "local" | "global") {
     const supabase = createClient();
@@ -23,12 +25,11 @@ export function SystemBar({ actor, environmentLabel }: { actor: { name: string; 
 
   return (
     <div className="system-bar">
-      {environmentLabel ? <span className="production-badge">{environmentLabel}</span> : null}
       <Link href="/sistema/conta" className="session-chip">
-        <span className="session-avatar" aria-hidden="true">{initials || "LB"}</span>
-        <span>
+        <span className="session-avatar" aria-hidden="true">{initials}</span>
+        <span className="session-text">
           <strong>{actor.name}</strong>
-          <small>{actor.role}</small>
+          {showRole ? <small>{roleLabel}</small> : null}
         </span>
       </Link>
       <Link href="/sistema/conta" className="button">Minha área</Link>

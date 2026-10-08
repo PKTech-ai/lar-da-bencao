@@ -1,41 +1,28 @@
 import { Sidebar } from "@/components/sidebar";
 import { SystemBar } from "@/components/system-bar";
 import { runtimeEnvironment } from "@/lib/environment";
-import { listEnabledFlags } from "@/lib/feature-flags";
-import { moduleCatalog } from "@/lib/modules";
+import { loadNavigation } from "@/lib/navigation";
 import { requirePageActor } from "@/lib/page-auth";
-import { hasAnyDepartmentPermission, hasPermission } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function SystemLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const actor = await requirePageActor();
-  const flags = await listEnabledFlags();
-  const [audit, attachments, users, moduleAdmin] = await Promise.all([
-    hasPermission(actor, "audit", "read"),
-    hasPermission(actor, "attachments", "admin"),
-    hasPermission(actor, "users", "admin"),
-    hasPermission(actor, "modules", "admin")
-  ]);
-
-  const modules = [];
-  for (const mod of moduleCatalog) {
-    if (mod.key === "home") continue;
-    if (!flags.get(mod.flagKey)) continue;
-    const allowed = mod.department
-      ? await hasPermission(actor, mod.permissionResource, "read", mod.department)
-      : mod.permissionResource === "department"
-        ? await hasAnyDepartmentPermission(actor, "read")
-        : await hasPermission(actor, mod.permissionResource, "read");
-    if (allowed) modules.push({ href: mod.href, label: mod.label });
-  }
+  const nav = await loadNavigation(actor);
+  const env = runtimeEnvironment();
 
   return (
     <div className="app-shell">
-      <Sidebar actor={actor} capabilities={{ audit, attachments, users, moduleAdmin, modules }} />
+      <Sidebar actor={actor} capabilities={nav.capabilities} />
       <main className="app-main">
-        <SystemBar actor={actor} environmentLabel={runtimeEnvironment().production ? runtimeEnvironment().label : null} />
-        {runtimeEnvironment().production ? null : <div className="notice no-print" role="note"><strong>{runtimeEnvironment().label}.</strong> Não cadastre dados pessoais reais neste ambiente.</div>}
+        <SystemBar actor={actor} roleLabel={nav.roleLabel} />
+        <p className="ops-save" role="status">Pronto para uso</p>
+        {env.production ? null : (
+          <details className="lar-demo-note">
+            <summary>Ambiente de teste · dados fictícios</summary>
+            <div className="notice" role="note"><strong>{env.label}.</strong> Não cadastre dados pessoais reais neste ambiente.</div>
+          </details>
+        )}
         {children}
       </main>
     </div>

@@ -1,8 +1,10 @@
 import { HomeClient } from "./home-client";
+import { loadNavigation } from "@/lib/navigation";
 import { requirePageActor } from "@/lib/page-auth";
 
 export default async function DashboardPage() {
   const actor = await requirePageActor();
+  const nav = await loadNavigation(actor);
 
   return (
     <>
@@ -12,7 +14,7 @@ export default async function DashboardPage() {
           <p>Acesse cada departamento pelo seu próprio módulo.</p>
         </div>
       </header>
-      <HomeClient firstName={actor.name.split(" ")[0]} />
+      <HomeClient moduleCount={nav.modules.length} />
     </>
   );
 }

@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
+import { addDays, buildHomeStats, filterAgenda, todayInSaoPaulo, type AgendaItem } from "@/lib/home-dashboard";
 import { brDate, formatMoney } from "@/lib/resources/types";
 
-type Card = { key: string; label: string; value: string; href?: string; hint?: string };
-type Pending = { key: string; label: string; count: number; href: string };
-type AgendaItem = { date: string; label: string; module: string; href: string };
+type Pending = { key: string; label: string; count: number; href: string; hint?: string };
 type Area = {
   worker: { full_name: string; status: string; functions: string[]; departments: string[] } | null;
   cleaning: { clean_date: string; status: string; fee_cents: number; payment_status: string | null }[];
@@ -16,21 +15,39 @@ type Area = {
 };
 type Home = {
   institution: { name: string; motto: string };
-  memory: { foundedOn: string; age: number; nextAnniversary: string; daysToAnniversary: number };
-  cards: Card[];
+  cards: { key: string; label: string; value: string; href?: string; hint?: string }[];
   myArea: Area | null;
 };
 
 const CLEANING = { scheduled: "Escalado", done: "Realizada", fee: "Taxa de serviço", cancelled: "Cancelado" } as Record<string, string>;
+const PEOPLE = "M16 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1M10 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 19v-1a3 3 0 0 0-2.2-2.9M16 5.1a3 3 0 0 1 0 5.8";
+const ORG = "M5 5h6v6H5zM13 5h6v6h-6zM5 13h6v6H5zM13 13h6v6h-6z";
 
 function monthShort(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase();
 }
 
-export function HomeClient({ firstName }: { firstName: string }) {
+function OpIcon({ name }: { name: "calendar" | "check" | "people" | "org" }) {
+  return (
+    <svg className="op-icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {name === "calendar" ? (
+        <>
+          <path d="M5 5h14v15H5z" />
+          <path d="M5 10h14" />
+        </>
+      ) : null}
+      {name === "check" ? <path d="M5 12.5 9.5 17 19 7" /> : null}
+      {name === "people" ? <path d={PEOPLE} /> : null}
+      {name === "org" ? <path d={ORG} /> : null}
+    </svg>
+  );
+}
+
+export function HomeClient({ moduleCount }: { moduleCount: number }) {
   const [home, setHome] = useState<Home | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
+  const [period, setPeriod] = useState<0 | 7 | 30>(30);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -39,14 +56,11 @@ export function HomeClient({ firstName }: { firstName: string }) {
     void api<{ items: AgendaItem[] }>("/api/agenda").then((b) => setAgenda(b.items)).catch(() => undefined);
   }, []);
 
-  const memory = home?.memory;
-  const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  const stats = home?.cards.length
-    ? home.cards.slice(0, 4)
-    : [
-        { key: "agenda", label: "Na agenda de hoje", value: String(agenda.filter((item) => item.date === new Date().toISOString().slice(0, 10)).length), hint: "Atividades programadas com data" },
-        { key: "pending", label: "Pendências para acompanhar", value: String(pending.reduce((sum, item) => sum + item.count, 0)), hint: "Nos módulos liberados para seu perfil" }
-      ];
+  const today = todayInSaoPaulo();
+  const todayLabel = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const stats = buildHomeStats({ today, moduleCount, agenda, pending });
+  const visibleAgenda = filterAgenda(agenda, today, period);
+  const agendaTotal = agenda.filter((item) => item.date >= today && item.date <= addDays(today, period)).length;
 
   function reload() {
     window.location.reload();
@@ -64,46 +78,81 @@ export function HomeClient({ firstName }: { firstName: string }) {
             <Link className="button primary" href="/sistema/conta">Acessar minha área</Link>
             <button className="button" type="button" onClick={reload}>Atualizar painel</button>
           </div>
-          <small className="lar-welcome-date">{today}</small>
-          {memory ? (
-            <p className="small muted">
-              Casa fundada em {brDate(memory.foundedOn)} · {memory.age} anos ·
-              {memory.daysToAnniversary === 0 ? " hoje é o aniversário da Casa." : ` próximo aniversário em ${brDate(memory.nextAnniversary)} (${memory.daysToAnniversary} dia(s)).`}
-            </p>
-          ) : null}
-          <p className="small muted">Olá, {firstName}.</p>
+          <small className="lar-welcome-date">{todayLabel}</small>
         </div>
         <div className="lar-welcome-emblem"><img src="/marca-lar-da-bencao.png" alt="" /></div>
       </section>
 
       <div className="op-stats">
         {stats.map((card) => (
-          <article key={card.key} className="op-stat">
+          <article key={card.key} className={card.pending ? "op-stat op-pending" : "op-stat"}>
+            <OpIcon name={card.icon} />
             <span>{card.label}</span>
             <b>{card.value}</b>
-            {card.hint ? <small>{card.hint}</small> : null}
+            <small>{card.hint}</small>
           </article>
         ))}
       </div>
 
-      <div className="home-columns">
-        <section className="card">
-          <h2>Agenda</h2>
-          {agenda.length ? agenda.slice(0, 6).map((item, index) => (
-            <Link key={`${item.date}-${index}`} href={item.href} className="agenda-line">
-              <span className="agenda-date"><b>{item.date.slice(8)}</b>{monthShort(item.date)}</span>
-              <span><strong>{item.label}</strong><small>{item.module}</small></span>
-            </Link>
-          )) : <p className="small muted">Nenhuma atividade neste período.</p>}
+      <div className="op-columns">
+        <section className="op-section">
+          <div className="op-section-head">
+            <h3>Agenda</h3>
+            <label>Período
+              <select aria-label="Período da agenda" value={period} onChange={(event) => setPeriod(Number(event.target.value) as 0 | 7 | 30)}>
+                <option value={0}>Hoje</option>
+                <option value={7}>Próximos 7 dias</option>
+                <option value={30}>Próximos 30 dias</option>
+              </select>
+            </label>
+          </div>
+          {visibleAgenda.length ? (
+            <ul className="op-list">
+              {visibleAgenda.map((item, index) => (
+                <li key={`${item.date}-${index}`}>
+                  <Link href={item.href} className="op-agenda-link">
+                    <span className="op-date"><b>{item.date.slice(8)}</b>{monthShort(item.date)}</span>
+                    <span className="op-line-copy"><strong>{item.label}</strong><small>{item.module}</small></span>
+                    <span className="op-arrow" aria-hidden="true">›</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="op-empty">
+              <strong>Nenhuma atividade neste período</strong>
+              <p>Confira as agendas dos seus departamentos ou escolha outro período.</p>
+            </div>
+          )}
+          <p className="op-footnote">
+            {agendaTotal > 6
+              ? `Exibindo as próximas 6 de ${agendaTotal} atividades. Abra o departamento para consultar a agenda completa.`
+              : "Agenda formada pelos eventos, atividades, reuniões e limpeza cadastrados nos módulos liberados."}
+          </p>
         </section>
-        <section className="card">
-          <h2>Pendências</h2>
-          {pending.length ? pending.map((item) => (
-            <Link key={item.key} href={item.href} className="agenda-line">
-              <span className="agenda-date"><b>{item.count}</b></span>
-              <span><strong>{item.label}</strong></span>
-            </Link>
-          )) : <p className="small muted">Nada pendente no seu escopo.</p>}
+        <section className="op-section">
+          <div className="op-section-head">
+            <h3>Pendências</h3>
+            <span>Acompanhamento</span>
+          </div>
+          {pending.length ? (
+            <ul className="op-list">
+              {pending.map((item) => (
+                <li key={item.key}>
+                  <Link href={item.href} className="op-pending-link">
+                    <span className="op-count">{item.count}</span>
+                    <span className="op-line-copy"><strong>{item.label}</strong><small>{item.hint}</small></span>
+                    <span className="op-arrow" aria-hidden="true">›</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="op-empty">
+              <strong>Nenhuma pendência neste resumo</strong>
+              <p>Não há fichas, pedidos ou sugestões aguardando análise nas categorias exibidas.</p>
+            </div>
+          )}
         </section>
       </div>
 
