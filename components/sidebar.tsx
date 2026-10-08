@@ -16,6 +16,25 @@ export type NavCapability = {
 
 const DIRETORIA = ["/sistema/presidencia", "/sistema/secretaria", "/sistema/tesouraria", "/sistema/conselhofiscal"];
 const PLACED = new Set(["/sistema/documentos", ...DIRETORIA]);
+const MENU_LABEL: Record<string, string> = {
+  "/sistema/doutrina": "Dpto de Doutrina",
+  "/sistema/infancia": "Dpto da Infância",
+  "/sistema/juventude": "Dpto da Juventude",
+  "/sistema/assistencia": "Dpto de Assist. e Prom. Social",
+  "/sistema/patrimonio": "Dpto de Patrimônio",
+  "/sistema/eventos": "Dpto de Eventos",
+  "/sistema/divulgacao": "Dpto de Divulgação",
+  "/sistema/juridico": "Dpto Jurídico"
+};
+const MENU_ORDER = [
+  "/sistema/doutrina", "/sistema/infancia", "/sistema/juventude", "/sistema/assistencia",
+  "/sistema/patrimonio", "/sistema/eventos", "/sistema/divulgacao", "/sistema/juridico",
+  "/sistema/trabalhadores", "/sistema/admissoes"
+];
+
+function menuLabel(href: string, fallback: string) {
+  return MENU_LABEL[href] ?? fallback;
+}
 
 function NavItem({ href, label, current }: { href: string; label: string; current: boolean }) {
   return (
@@ -36,9 +55,18 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
   const documentos = byHref.get("/sistema/documentos");
   const diretoria = DIRETORIA.flatMap((href) => {
     const mod = byHref.get(href);
-    return mod && show(mod.label) ? [mod] : [];
+    const label = mod ? menuLabel(mod.href, mod.label) : "";
+    return mod && show(label) ? [{ ...mod, label }] : [];
   });
-  const rest = capabilities.modules.filter((mod) => !PLACED.has(mod.href) && show(mod.label));
+  const rest = capabilities.modules
+    .filter((mod) => !PLACED.has(mod.href))
+    .map((mod) => ({ ...mod, label: menuLabel(mod.href, mod.label) }))
+    .filter((mod) => show(mod.label))
+    .sort((a, b) => {
+      const left = MENU_ORDER.indexOf(a.href);
+      const right = MENU_ORDER.indexOf(b.href);
+      return (left === -1 ? 99 : left) - (right === -1 ? 99 : right);
+    });
   const tools = [
     { href: "/sistema/auditoria", label: "Dedo-duro / Histórico", shown: capabilities.audit },
     { href: "/sistema/anexos", label: "Anexos no banco", shown: capabilities.attachments },

@@ -14,7 +14,7 @@ export default async function DashboardPage() {
           <p>Acesse cada departamento pelo seu próprio módulo.</p>
         </div>
       </header>
-      <HomeClient moduleCount={nav.modules.length} />
+      <HomeClient moduleCount={nav.modules.length} modules={nav.modules} showAccess={nav.capabilities.users} />
     </>
   );
 }

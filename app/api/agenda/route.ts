@@ -42,7 +42,16 @@ export async function GET() {
       (row) => ({ date: row.date, label: `Kits de higiene · ${row.responsible}`, module: "Assistência", href: "/sistema/assistencia/kits" }));
 
     items.sort((a, b) => a.date.localeCompare(b.date));
-    return Response.json({ items: items.slice(0, 50) }, { headers: { "Cache-Control": "private, no-store" } });
+    let undatedEvents = 0;
+    if (flags.get("module_eventos") && await hasPermission(actor, "department", "read", "eventos")) {
+      const undated = await query<{ count: string }>(
+        `select count(*)::text as count from app.events
+          where archived_at is null and event_date is null
+            and status in ('A definir','Planejado','Em preparação')`
+      ).catch(() => ({ rows: [{ count: "0" }] }));
+      undatedEvents = Number(undated.rows[0]?.count ?? 0);
+    }
+    return Response.json({ items: items.slice(0, 50), undatedEvents }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }
