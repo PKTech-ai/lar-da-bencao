@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar";
+import { SystemBar } from "@/components/system-bar";
 import { runtimeEnvironment } from "@/lib/environment";
 import { listEnabledFlags } from "@/lib/feature-flags";
 import { moduleCatalog } from "@/lib/modules";
@@ -33,7 +34,8 @@ export default async function SystemLayout({ children }: Readonly<{ children: Re
     <div className="app-shell">
       <Sidebar actor={actor} capabilities={{ audit, attachments, users, moduleAdmin, modules }} />
       <main className="app-main">
-        {runtimeEnvironment().production ? null : <div className="notice no-print" role="note" style={{ marginBottom: 16 }}><strong>{runtimeEnvironment().label}.</strong> Não cadastre dados pessoais reais neste ambiente.</div>}
+        <SystemBar actor={actor} environmentLabel={runtimeEnvironment().production ? runtimeEnvironment().label : null} />
+        {runtimeEnvironment().production ? null : <div className="notice no-print" role="note"><strong>{runtimeEnvironment().label}.</strong> Não cadastre dados pessoais reais neste ambiente.</div>}
         {children}
       </main>
     </div>

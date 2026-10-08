@@ -23,6 +23,10 @@ type Home = {
 
 const CLEANING = { scheduled: "Escalado", done: "Realizada", fee: "Taxa de serviço", cancelled: "Cancelado" } as Record<string, string>;
 
+function monthShort(date: string) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase();
+}
+
 export function HomeClient({ firstName }: { firstName: string }) {
   const [home, setHome] = useState<Home | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
@@ -36,6 +40,17 @@ export function HomeClient({ firstName }: { firstName: string }) {
   }, []);
 
   const memory = home?.memory;
+  const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const stats = home?.cards.length
+    ? home.cards.slice(0, 4)
+    : [
+        { key: "agenda", label: "Na agenda de hoje", value: String(agenda.filter((item) => item.date === new Date().toISOString().slice(0, 10)).length), hint: "Atividades programadas com data" },
+        { key: "pending", label: "Pendências para acompanhar", value: String(pending.reduce((sum, item) => sum + item.count, 0)), hint: "Nos módulos liberados para seu perfil" }
+      ];
+
+  function reload() {
+    window.location.reload();
+  }
 
   return (
     <div className="grid">
@@ -45,58 +60,52 @@ export function HomeClient({ firstName }: { firstName: string }) {
           <p className="op-eyebrow">Seja bem-vindo</p>
           <h2>Ao Lar da Bênção</h2>
           <p>{home?.institution.motto || "Uma Casa de estudo, acolhimento e caridade."}</p>
-          <p className="small muted">Olá, {firstName}.</p>
+          <div className="lar-welcome-actions">
+            <Link className="button primary" href="/sistema/conta">Acessar minha área</Link>
+            <button className="button" type="button" onClick={reload}>Atualizar painel</button>
+          </div>
+          <small className="lar-welcome-date">{today}</small>
           {memory ? (
-            <p className="small">
+            <p className="small muted">
               Casa fundada em {brDate(memory.foundedOn)} · {memory.age} anos ·
               {memory.daysToAnniversary === 0 ? " hoje é o aniversário da Casa." : ` próximo aniversário em ${brDate(memory.nextAnniversary)} (${memory.daysToAnniversary} dia(s)).`}
             </p>
           ) : null}
+          <p className="small muted">Olá, {firstName}.</p>
         </div>
         <img className="lar-welcome-emblem" src="/marca-lar-da-bencao.png" alt="" />
       </section>
 
-      {pending.length ? (
-        <section className="card">
-          <h2>Pendências para você</h2>
-          <div className="grid cards">
-            {pending.map((item) => (
-              <Link key={item.key} href={item.href} className="card card-link kpi"><span className="small">{item.label}</span><b>{item.count}</b></Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      <div className="op-stats">
+        {stats.map((card) => (
+          <article key={card.key} className="op-stat">
+            <span>{card.label}</span>
+            <b>{card.value}</b>
+            {card.hint ? <small>{card.hint}</small> : null}
+          </article>
+        ))}
+      </div>
 
-      {agenda.length ? (
+      <div className="home-columns">
         <section className="card">
-          <h2>Próximos 45 dias</h2>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Data</th><th>Compromisso</th><th>Módulo</th></tr></thead>
-              <tbody>
-                {agenda.map((item, index) => (
-                  <tr key={`${item.date}-${index}`}>
-                    <td>{brDate(item.date)}</td>
-                    <td><Link href={item.href}>{item.label}</Link></td>
-                    <td className="small">{item.module}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <h2>Agenda</h2>
+          {agenda.length ? agenda.slice(0, 6).map((item, index) => (
+            <Link key={`${item.date}-${index}`} href={item.href} className="agenda-line">
+              <span className="agenda-date"><b>{item.date.slice(8)}</b>{monthShort(item.date)}</span>
+              <span><strong>{item.label}</strong><small>{item.module}</small></span>
+            </Link>
+          )) : <p className="small muted">Nenhuma atividade neste período.</p>}
         </section>
-      ) : null}
-
-      {home?.cards.length ? (
         <section className="card">
-          <h2>Seus módulos</h2>
-          <div className="grid cards">
-            {home.cards.map((card) => card.href
-              ? <Link key={card.key} href={card.href} className="card card-link kpi"><span className="small">{card.label}</span><b>{card.value}</b></Link>
-              : <article key={card.key} className="card kpi"><span className="small">{card.label}</span><b>{card.value}</b></article>)}
-          </div>
+          <h2>Pendências</h2>
+          {pending.length ? pending.map((item) => (
+            <Link key={item.key} href={item.href} className="agenda-line">
+              <span className="agenda-date"><b>{item.count}</b></span>
+              <span><strong>{item.label}</strong></span>
+            </Link>
+          )) : <p className="small muted">Nada pendente no seu escopo.</p>}
         </section>
-      ) : null}
+      </div>
 
       {home?.myArea?.worker ? (
         <section className="card">

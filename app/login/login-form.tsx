@@ -38,7 +38,7 @@ export function LoginForm() {
   }
 
   return (
-    <form className="form-stack" onSubmit={submit}>
+    <form className="form-stack" method="post" action="/login" onSubmit={submit}>
       {params.get("motivo") === "sessao" ? <div className="notice" role="status">Sua sessão foi encerrada. Entre novamente.</div> : null}
       {params.get("motivo") === "bienio" ? <div className="notice" role="status">Seu acesso de Diretoria está fora do biênio vigente. Procure o Administrador do Sistema.</div> : null}
       <label>E-mail institucional<input name="email" type="email" autoComplete="username" required /></label>

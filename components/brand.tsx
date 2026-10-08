@@ -1,4 +1,4 @@
-export function Brand({ prominent = false }: { prominent?: boolean }) {
+export function Brand({ prominent = false, subtitle = "Luz, amor e caridade cristã" }: { prominent?: boolean; subtitle?: string }) {
   return (
     <div className={prominent ? "brand-lockup brand-lockup-prominent" : "brand-lockup"}>
       <img
@@ -10,7 +10,7 @@ export function Brand({ prominent = false }: { prominent?: boolean }) {
       />
       <div>
         <strong>Lar da Bênção</strong>
-        <small>Luz, amor e caridade cristã</small>
+        <small>{subtitle}</small>
       </div>
     </div>
   );
