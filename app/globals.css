@@ -147,8 +147,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .sidebar-user .button { width: 100%; min-height: 44px; }
 .theme-toggle { width: 100%; min-height: 40px; margin-top: 8px; }
 .app-main { padding: 24px 30px 32px; min-width: 0; }
-.system-bar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
-.session-chip { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 12px 6px 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); text-decoration: none; color: inherit; }
+.system-bar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; position: relative; z-index: 2; }
+.session-chip { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 14px 6px 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); text-decoration: none; color: inherit; flex: 0 0 auto; }
+.session-chip strong { white-space: nowrap; }
 .session-chip strong, .session-chip small { display: block; }
 .session-chip small { color: var(--muted); font-size: 12px; }
 .session-avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--sage-100); color: var(--sage-700); font-weight: 800; font-size: 13px; }
@@ -160,14 +161,15 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .page-heading h1 { margin: 0 0 6px; font-size: 34px; letter-spacing: -.6px; line-height: 1.15; }
 .page-heading p { margin: 0; color: var(--muted); }
 .op-eyebrow { margin: 0 0 8px; font-size: 12px; letter-spacing: 1.5px; color: var(--blue-800); font-weight: 700; }
-.lar-welcome { display: flex; align-items: center; justify-content: space-between; gap: 24px; background: var(--blue-100); border-color: var(--border-welcome); }
-.lar-welcome h2 { margin: 0 0 8px; font-size: 34px; letter-spacing: -.4px; line-height: 1.15; }
-.lar-welcome p { margin: 0; }
-.lar-welcome-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 8px; }
-.lar-welcome-date { display: block; color: var(--muted); margin-bottom: 8px; }
-.lar-welcome-emblem { width: 108px; height: auto; flex: none; background: #fff; border: 6px solid #fff; border-radius: 50%; padding: 6px; box-shadow: 0 0 0 1px var(--line); }
-.op-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.op-stat { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+.card.lar-welcome { display: flex; align-items: center; justify-content: space-between; gap: 20px; background: #eaf3f6; border: 1px solid #d6e6ed; border-radius: 18px; padding: 28px 30px; box-shadow: none; }
+.card.lar-welcome h2 { margin: 0 0 10px; font-size: 34px; letter-spacing: -.8px; line-height: 1.2; color: #203e50; }
+.card.lar-welcome p { margin: 0; font-size: 16px; color: #526f7e; max-width: 510px; line-height: 1.55; }
+.lar-welcome-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 20px; }
+.card.lar-welcome .lar-welcome-date { display: block; font-size: 13px; color: #617683; margin-top: 14px; }
+.lar-welcome-emblem { display: grid; place-items: center; background: #fffdf6; border: 7px solid #f1e7cb; width: 142px; height: 142px; flex: 0 0 142px; border-radius: 50%; margin: 0 12px; }
+.lar-welcome-emblem img { width: 78px; height: 106px; object-fit: contain; }
+.op-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.op-stat { position: relative; background: var(--surface); border: 1px solid #dae5e9; border-radius: 15px; padding: 20px; }
 .op-stat span, .op-stat small { display: block; color: var(--muted); }
 .op-stat b { display: block; font-size: 30px; margin: 8px 0 4px; }
 .home-columns { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, .8fr); gap: 16px; }
@@ -249,8 +251,9 @@ th { background: var(--surface-sunken); color: var(--text-table-head); position:
   .page-heading { flex-direction: column; }
   .grid.cards, .filters { grid-template-columns: 1fr; }
   .auth-card { padding: 22px; border-radius: 18px; }
-  .lar-welcome { align-items: flex-start; }
-  .lar-welcome-emblem { width: 96px; }
+  .card.lar-welcome { align-items: flex-start; }
+  .lar-welcome-emblem { width: 106px; height: 106px; flex-basis: 106px; }
+  .lar-welcome-emblem img { width: 59px; height: 81px; }
   input, select, textarea { font-size: 16px; }
 }
 

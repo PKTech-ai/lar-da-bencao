@@ -73,7 +73,7 @@ export function HomeClient({ firstName }: { firstName: string }) {
           ) : null}
           <p className="small muted">Olá, {firstName}.</p>
         </div>
-        <img className="lar-welcome-emblem" src="/marca-lar-da-bencao.png" alt="" />
+        <div className="lar-welcome-emblem"><img src="/marca-lar-da-bencao.png" alt="" /></div>
       </section>
 
       <div className="op-stats">
