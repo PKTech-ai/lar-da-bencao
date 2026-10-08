@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Rotas com autenticação própria (Bearer/segredo) também ficam fora do redirecionamento de login.
 // /cadastro e /api/public: cadastro online de trabalhadores, sem login (cai numa fila de revisão).
-const publicPaths = ["/login", "/recuperar", "/auth/callback", "/auth/signout", "/api/auth/login", "/api/health", "/api/bootstrap", "/api/maintenance", "/cadastro", "/api/public"];
+const publicPaths = ["/login", "/recuperar", "/auth/callback", "/auth/signout", "/api/auth/login", "/api/health", "/api/bootstrap", "/api/maintenance", "/cadastro", "/api/public", "/visual"];
 
 export async function proxy(request: NextRequest) {
   if (process.env.VERCEL_ENV === "production" && process.env.APP_URL) {
@@ -59,5 +59,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"]
+  matcher: ["/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|html)$).*)"]
 };

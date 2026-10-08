@@ -42,6 +42,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  async rewrites() {
+    return [{ source: "/visual", destination: "/visual-v215.html" }];
+  },
   async headers() {
     return [
       {

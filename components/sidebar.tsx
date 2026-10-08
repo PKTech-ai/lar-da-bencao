@@ -47,6 +47,7 @@ export function Sidebar({ actor, capabilities }: { actor: { name: string; role: 
     <aside className="sidebar">
       <Brand />
       <nav className="nav-list" aria-label="Módulos principais">
+        <a className="nav-link" href="/visual">Visual v215</a>
         {links.filter(([, , visible]) => visible).map(([href, label]) => (
           <Link key={href} className="nav-link" href={href} data-current={pathname === href || (href !== "/sistema" && pathname.startsWith(href))}>{label}</Link>
         ))}

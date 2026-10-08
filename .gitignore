@@ -15,6 +15,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 /tmp/
+/public/visual-v215.html
 /backups-pessoais/
 .vercel
 .env*
