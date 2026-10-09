@@ -14,8 +14,8 @@ export type NavCapability = {
   modules: { href: string; label: string }[];
 };
 
-const DIRETORIA = ["/sistema/presidencia", "/sistema/secretaria", "/sistema/tesouraria", "/sistema/conselhofiscal"];
-const PLACED = new Set(["/sistema/documentos", ...DIRETORIA]);
+const DIRETORIA = ["/sistema/presidencia", "/sistema/secretaria", "/sistema/tesouraria"];
+const PLACED = new Set(["/sistema/documentos", "/sistema/conselhofiscal", ...DIRETORIA]);
 const MENU_LABEL: Record<string, string> = {
   "/sistema/doutrina": "Dpto de Doutrina",
   "/sistema/infancia": "Dpto da Infância",
@@ -53,6 +53,7 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
   const current = (href: string) => pathname === href || (href !== "/sistema" && pathname.startsWith(href));
   const byHref = new Map(capabilities.modules.map((mod) => [mod.href, mod]));
   const documentos = byHref.get("/sistema/documentos");
+  const conselho = byHref.get("/sistema/conselhofiscal");
   const diretoria = DIRETORIA.flatMap((href) => {
     const mod = byHref.get(href);
     const label = mod ? menuLabel(mod.href, mod.label) : "";
@@ -80,7 +81,7 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
 
   return (
     <aside className="sidebar">
-      <Brand subtitle="Sistema integrado" />
+      <Brand subtitle="Sistema integrado — Demonstração Funcional com Dados Fictícios" />
       <label className="module-search">
         Encontrar módulo
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome do departamento" aria-label="Encontrar módulo" />
@@ -93,9 +94,12 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
         {diretoria.length ? (
           <details className="nav-group" open={diretoriaOpen || undefined}>
             <summary>Diretoria</summary>
-            {diretoria.map((mod) => <NavItem key={mod.href} href={mod.href} label={mod.label} current={current(mod.href)} />)}
+            <div className="diretoria-nav-items">
+              {diretoria.map((mod) => <NavItem key={mod.href} href={mod.href} label={mod.label} current={current(mod.href)} />)}
+            </div>
           </details>
         ) : null}
+        {conselho && show(conselho.label) ? <NavItem href={conselho.href} label={conselho.label} current={current(conselho.href)} /> : null}
         {rest.map((mod) => <NavItem key={mod.href} href={mod.href} label={mod.label} current={current(mod.href)} />)}
         {tools.map((item) => <NavItem key={item.href} href={item.href} label={item.label} current={current(item.href)} />)}
       </nav>
