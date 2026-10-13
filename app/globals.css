@@ -240,11 +240,11 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .home-history-item small { color: #728897; font-size: 11px; margin-top: 5px; }
 .home-institution-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; padding-top: 9px; border-top: 1px solid #d9e8f1; color: #587385; font-size: 11px; }
 .visual-suggestions { border: 1px solid #dae5e9; border-radius: 13px; background: #fff; }
-.visual-suggestions > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; padding: 12px 16px; list-style: none; cursor: pointer; color: #356f8f; font-size: 14px; font-weight: 600; }
+.visual-suggestions > summary { display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 12px 16px; list-style: none; cursor: pointer; color: #356f8f; font-size: 14px; font-weight: 600; }
 .visual-suggestions > summary::-webkit-details-marker { display: none; }
 .visual-suggestions > summary::after { content: "+"; font-size: 20px; line-height: 1; color: #617683; font-weight: 400; }
 .visual-suggestions[open] > summary::after { content: "−"; }
-.visual-suggestions-hint { font-size: 12px; font-weight: 400; color: #617683; }
+.visual-suggestions-hint { margin-left: auto; font-size: 12px; font-weight: 400; color: #617683; }
 .visual-suggestions .sg-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 16px; border-top: 1px solid #e7edf2; }
 .visual-suggestions .sg-heading p { margin: 0; color: #617683; font-size: 14px; }
 .lar-system-footer { margin-top: 8px; padding: 20px 12px; border-top: 1px solid #dae5e9; text-align: center; color: #617683; font-size: 13px; line-height: 1.7; }
@@ -403,3 +403,24 @@ th { background: var(--surface-sunken); color: var(--text-table-head); position:
 .module-section-head p { margin: 0; color: #617683; font-size: 14px; }
 :root[data-theme="dark"] .module-section-head h2 { color: var(--blue-900); }
 :root[data-theme="dark"] .module-section-head p { color: var(--muted); }
+
+/* Sobre o departamento — op-department do visual v215 */
+.op-department { border: 1px solid #d7e4ed; border-radius: 11px; background: #fff; margin: 0 0 20px; overflow: hidden; }
+.op-department > summary { display: flex; align-items: center; gap: 12px; padding: 15px 19px; cursor: pointer; list-style: none; color: #315e7d; font-weight: 650; font-size: 14px; min-height: 54px; }
+.op-department > summary::-webkit-details-marker { display: none; }
+.op-department > summary small { display: block; color: #768c9b; font-weight: 400; font-size: 11px; margin-top: 3px; }
+.op-department > summary::after { content: "+"; margin-left: auto; font-size: 22px; font-weight: 400; color: #6f90a8; }
+.op-department[open] > summary::after { content: "−"; }
+.op-department[open] > summary { border-bottom: 1px solid #e1eaf1; background: #f8fbfd; }
+.op-department .dept-board { padding: 18px 19px; }
+.op-department .dept-board-head h3 { margin: 0 0 8px; color: #203e50; }
+.op-department .dept-board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 14px; }
+.op-department .dept-board-card { border: 1px solid #e1eaee; border-radius: 10px; padding: 14px; }
+.op-department .dept-board-card h4 { margin: 0 0 8px; color: #285870; }
+.module-tabs + .visual-suggestions { margin-bottom: 16px; }
+:root[data-theme="dark"] .op-department, :root[data-theme="dark"] .visual-suggestions { background: var(--surface); border-color: var(--line); }
+:root[data-theme="dark"] .op-department[open] > summary { background: var(--surface-sunken); border-color: var(--line); }
+:root[data-theme="dark"] .op-department > summary, :root[data-theme="dark"] .visual-suggestions > summary { color: var(--blue-900); }
+:root[data-theme="dark"] .op-department .dept-board-head h3, :root[data-theme="dark"] .op-department .dept-board-card h4 { color: var(--blue-900); }
+:root[data-theme="dark"] .op-department .dept-board-card { border-color: var(--line); }
+:root[data-theme="dark"] .visual-suggestions .sg-heading { border-color: var(--line); }

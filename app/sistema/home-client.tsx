@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { NavIcon } from "@/components/nav-icon";
+import { SuggestionsBox } from "@/components/suggestions-box";
 import { api } from "@/lib/client-api";
 import { addDays, buildHomeStats, filterAgenda, todayInSaoPaulo, type AgendaItem } from "@/lib/home-dashboard";
 import { brDate, formatMoney } from "@/lib/resources/types";
@@ -289,13 +290,7 @@ export function HomeClient({ moduleCount, modules, showAccess }: { moduleCount: 
         </section>
       ) : null}
 
-      <details className="visual-suggestions">
-        <summary><span>Sugestões e melhorias</span><span className="visual-suggestions-hint">Enviar uma ideia ou acompanhar</span></summary>
-        <div className="sg-heading">
-          <p>O que você escrever chega à Diretoria. Você acompanha a resposta na central de sugestões.</p>
-          <Link className="button primary" href="/sistema/sugestoes">Enviar sugestão</Link>
-        </div>
-      </details>
+      <SuggestionsBox />
 
       <footer className="lar-system-footer">
         <p>Desenvolvido por <strong>PK Instituto</strong>, inspirada pela Espiritualidade Amiga.</p>
