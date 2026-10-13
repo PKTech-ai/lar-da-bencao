@@ -44,14 +44,14 @@ const MODULE_CARDS: { href: string; title: string; text: string; when?: "always"
   { href: "/sistema/admissoes", title: "Admissões", text: "Fichas encaminhadas à Diretoria para decisão." }
 ];
 const SHORTCUTS = [
-  { href: "/sistema/tesouraria", needs: "/sistema/tesouraria", title: "Contribuições" },
-  { href: "/sistema/assistencia", needs: "/sistema/assistencia", title: "Atividades sociais" },
+  { href: "/sistema/tesouraria/contribuicoes", needs: "/sistema/tesouraria", title: "Contribuições" },
+  { href: "/sistema/assistencia/atividades", needs: "/sistema/assistencia", title: "Atividades sociais" },
   { href: "/sistema/infancia/frequencia", needs: "/sistema/infancia", title: "Frequência da Infância" },
   { href: "/sistema/juventude/frequencia", needs: "/sistema/juventude", title: "Frequência da Juventude" },
-  { href: "/sistema/eventos", needs: "/sistema/eventos", title: "Agenda de eventos" },
-  { href: "/sistema/patrimonio", needs: "/sistema/patrimonio", title: "Cadastro de bens" },
+  { href: "/sistema/eventos/agenda", needs: "/sistema/eventos", title: "Agenda de eventos" },
+  { href: "/sistema/patrimonio/bens", needs: "/sistema/patrimonio", title: "Cadastro de bens" },
   { href: "/sistema/divulgacao", needs: "/sistema/divulgacao", title: "Controle da livraria" },
-  { href: "/sistema/secretaria", needs: "/sistema/secretaria", title: "Reuniões e atas" },
+  { href: "/sistema/secretaria/reunioes", needs: "/sistema/secretaria", title: "Reuniões e atas" },
   { href: "/sistema/admissoes", needs: "/sistema/admissoes", title: "Aprovação de fichas" }
 ];
 
@@ -215,7 +215,7 @@ export function HomeClient({ moduleCount, modules, showAccess }: { moduleCount: 
             </div>
           )}
           {undatedEvents ? (
-            <Link href="/sistema/eventos" className="op-pending-link">
+            <Link href="/sistema/eventos/agenda" className="op-pending-link">
               <OpIcon name="calendar" />
               <span className="op-line-copy"><strong>{undatedEvents} evento(s) com data a definir</strong><small>Consultar a agenda de eventos</small></span>
               <span className="op-arrow" aria-hidden="true">›</span>

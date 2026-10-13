@@ -31,12 +31,13 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_patrimonio",
     access: { resource: "department", department: "patrimonio" },
     sections: [
-      { slug: "", label: "Bens", resource: "patrimonio-bens" },
+      { slug: "", label: "Painel", panel: "painel" },
+      { slug: "bens", label: "Cadastro de Bens", resource: "patrimonio-bens" },
+      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-patrimonio" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "patrimonio-relatorio" },
       { slug: "baixas", label: "Autorização de Baixa", panel: "patrimonio-baixas" },
       { slug: "limpeza", label: "Escala de Limpeza", panel: "patrimonio-limpeza" },
-      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-patrimonio" },
-      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes-patrimonio" },
-      { slug: "relatorio", label: "Relatório Anual", panel: "patrimonio-relatorio" }
+      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes-patrimonio" }
     ]
   },
   {
@@ -46,10 +47,11 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_eventos",
     access: { resource: "department", department: "eventos" },
     sections: [
-      { slug: "", label: "Agenda", resource: "eventos-agenda" },
-      { slug: "itens", label: "Itens", resource: "eventos-itens" },
+      { slug: "", label: "Painel", panel: "painel" },
+      { slug: "agenda", label: "Agenda de Eventos", resource: "eventos-agenda" },
+      { slug: "itens", label: "Itens do Evento", resource: "eventos-itens" },
+      { slug: "avaliacao", label: "Avaliação do Evento", resource: "eventos-avaliacao" },
       { slug: "escala", label: "Escala de Trabalho", resource: "eventos-escala" },
-      { slug: "avaliacao", label: "Avaliação", resource: "eventos-avaliacao" },
       { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-eventos" },
       { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-eventos" }
     ]
@@ -61,21 +63,22 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_assistencia",
     access: { resource: "department", department: "assistencia_social" },
     sections: [
-      { slug: "", label: "Famílias", resource: "assistencia-familias" },
-      { slug: "rancho", label: "Rancho", resource: "assistencia-rancho" },
-      { slug: "kits", label: "Kits de Higiene", resource: "assistencia-kits" },
-      { slug: "atividades", label: "Controle de Atividades", resource: "assistencia-atividades" },
-      { slug: "voluntarios", label: "Voluntários", resource: "assistencia-voluntarios" },
-      { slug: "mantenedores", label: "Mantenedores da Cesta", resource: "assistencia-mantenedores" },
-      { slug: "cafe", label: "Café das Crianças", resource: "assistencia-cafe" },
+      { slug: "", label: "Painel", panel: "painel" },
+      { slug: "rancho", label: "Rancho dos Evangelizandos", resource: "assistencia-rancho" },
+      { slug: "voluntarios", label: "Cadastro de Voluntários", resource: "assistencia-voluntarios" },
+      { slug: "mantenedores", label: "Mantenedores da Cesta Básica", resource: "assistencia-mantenedores" },
+      { slug: "cafe", label: "Doadores do Café das Crianças", resource: "assistencia-cafe" },
+      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-assistencia" },
+      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-assistencia" },
       { slug: "brecho", label: "Brechó — Livro Caixa", resource: "brecho-caixa", access: { resource: "social_brecho" } },
       { slug: "clube-maes", label: "Clube de Mães — Livro Caixa", resource: "clube-maes-caixa", access: { resource: "social_clube_maes" } },
       { slug: "clube-maes-pessoas", label: "Clube de Mães — Pessoas", resource: "clube-maes-pessoas", access: { resource: "social_clube_maes" } },
       { slug: "clube-maes-entregas", label: "Clube de Mães — Entregas", resource: "clube-maes-entregas", access: { resource: "social_clube_maes" } },
-      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-assistencia" },
-      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
       { slug: "planejamento", label: "Planejamento Anual", resource: "assistencia-planejamento" },
-      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-assistencia" }
+      { slug: "atividades", label: "Controle de Atividades", resource: "assistencia-atividades" },
+      { slug: "kits", label: "Kits de Higiene", resource: "assistencia-kits" },
+      { slug: "familias", label: "Famílias", resource: "assistencia-familias" }
     ]
   },
   {
@@ -101,10 +104,11 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_secretaria",
     access: { resource: "secretaria" },
     sections: [
-      { slug: "", label: "Reuniões e Atas", resource: "secretaria-reunioes" },
-      { slug: "gravador", label: "Gravador", panel: "secretaria-gravador" },
-      { slug: "admissoes", label: "Admissões", panel: "admissoes-atalho" },
-      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" }
+      { slug: "reunioes", label: "Reuniões e Atas", resource: "secretaria-reunioes" },
+      { slug: "", label: "Painel", panel: "painel" },
+      { slug: "admissoes", label: "Acompanhar admissões", panel: "admissoes-atalho" },
+      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
+      { slug: "gravador", label: "Gravador", panel: "secretaria-gravador" }
     ]
   },
   {
@@ -114,16 +118,17 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_tesouraria",
     access: { resource: "tesouraria" },
     sections: [
-      { slug: "", label: "Caixa Mensal", panel: "tesouraria-mes" },
-      { slug: "lancamentos", label: "Lançamentos", resource: "tesouraria-lancamentos" },
+      { slug: "", label: "Painel", panel: "painel" },
       { slug: "contribuicoes", label: "Contribuições", panel: "tesouraria-contribuicoes" },
       { slug: "mantenedores", label: "Mantenedores", resource: "tesouraria-mantenedores" },
-      { slug: "doacoes", label: "Doações recebidas", resource: "tesouraria-doacoes" },
-      { slug: "extrato", label: "Extrato e Conciliação", panel: "tesouraria-extrato" },
       { slug: "plano-de-contas", label: "Plano de Contas", panel: "tesouraria-contas" },
+      { slug: "caixa", label: "Caixa Mensal", panel: "tesouraria-mes" },
       { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "tesouraria-relatorio" },
       { slug: "whatsapp", label: "WhatsApp", panel: "whatsapp-tesouraria" },
-      { slug: "relatorio", label: "Relatório Anual", panel: "tesouraria-relatorio" }
+      { slug: "extrato", label: "Extrato Bancário", panel: "tesouraria-extrato" },
+      { slug: "lancamentos", label: "Lançamentos", resource: "tesouraria-lancamentos" },
+      { slug: "doacoes", label: "Doações recebidas", resource: "tesouraria-doacoes" }
     ]
   },
   {
@@ -133,7 +138,8 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_conselho_fiscal",
     access: { resource: "conselho_fiscal" },
     sections: [
-      { slug: "", label: "Análises e Pareceres", panel: "conselho-analises" }
+      { slug: "", label: "Painel", panel: "painel" },
+      { slug: "analises", label: "Análises e Pareceres", panel: "conselho-analises" }
     ]
   },
   {
@@ -143,9 +149,10 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_juridico",
     access: { resource: "department", department: "juridico" },
     sections: [
-      { slug: "", label: "Eleições", resource: "juridico-eleicoes" },
-      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-juridico" },
-      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-juridico" }
+      { slug: "", label: "Painel", panel: "painel" },
+      { slug: "eleicoes", label: "Eleições", resource: "juridico-eleicoes" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-juridico" },
+      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-juridico" }
     ]
   },
   {
@@ -156,8 +163,8 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     access: { resource: "presidencia" },
     sections: [
       { slug: "", label: "Painel", panel: "presidencia-painel" },
-      { slug: "baixas", label: "Autorizações de Baixa", panel: "presidencia-baixas" },
       { slug: "admissoes", label: "Aprovação de Trabalhadores", panel: "admissoes-atalho" },
+      { slug: "baixas", label: "Autorizações de Baixa", panel: "presidencia-baixas" },
       { slug: "sugestoes", label: "Sugestões", panel: "sugestoes-atalho" }
     ]
   }

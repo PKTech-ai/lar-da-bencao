@@ -36,14 +36,14 @@ export async function GET() {
       hasPermission(actor, "tesouraria", "update"),
       "select count(*)::text as count from app.bank_statement_lines where status = 'pending'",
       "Conciliar as linhas do extrato");
-    await add("caixa", "Meses do caixa ainda abertos", "/sistema/tesouraria", "module_tesouraria",
+    await add("caixa", "Meses do caixa ainda abertos", "/sistema/tesouraria/caixa", "module_tesouraria",
       hasPermission(actor, "tesouraria", "update"),
       `select count(*)::text as count from (
          select distinct to_char(e.entry_date, 'YYYY-MM') as month from app.treasury_entries e where e.archived_at is null
           and e.entry_date < date_trunc('month', current_date)) meses
         where not exists (select 1 from app.treasury_months m where m.reference_month = meses.month and m.status <> 'Aberto')`,
       "Fechar os meses ainda abertos");
-    await add("parecer", "Meses aguardando parecer do Conselho Fiscal", "/sistema/conselhofiscal", "module_conselho_fiscal",
+    await add("parecer", "Meses aguardando parecer do Conselho Fiscal", "/sistema/conselhofiscal/analises", "module_conselho_fiscal",
       hasPermission(actor, "conselho_fiscal", "update"),
       `select count(*)::text as count from app.treasury_months m
         where m.status = 'Enviado ao Conselho Fiscal'

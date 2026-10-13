@@ -164,7 +164,7 @@ export function DisposalsPanel({ area }: { area: "patrimonio" | "diretoria" }) {
             <h2>Memorando {open.number}</h2>
             <div className="row-actions no-print">
               <button type="button" className="button" onClick={() => window.print()}>⎙ Imprimir memorando</button>
-              {area === "patrimonio" ? <Link className="button" href="/sistema/patrimonio">Consultar ficha e anexos do bem</Link> : null}
+              {area === "patrimonio" ? <Link className="button" href="/sistema/patrimonio/bens">Consultar ficha e anexos do bem</Link> : null}
               <button type="button" className="button" onClick={() => setOpen(null)}>Fechar</button>
             </div>
           </div>

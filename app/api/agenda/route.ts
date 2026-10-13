@@ -28,12 +28,12 @@ export async function GET() {
       `select to_char(event_date,'YYYY-MM-DD') as date, name
          from app.events where archived_at is null and status in ('A definir','Planejado','Em preparação')
            and event_date between current_date and current_date + 45 order by event_date`,
-      (row) => ({ date: row.date, label: row.name, module: "Eventos", href: "/sistema/eventos" }));
+      (row) => ({ date: row.date, label: row.name, module: "Eventos", href: "/sistema/eventos/agenda" }));
 
     await add("module_secretaria", hasPermission(actor, "secretaria", "read"),
       `select to_char(meeting_date,'YYYY-MM-DD') as date, title
          from app.meetings where archived_at is null and meeting_date between current_date and current_date + 45 order by meeting_date`,
-      (row) => ({ date: row.date, label: row.title, module: "Secretaria", href: "/sistema/secretaria" }));
+      (row) => ({ date: row.date, label: row.title, module: "Secretaria", href: "/sistema/secretaria/reunioes" }));
 
     await add("module_assistencia", hasPermission(actor, "department", "read", "assistencia_social"),
       `select to_char(planned_date,'YYYY-MM-DD') as date, responsible

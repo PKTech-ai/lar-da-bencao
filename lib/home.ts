@@ -54,15 +54,15 @@ export async function homeCards(actor: Actor): Promise<HomeCard[]> {
     }));
   }
   await add("module_patrimonio", hasPermission(actor, "department", "read", "patrimonio"), async () => ({
-    key: "assets", label: "Bens no patrimônio", href: "/sistema/patrimonio",
+    key: "assets", label: "Bens no patrimônio", href: "/sistema/patrimonio/bens",
     value: await count("select count(*)::text as count from app.patrimony_assets where disposal_date is null and archived_at is null")
   }));
   await add("module_assistencia", hasPermission(actor, "department", "read", "assistencia_social"), async () => ({
-    key: "families", label: "Famílias em acompanhamento", href: "/sistema/assistencia",
+    key: "families", label: "Famílias em acompanhamento", href: "/sistema/assistencia/familias",
     value: await count("select count(*)::text as count from app.social_families where status = 'Em acompanhamento' and archived_at is null")
   }));
   await add("module_eventos", hasPermission(actor, "department", "read", "eventos"), async () => ({
-    key: "events", label: "Eventos programados", href: "/sistema/eventos",
+    key: "events", label: "Eventos programados", href: "/sistema/eventos/agenda",
     value: await count("select count(*)::text as count from app.events where archived_at is null and status in ('A definir','Planejado','Em preparação')")
   }));
   await add("module_divulgacao", hasPermission(actor, "department", "read", "divulgacao"), async () => ({
@@ -79,12 +79,12 @@ export async function homeCards(actor: Actor): Promise<HomeCard[]> {
         where e.archived_at is null and date_trunc('month', e.entry_date) = date_trunc('month', current_date)`
     );
     return {
-      key: "treasury", label: "Resultado do mês", href: "/sistema/tesouraria",
+      key: "treasury", label: "Resultado do mês", href: "/sistema/tesouraria/caixa",
       value: (Number(result.rows[0].balance) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
     };
   });
   await add("module_secretaria", hasPermission(actor, "secretaria", "read"), async () => ({
-    key: "meetings", label: "Atas em rascunho", href: "/sistema/secretaria",
+    key: "meetings", label: "Atas em rascunho", href: "/sistema/secretaria/reunioes",
     value: await count("select count(*)::text as count from app.meetings where archived_at is null and status = 'Rascunho'")
   }));
   return cards;

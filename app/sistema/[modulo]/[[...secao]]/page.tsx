@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { ModuleTabs } from "@/components/module-tabs";
 import { SuggestionsBox } from "@/components/suggestions-box";
+import { DepartmentDashboard } from "@/components/modules/department-dashboard";
 import { ModulePanel } from "@/components/modules/panels";
 import { ResourceManager } from "@/components/resources/resource-manager";
 import { findModulePage, SECTOR_ROLE_RESOURCE, type SectionAccess } from "@/lib/module-pages";
@@ -36,7 +37,9 @@ export default async function ModuleSectionPage({ params }: Params) {
         tabs={visible.map((s) => ({ href: `/sistema/${page.slug}${s.slug ? `/${s.slug}` : ""}`, label: s.label }))}
         current={`/sistema/${page.slug}${current.slug ? `/${current.slug}` : ""}`} />
       <SuggestionsBox />
-      {def ? <ResourceManager resourceKey={def.key} /> : current.panel ? <ModulePanel name={current.panel} /> : null}
+      {def ? <ResourceManager resourceKey={def.key} />
+        : current.panel === "painel" ? <DepartmentDashboard page={page} />
+        : current.panel ? <ModulePanel name={current.panel} /> : null}
     </>
   );
 }
