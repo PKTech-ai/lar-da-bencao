@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { query } from "@/lib/db";
 import { canEditDoutrina, loadScale, loadScaleOptions, reviewScale } from "@/lib/doutrina-data";
 import { scaleStatusLabel } from "@/lib/doutrina-scale";
-import { doutrinaSubnav } from "@/lib/modules";
 import { requireModulePage } from "@/lib/page-auth";
 import { DoctrineContactForm } from "./contact-form";
 
@@ -41,9 +39,6 @@ export default async function DoutrinaPage() {
 
   return (
     <>
-      <header className="page-heading">
-        <div><h1>Doutrina</h1><p>Painel, trabalhadores, palestrantes, biblioteca de estudos, escala, frequência e Culto no Lar.</p></div>
-      </header>
       <div className="grid cards" style={{ marginBottom: 16 }}>
         <article className="card kpi"><span className="small muted">Trabalhadores ativos</span><b>{c.workers}</b></article>
         <article className="card kpi"><span className="small muted">Palestrantes externos</span><b>{c.speakers}</b></article>
@@ -61,11 +56,6 @@ export default async function DoutrinaPage() {
         <p className="small muted">Estas informações aparecem nas escalas impressas para contato em caso de dúvidas.</p>
         <DoctrineContactForm coordinator={contact.rows[0]?.coordinator ?? "Sem coordenador vinculado"} phone={contact.rows[0]?.phone ?? ""} canEdit={canEdit} />
       </section>
-      <div className="grid cards">
-        {doutrinaSubnav.map((item) => (
-          <Link key={item.href} href={item.href} className="card card-link"><h2>{item.label}</h2></Link>
-        ))}
-      </div>
     </>
   );
 }

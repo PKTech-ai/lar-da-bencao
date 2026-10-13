@@ -49,8 +49,8 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <header className="page-heading no-print">
-        <div><h1>Impressão da escala</h1><p>{scaleStatusLabel[scale.month.status]}</p></div>
+      <header className="module-section-head no-print">
+        <div><h2>Impressão da escala</h2><p>{scaleStatusLabel[scale.month.status]}</p></div>
         <div className="row-actions"><Link className="button" href="/sistema/doutrina/escalas">Voltar</Link><PrintButton /></div>
       </header>
       {dows.map((dow) => {

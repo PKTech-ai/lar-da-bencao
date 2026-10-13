@@ -28,6 +28,7 @@ export const moduleCatalog: ModuleDef[] = [
 ];
 
 export const doutrinaSubnav = [
+  { href: "/sistema/doutrina", label: "Painel" },
   { href: "/sistema/doutrina/trabalhadores", label: "Trabalhadores" },
   { href: "/sistema/doutrina/palestrantes", label: "Palestrantes Externos" },
   { href: "/sistema/doutrina/estudos", label: "Biblioteca de Estudos" },

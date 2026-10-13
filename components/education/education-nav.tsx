@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ModuleTabs } from "@/components/module-tabs";
 import type { EducationDepartment } from "@/lib/education";
 
 const tabs = [
@@ -8,11 +9,10 @@ const tabs = [
 
 export function EducationNav({ department, current }: { department: EducationDepartment; current: string }) {
   return (
-    <nav className="row-actions no-print" aria-label="Seções do departamento" style={{ marginBottom: 16 }}>
-      {tabs.map(([path, label]) => (
-        <Link key={path} className={`button${current === path ? " primary" : ""}`} href={`/sistema/${department}${path ? `/${path}` : ""}`}>{label}</Link>
-      ))}
-      <Link className="button" href="/sistema/trabalhadores">Evangelizadores (fichas)</Link>
-    </nav>
+    <>
+      <ModuleTabs label="Seções do departamento" current={`/sistema/${department}${current ? `/${current}` : ""}`}
+        tabs={tabs.map(([path, label]) => ({ href: `/sistema/${department}${path ? `/${path}` : ""}`, label }))} />
+      <p className="no-print"><Link className="button" href="/sistema/trabalhadores">Evangelizadores (fichas)</Link></p>
+    </>
   );
 }

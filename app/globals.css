@@ -148,7 +148,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .sidebar-user small { color: var(--muted); display: block; margin: 4px 0 12px; }
 .sidebar-user .button { width: 100%; min-height: 44px; }
 .theme-toggle { width: 100%; min-height: 40px; margin-top: 8px; }
-.app-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, max-content); column-gap: 20px; row-gap: 0; align-items: start; padding: 24px 30px 32px; min-width: 0; }
+.app-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, max-content); column-gap: 20px; row-gap: 0; align-items: start; align-content: start; padding: 24px 30px 32px; min-width: 0; }
 .system-bar { grid-column: 2; grid-row: 1; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; max-width: 420px; margin: 0; position: relative; z-index: 2; }
 .session-chip { display: flex; align-items: center; gap: 10px; min-height: 48px; max-width: 290px; padding: 6px 14px 6px 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); text-decoration: none; color: inherit; flex: 0 0 auto; }
 .session-chip strong { white-space: nowrap; }
@@ -382,3 +382,24 @@ th { background: var(--surface-sunken); color: var(--text-table-head); position:
     --surface: #ffffff; --surface-sunken: #f1f7fa; --border-faint: #e6eef3; --text-table-head: #3d5d70;
   }
 }
+
+/* Abas dos módulos — .sub do visual v215 */
+.module-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 16px; padding-bottom: 16px; border-bottom: 1px solid #e1eaee; }
+.module-tabs a { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 14px; border-radius: 10px; border: 1px solid transparent; font-size: 14px; font-weight: 700; color: #526f7e; text-decoration: none; }
+.module-tabs a:hover { background: #eaf3f6; }
+.module-tabs a.active { color: #fff; background: #356f8f; border-color: #356f8f; }
+@media (max-width: 720px) {
+  .module-tabs { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; gap: 6px; }
+  .module-tabs a { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; }
+}
+:root[data-theme="dark"] .module-tabs { border-color: var(--line); }
+:root[data-theme="dark"] .module-tabs a { color: var(--muted); }
+:root[data-theme="dark"] .module-tabs a:hover { background: var(--button-hover); }
+:root[data-theme="dark"] .module-tabs a.active { color: #fff; background: var(--blue-800); border-color: var(--blue-800); }
+
+/* Título da aba quando o cabeçalho do módulo já está no layout */
+.module-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 0 16px; }
+.module-section-head h2 { margin: 0 0 4px; font-size: 20px; color: #203e50; }
+.module-section-head p { margin: 0; color: #617683; font-size: 14px; }
+:root[data-theme="dark"] .module-section-head h2 { color: var(--blue-900); }
+:root[data-theme="dark"] .module-section-head p { color: var(--muted); }

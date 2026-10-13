@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ModuleTabs } from "@/components/module-tabs";
 import { ModulePanel } from "@/components/modules/panels";
 import { ResourceManager } from "@/components/resources/resource-manager";
 import { findModulePage, SECTOR_ROLE_RESOURCE, type SectionAccess } from "@/lib/module-pages";
@@ -31,12 +31,9 @@ export default async function ModuleSectionPage({ params }: Params) {
   return (
     <>
       <header className="page-heading"><div><h1>{page.title}</h1><p>{page.intro}</p></div></header>
-      <nav className="row-actions no-print" aria-label={`Seções de ${page.title}`} style={{ marginBottom: 16 }}>
-        {visible.map((s) => (
-          <Link key={s.slug} className={`button${s === current ? " primary" : ""}`} aria-current={s === current ? "page" : undefined}
-            href={`/sistema/${page.slug}${s.slug ? `/${s.slug}` : ""}`}>{s.label}</Link>
-        ))}
-      </nav>
+      <ModuleTabs label={`Seções de ${page.title}`}
+        tabs={visible.map((s) => ({ href: `/sistema/${page.slug}${s.slug ? `/${s.slug}` : ""}`, label: s.label }))}
+        current={`/sistema/${page.slug}${current.slug ? `/${current.slug}` : ""}`} />
       {def ? <ResourceManager resourceKey={def.key} /> : current.panel ? <ModulePanel name={current.panel} /> : null}
     </>
   );

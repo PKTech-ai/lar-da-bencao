@@ -12,8 +12,8 @@ export default async function DoutrinaWorkersPage() {
   );
   return (
     <>
-      <header className="page-heading">
-        <div><h1>Trabalhadores da Doutrina</h1><p>Somente trabalhadores aprovados pela Diretoria ficam ativos nas escalas.</p></div>
+      <header className="module-section-head">
+        <div><h2>Trabalhadores da Doutrina</h2><p>Somente trabalhadores aprovados pela Diretoria ficam ativos nas escalas.</p></div>
         <Link className="button primary" href="/sistema/trabalhadores">Cadastrar / editar fichas</Link>
       </header>
       <section className="card">
