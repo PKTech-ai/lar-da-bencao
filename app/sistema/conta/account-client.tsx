@@ -79,7 +79,6 @@ export function AccountClient() {
       <div className="mb-profile">
         <strong>{area.worker?.name || area.profile.name}</strong>
         <p>{area.profile.roleLabel}</p>
-        <p className="mb-muted">{data.email}</p>
       </div>
 
       {area.worker ? (
@@ -121,7 +120,7 @@ export function AccountClient() {
           </ul>
         </>
       ) : (
-        <p className="mb-muted">Seu acesso ainda não está vinculado a uma ficha de trabalhador. Peça à Secretaria para fazer o vínculo no Controle de Acesso.</p>
+        <p className="mb-muted">Seu acesso ainda não foi vinculado a uma ficha de trabalhador. Solicite ao Administrador esse vínculo para consultar suas informações pessoais.</p>
       )}
 
       <section className="card">

@@ -310,7 +310,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .filters { display: grid; grid-template-columns: 1.5fr repeat(4, minmax(130px, .7fr)); gap: 10px; margin: 16px 0; }
 .table-wrap, .visual-table-scroll { overflow: auto; border: 1px solid #d4e3e9; border-radius: 12px; scrollbar-color: #91afbd #edf4f7; }
-table, table.visual-table { width: 100%; border-collapse: collapse; min-width: 850px; background: var(--surface); }
+table, table.visual-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+table { min-width: 850px; }
+table.visual-table { min-width: 0; }
 th, td { text-align: left; vertical-align: top; }
 th, table.visual-table > thead > tr > th { font-size: 14px; color: #285870; background: #eaf3f6; border-bottom: 1px solid #d4e3e9; padding: 14px 12px; position: sticky; top: 0; }
 td, table.visual-table > tbody > tr > td { font-size: 15px; color: #203e50; border-bottom: 1px solid #e1eaee; padding: 14px 12px; }
@@ -437,8 +439,8 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 
 /* Topo no desenho do visual v215 (medidas tiradas do .top e do #accessSessionButton do HTML) */
 .system-bar { padding-bottom: 20px; }
-.system-bar .session-chip { gap: 9px; min-height: 54px; padding: 8px 11px; border-color: #cbdde5; color: #356f8f; font-size: 12px; font-weight: 600; }
-.system-bar .session-text strong { font-size: 14px; font-weight: 650; color: #356f8f; }
+.system-bar .session-chip { gap: 9px; min-height: 48px; padding: 8px 11px; border-color: #dae5e9; color: #203e50; font-size: 12px; font-weight: 600; }
+.system-bar .session-text strong { font-size: 14px; font-weight: 650; color: #203e50; }
 .system-bar .session-avatar { background: #eef5f0; color: #356f52; font-weight: 700; }
 .system-bar > .button { min-height: 44px; padding: 10px 15px; font-size: 14px; font-weight: 600; color: #356f8f; border-color: #cbdde5; }
 .system-menu > summary.button { min-height: 48px; padding: 12px; font-size: 14px; font-weight: 600; color: #526f7e; border-color: #dae5e9; border-radius: 12px; }
