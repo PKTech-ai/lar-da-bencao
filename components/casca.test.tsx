@@ -13,12 +13,12 @@ const capabilities = {
 };
 
 describe("menu lateral como no visual", () => {
-  it("não mostra ferramentas administrativas nem Trabalhadores/Admissões", async () => {
+  it("reúne as opções do sistema dentro do grupo Diretoria", async () => {
     const { Sidebar } = await import("@/components/sidebar");
     const html = renderToStaticMarkup(<Sidebar actor={{ name: "Ana", role: "administrador", email: "a@x" }} capabilities={capabilities} />);
-    expect(html).toContain("Dpto de Doutrina");
-    for (const label of ["Dedo-duro", "Anexos no banco", "Usuários e permissões", "Dados da instituição", "Módulos e ondas", "Importação v215", ">Trabalhadores<", ">Admissões<"]) {
-      expect(html).not.toContain(label);
+    const group = html.slice(html.indexOf("Diretoria"), html.indexOf("Dpto de Doutrina"));
+    for (const label of ["Trabalhadores", "Admissões", "Dedo-duro / Histórico", "Anexos no banco", "Usuários e permissões", "Dados da instituição", "Sugestões", "Módulos e ondas", "Importação v215"]) {
+      expect(group).toContain(label);
     }
   });
   it("o grupo Diretoria nasce aberto, como no visual", async () => {
@@ -42,20 +42,24 @@ describe("topo como no visual", () => {
     expect(html).toContain(">AS<");
     expect(html).not.toContain("<small>");
   });
-  it("Opções do sistema reúne as ferramentas que saíram do menu lateral", async () => {
+  it("Opções do sistema fica só com sair e o tema", async () => {
     const { SystemBar } = await import("@/components/system-bar");
     const html = renderToStaticMarkup(<SystemBar actor={{ name: "Ana", role: "administrador" }} roleLabel="Administrador do Sistema" capabilities={capabilities} />);
     const menu = html.slice(html.indexOf("system-menu"));
-    for (const label of ["Trabalhadores", "Admissões", "Dedo-duro / Histórico", "Anexos no banco", "Usuários e permissões", "Dados da instituição", "Sugestões", "Módulos e ondas", "Importação v215"]) {
-      expect(menu).toContain(label);
+    expect(menu).toContain("Sair deste aparelho");
+    expect(menu).toContain("Tema escuro");
+    for (const label of ["Trabalhadores", "Dedo-duro", "Usuários e permissões", "Sugestões"]) {
+      expect(menu).not.toContain(label);
     }
   });
   it("quem não administra vê só o que pode abrir e o chip leva à Minha área", async () => {
     const { SystemBar } = await import("@/components/system-bar");
-    const html = renderToStaticMarkup(<SystemBar actor={{ name: "Bia", role: "trabalhador" }} roleLabel="Trabalhador"
-      capabilities={{ audit: false, attachments: false, users: false, moduleAdmin: false, modules: [] }} />);
-    expect(html).toMatch(/href="\/sistema\/conta"[^>]*class="session-chip"|class="session-chip"[^>]*href="\/sistema\/conta"/);
-    expect(html).not.toContain("Dedo-duro");
-    expect(html).toContain("Sugestões");
+    const { Sidebar } = await import("@/components/sidebar");
+    const caps = { audit: false, attachments: false, users: false, moduleAdmin: false, modules: [] };
+    const bar = renderToStaticMarkup(<SystemBar actor={{ name: "Bia", role: "trabalhador" }} roleLabel="Trabalhador" capabilities={caps} />);
+    const side = renderToStaticMarkup(<Sidebar actor={{ name: "Bia", role: "trabalhador", email: "b@x" }} capabilities={caps} />);
+    expect(bar).toMatch(/href="\/sistema\/conta"[^>]*class="session-chip"|class="session-chip"[^>]*href="\/sistema\/conta"/);
+    expect(side).not.toContain("Dedo-duro");
+    expect(side).toContain("Sugestões");
   });
 });

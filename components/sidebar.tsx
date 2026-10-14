@@ -5,7 +5,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { NavIcon } from "@/components/nav-icon";
-import { TOOL_MODULES, type ToolCapabilities } from "@/lib/admin-tools";
+import { adminTools, TOOL_MODULES, type ToolCapabilities } from "@/lib/admin-tools";
 
 export type NavCapability = ToolCapabilities;
 
@@ -53,6 +53,7 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
     const label = mod ? menuLabel(mod.href, mod.label) : "";
     return mod && show(label) ? [{ ...mod, label }] : [];
   });
+  const tools = adminTools(capabilities).filter((tool) => show(tool.label));
   const rest = capabilities.modules
     .filter((mod) => !PLACED.has(mod.href) && !TOOL_MODULES.includes(mod.href))
     .map((mod) => ({ ...mod, label: menuLabel(mod.href, mod.label) }))
@@ -75,11 +76,12 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
         {documentos && show(documentos.label) ? <NavItem href={documentos.href} label={documentos.label} current={current(documentos.href)} /> : null}
         {show("Organograma") ? <NavItem href="/sistema/organograma" label="Organograma" current={current("/sistema/organograma")} /> : null}
         {capabilities.users && show("Controle de Acesso") ? <NavItem href="/sistema/acesso" label="Controle de Acesso" current={current("/sistema/acesso")} /> : null}
-        {diretoria.length ? (
+        {diretoria.length || tools.length ? (
           <details className="nav-group" open>
             <summary>Diretoria</summary>
             <div className="diretoria-nav-items">
               {diretoria.map((mod) => <NavItem key={mod.href} href={mod.href} label={mod.label} current={current(mod.href)} />)}
+              {tools.map((tool) => <NavItem key={tool.href} href={tool.href} label={tool.label} current={current(tool.href)} />)}
             </div>
           </details>
         ) : null}

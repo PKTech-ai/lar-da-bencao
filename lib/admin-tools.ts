@@ -1,4 +1,4 @@
-/** Ferramentas que o visual v215 não mostra no menu lateral: ficam em "Opções do sistema". Módulo puro. */
+/** Ferramentas do sistema: entram no grupo Diretoria da barra lateral. Módulo puro. */
 export type ToolCapabilities = {
   audit: boolean;
   attachments: boolean;
