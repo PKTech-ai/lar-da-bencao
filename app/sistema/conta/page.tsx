@@ -5,7 +5,7 @@ export default async function AccountPage() {
   await requirePageActor();
   return (
     <>
-      <header className="page-heading"><div><h1>Minha conta</h1><p>Senha e últimos eventos de segurança.</p></div></header>
+      <header className="page-heading"><div><h1>Minha área</h1><p>Cadastro, contribuições, escalas e segurança da conta.</p></div></header>
       <AccountClient />
     </>
   );

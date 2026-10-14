@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { api } from "@/lib/client-api";
+import type { MyArea } from "@/lib/my-area";
+import { brDate, formatMoney } from "@/lib/resources/types";
 import { createClient } from "@/lib/supabase/client";
 
 type Account = {
@@ -8,8 +11,13 @@ type Account = {
   events: { occurred_at: string; action: string; result: string; masked_ip: string | null; by_me: boolean }[];
 };
 
+function monthLabel(month: string) {
+  return month.split("-").reverse().join("/");
+}
+
 export function AccountClient() {
   const [data, setData] = useState<Account | null>(null);
+  const [area, setArea] = useState<MyArea | null>(null);
   const [pending, setPending] = useState<"password" | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -17,10 +25,12 @@ export function AccountClient() {
   const [needsNonce, setNeedsNonce] = useState(false);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/account", { cache: "no-store" });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error);
-    setData(body);
+    const [account, minhaArea] = await Promise.all([
+      api<Account>("/api/account"),
+      api<MyArea>("/api/minha-area")
+    ]);
+    setData(account);
+    setArea(minhaArea);
   }, []);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
@@ -59,15 +69,61 @@ export function AccountClient() {
     }
   }
 
-  if (!data) return error ? <div className="error" role="alert">{error}</div> : <div className="notice">Carregando…</div>;
+  if (!data || !area) return error ? <div className="error" role="alert">{error}</div> : <div className="notice">Carregando…</div>;
 
   return (
-    <div className="grid">
+    <div className="grid my-area">
       {error ? <div className="error" role="alert">{error}</div> : null}
       {message ? <div className="success" role="status">{message}</div> : null}
-      <div className="grid cards">
-        <article className="card kpi"><span className="small muted">Conta</span><b style={{ fontSize: 18 }}>{data.name}</b><span className="small muted">{data.email}</span></article>
+
+      <div className="mb-profile">
+        <strong>{area.worker?.name || area.profile.name}</strong>
+        <p>{area.profile.roleLabel}</p>
+        <p className="mb-muted">{data.email}</p>
       </div>
+
+      {area.worker ? (
+        <>
+          <h3>Meu cadastro</h3>
+          <p>{area.worker.departments.join(" · ") || "Departamento não informado"}</p>
+          <p>Contato: {area.worker.phone || "Não informado"}</p>
+          <p>Situação da ficha: {area.worker.status}</p>
+
+          <h3>Minhas contribuições</h3>
+          <p className="mb-muted">Últimos 12 meses com lançamentos registrados. Meses sem lançamento não são considerados pendentes.</p>
+          <ul className="mb-own-list">
+            {area.contributions.map((item) => (
+              <li key={item.month} className="mb-contrib">
+                <div>
+                  <strong>{monthLabel(item.month)}</strong>
+                  <span>{item.status}</span>
+                </div>
+                <div>
+                  <span>Recebido: {formatMoney(item.amount_cents)}</span>
+                  <small>Previsto: {formatMoney(item.expected_cents)}</small>
+                  {item.amount_cents ? <small>Data: {brDate(item.paid_date)}</small> : null}
+                </div>
+              </li>
+            ))}
+            {!area.contributions.length ? <li>Nenhum lançamento registrado.</li> : null}
+          </ul>
+
+          <h3>Minhas escalas de limpeza e eventos</h3>
+          <ul className="mb-own-list">
+            {area.scales.map((item, index) => (
+              <li key={`${item.date}-${item.activity}-${index}`}>
+                <strong>{item.activity}</strong>
+                {item.date ? brDate(item.date) : "Data a definir"}
+                <small>{[item.place || item.role, item.status].filter(Boolean).join(" · ")}</small>
+              </li>
+            ))}
+            {!area.scales.length ? <li>Nenhuma escala futura registrada para você.</li> : null}
+          </ul>
+        </>
+      ) : (
+        <p className="mb-muted">Seu acesso ainda não está vinculado a uma ficha de trabalhador. Peça à Secretaria para fazer o vínculo no Controle de Acesso.</p>
+      )}
+
       <section className="card">
         <h2>Segurança</h2>
         <div className="row-actions">
@@ -90,8 +146,8 @@ export function AccountClient() {
       <section className="card">
         <h2>Últimos eventos de segurança da sua conta</h2>
         <p className="small muted">Se não reconhecer algum evento, troque a senha e avise a administração.</p>
-        <div className="table-wrap">
-          <table>
+        <div className="table-wrap visual-table-scroll">
+          <table className="visual-table">
             <thead><tr><th>Quando</th><th>Evento</th><th>Resultado</th><th>Origem</th></tr></thead>
             <tbody>
               {data.events.map((e, i) => (

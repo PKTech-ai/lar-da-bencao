@@ -157,7 +157,7 @@ test("Infância: matrícula com turma pela idade e chamada dominical", async () 
 
 test("todas as telas da fundação e da onda 1 abrem sem erro", async () => {
   const pages: [string, RegExp][] = [
-    ["/sistema", /Visão Geral/], ["/sistema/conta", /Minha conta/], ["/sistema/usuarios", /Usuários e permissões/],
+    ["/sistema", /Visão Geral/], ["/sistema/conta", /Minha área/], ["/sistema/usuarios", /Usuários e permissões/],
     ["/sistema/modulos", /Módulos e ondas/], ["/sistema/auditoria", /Dedo-duro/], ["/sistema/anexos", /Anexos/],
     ["/sistema/importacao", /Importação do backup v215/], ["/sistema/documentos", /Estatuto e Regimento/],
     ["/sistema/trabalhadores", /Trabalhadores/], ["/sistema/admissoes", /Aprovação de Trabalhadores/],
@@ -237,7 +237,7 @@ test("um bem vira memorando de baixa e a Diretoria autoriza", async () => {
   expect(asset.disposal_date).not.toBeNull();
 });
 
-test("Minha conta: troca de senha", async () => {
+test("Minha área: troca de senha", async () => {
   await coord.goto("/sistema/conta");
   await coord.getByRole("button", { name: "Alterar senha" }).click();
   await coord.getByLabel("Nova senha", { exact: true }).fill(`${PASSWORD}X`);
