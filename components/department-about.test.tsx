@@ -26,4 +26,8 @@ describe("caixa de sugestões", () => {
     expect(html).toContain("Sugestões e melhorias");
     expect(html).toContain('href="/sistema/sugestoes"');
   });
+
+  it("não sai na impressão (a escala impressa da Doutrina fica dentro do mesmo layout)", () => {
+    expect(renderToStaticMarkup(<SuggestionsBox />)).toMatch(/^<details class="visual-suggestions no-print">/);
+  });
 });

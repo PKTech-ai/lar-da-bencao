@@ -161,9 +161,7 @@ test("todas as telas da fundação e da onda 1 abrem sem erro", async () => {
     ["/sistema/modulos", /Módulos e ondas/], ["/sistema/auditoria", /Dedo-duro/], ["/sistema/anexos", /Anexos/],
     ["/sistema/importacao", /Importação do backup v215/], ["/sistema/documentos", /Estatuto e Regimento/],
     ["/sistema/trabalhadores", /Trabalhadores/], ["/sistema/admissoes", /Aprovação de Trabalhadores/],
-    ["/sistema/doutrina", /Doutrina/], ["/sistema/doutrina/trabalhadores", /Trabalhadores da Doutrina/],
-    ["/sistema/doutrina/palestrantes", /Palestrantes Externos/], ["/sistema/doutrina/estudos", /Biblioteca de Estudos/],
-    ["/sistema/doutrina/escalas", /Escala Mensal/], ["/sistema/doutrina/frequencia", /Frequência/],
+    ["/sistema/doutrina", /Doutrina/],
     ["/sistema/infancia", /Infância/], ["/sistema/infancia/evangelizandos", /Evangelizandos/],
     ["/sistema/infancia/aniversariantes", /Aniversariantes/], ["/sistema/infancia/estudos", /Biblioteca/],
     ["/sistema/infancia/frequencia", /Chamada/], ["/sistema/infancia/cronograma", /Cronograma/],
@@ -171,6 +169,16 @@ test("todas as telas da fundação e da onda 1 abrem sem erro", async () => {
     ["/sistema/juventude", /Juventude/], ["/sistema/juventude/evangelizandos", /Evangelizandos/]
   ];
   for (const [path, heading] of pages) await expectHealthyPage(admin, path, heading);
+  // As abas da Doutrina dividem o título do módulo (layout); o nome da aba vem no h2.
+  const doutrina: [string, RegExp][] = [
+    ["/sistema/doutrina/trabalhadores", /Trabalhadores da Doutrina/], ["/sistema/doutrina/palestrantes", /Palestrantes Externos/],
+    ["/sistema/doutrina/estudos", /Biblioteca de Estudos/], ["/sistema/doutrina/escalas", /Escala Mensal/],
+    ["/sistema/doutrina/frequencia", /Frequência/]
+  ];
+  for (const [path, section] of doutrina) {
+    await expectHealthyPage(admin, path, /Dpto de Doutrina/);
+    await expect(admin.getByRole("heading", { level: 2, name: section }).first()).toBeVisible();
+  }
 });
 
 test("telas das ondas 2 e 3 abrem sem erro com os módulos ligados", async () => {
@@ -202,7 +210,7 @@ test("telas das ondas 2 e 3 abrem sem erro com os módulos ligados", async () =>
 });
 
 test("um bem vira memorando de baixa e a Diretoria autoriza", async () => {
-  await admin.goto("/sistema/patrimonio");
+  await admin.goto("/sistema/patrimonio/bens");
   await admin.getByRole("button", { name: "+ Novo" }).click();
   await admin.getByLabel("Número de tombamento *").fill("PAT-E2E-001");
   await admin.getByLabel("Situação (novo/usado) *").selectOption("Usado");
