@@ -143,6 +143,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .nav-link { padding: 12px; margin: 3px 0; border-radius: 12px; color: #294f63; text-decoration: none; display: flex; align-items: center; gap: 12px; min-height: 48px; font-size: 15px; line-height: 1.4; font-weight: 500; }
 .nav-link:hover { background: #f6fafb; color: #203e50; }
 .nav-link[data-current="true"] { background: #fff; color: #285870; font-weight: 700; box-shadow: 0 2px 8px #203e5009; }
+.sidebar-session { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #c7dce4; }
+.sidebar-session .button { width: 100%; justify-content: flex-start; min-height: 48px; padding: 12px; border-radius: 12px; border-color: #dae5e9; background: transparent; color: #294f63; font-size: 15px; font-weight: 500; text-align: left; }
+.sidebar-session .button:hover { background: #f6fafb; color: #203e50; }
 .sidebar-user { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
 .sidebar-user strong { display: block; }
 .sidebar-user small { color: var(--muted); display: block; margin: 4px 0 12px; }
@@ -449,6 +452,9 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 .system-menu-link { padding: 8px 10px; border-radius: 8px; color: #285870; font-size: 14px; font-weight: 600; text-decoration: none; }
 .system-menu-link:hover { background: #eaf3f6; }
 .app-main > .ops-save { border-top: 1px solid #dae5e9; padding-top: 22px; }
+:root[data-theme="dark"] .sidebar-session { border-color: var(--line); }
+:root[data-theme="dark"] .sidebar-session .button { color: var(--blue-900); border-color: var(--line); background: transparent; }
+:root[data-theme="dark"] .sidebar-session .button:hover { background: var(--button-hover); }
 :root[data-theme="dark"] .system-bar .session-chip { border-color: var(--line); color: var(--blue-900); }
 :root[data-theme="dark"] .system-bar .session-text strong, :root[data-theme="dark"] .system-bar > .button, :root[data-theme="dark"] .system-menu > summary.button, :root[data-theme="dark"] .system-menu-link { color: var(--blue-900); border-color: var(--line); }
 :root[data-theme="dark"] .system-menu-link:hover { background: var(--button-hover); }

@@ -1,4 +1,4 @@
-/** Ferramentas do sistema: entram no grupo Diretoria da barra lateral. Módulo puro. */
+/** Ferramentas do sistema: itens próprios da barra lateral, fora do grupo Diretoria. */
 export type ToolCapabilities = {
   audit: boolean;
   attachments: boolean;
@@ -7,13 +7,8 @@ export type ToolCapabilities = {
   modules: { href: string; label: string }[];
 };
 
-/** Rotas de módulo que saem do menu lateral (cadastro único e decisões da Diretoria). */
-export const TOOL_MODULES = ["/sistema/trabalhadores", "/sistema/admissoes"];
-
 export function adminTools(c: ToolCapabilities) {
-  const modules = c.modules.filter((mod) => TOOL_MODULES.includes(mod.href));
   return [
-    ...modules,
     { href: "/sistema/auditoria", label: "Dedo-duro / Histórico", shown: c.audit },
     { href: "/sistema/anexos", label: "Anexos no banco", shown: c.attachments },
     { href: "/sistema/usuarios", label: "Usuários e permissões", shown: c.users },

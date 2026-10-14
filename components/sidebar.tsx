@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { NavIcon } from "@/components/nav-icon";
-import { adminTools, TOOL_MODULES, type ToolCapabilities } from "@/lib/admin-tools";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { adminTools, type ToolCapabilities } from "@/lib/admin-tools";
+import { createClient } from "@/lib/supabase/client";
 
 export type NavCapability = ToolCapabilities;
 
@@ -41,6 +43,7 @@ function NavItem({ href, label, current }: { href: string; label: string; curren
 
 export function Sidebar({ capabilities }: { actor: { name: string; role: string; email: string }; capabilities: NavCapability }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const needle = query.trim().toLocaleLowerCase("pt-BR");
   const show = (label: string) => label.toLocaleLowerCase("pt-BR").includes(needle);
@@ -55,7 +58,7 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
   });
   const tools = adminTools(capabilities).filter((tool) => show(tool.label));
   const rest = capabilities.modules
-    .filter((mod) => !PLACED.has(mod.href) && !TOOL_MODULES.includes(mod.href))
+    .filter((mod) => !PLACED.has(mod.href))
     .map((mod) => ({ ...mod, label: menuLabel(mod.href, mod.label) }))
     .filter((mod) => show(mod.label))
     .sort((a, b) => {
@@ -63,6 +66,18 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
       const right = MENU_ORDER.indexOf(b.href);
       return (left === -1 ? 99 : left) - (right === -1 ? 99 : right);
     });
+
+  async function logout(scope: "local" | "global") {
+    const supabase = createClient();
+    await fetch("/api/auth/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: scope === "global" ? "logout_global" : "logout" })
+    });
+    await supabase.auth.signOut({ scope });
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <aside className="sidebar">
@@ -76,18 +91,23 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
         {documentos && show(documentos.label) ? <NavItem href={documentos.href} label={documentos.label} current={current(documentos.href)} /> : null}
         {show("Organograma") ? <NavItem href="/sistema/organograma" label="Organograma" current={current("/sistema/organograma")} /> : null}
         {capabilities.users && show("Controle de Acesso") ? <NavItem href="/sistema/acesso" label="Controle de Acesso" current={current("/sistema/acesso")} /> : null}
-        {diretoria.length || tools.length ? (
+        {diretoria.length ? (
           <details className="nav-group" open>
             <summary>Diretoria</summary>
             <div className="diretoria-nav-items">
               {diretoria.map((mod) => <NavItem key={mod.href} href={mod.href} label={mod.label} current={current(mod.href)} />)}
-              {tools.map((tool) => <NavItem key={tool.href} href={tool.href} label={tool.label} current={current(tool.href)} />)}
             </div>
           </details>
         ) : null}
         {conselho && show(conselho.label) ? <NavItem href={conselho.href} label={conselho.label} current={current(conselho.href)} /> : null}
         {rest.map((mod) => <NavItem key={mod.href} href={mod.href} label={mod.label} current={current(mod.href)} />)}
+        {tools.map((tool) => <NavItem key={tool.href} href={tool.href} label={tool.label} current={current(tool.href)} />)}
       </nav>
+      <div className="sidebar-session">
+        {show("Sair deste aparelho") ? <button className="button" type="button" onClick={() => void logout("local")}>Sair deste aparelho</button> : null}
+        {show("Sair de todos os aparelhos") ? <button className="button" type="button" onClick={() => void logout("global")}>Sair de todos os aparelhos</button> : null}
+        {show("Tema") ? <ThemeToggle /> : null}
+      </div>
     </aside>
   );
 }
