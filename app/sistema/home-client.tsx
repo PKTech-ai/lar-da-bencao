@@ -70,8 +70,6 @@ function longDate(iso: string) {
 }
 
 const CLEANING = { scheduled: "Escalado", done: "Realizada", fee: "Taxa de serviço", cancelled: "Cancelado" } as Record<string, string>;
-const PEOPLE = "M16 19v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1M10 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 19v-1a3 3 0 0 0-2.2-2.9M16 5.1a3 3 0 0 1 0 5.8";
-const ORG = "M5 5h6v6H5zM13 5h6v6h-6zM5 13h6v6H5zM13 13h6v6h-6z";
 
 function monthShort(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase();
@@ -80,15 +78,33 @@ function monthShort(date: string) {
 function OpIcon({ name }: { name: "calendar" | "check" | "people" | "org" }) {
   return (
     <svg className="op-icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {/* Traços copiados dos ícones do painel do visual v215 (lar-operational-behavior-v210). */}
       {name === "calendar" ? (
         <>
-          <path d="M5 5h14v15H5z" />
-          <path d="M5 10h14" />
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2m-8 3h2" />
         </>
       ) : null}
-      {name === "check" ? <path d="M5 12.5 9.5 17 19 7" /> : null}
-      {name === "people" ? <path d={PEOPLE} /> : null}
-      {name === "org" ? <path d={ORG} /> : null}
+      {name === "check" ? (
+        <>
+          <path d="m6 12 4 4 8-9" />
+          <rect x="3" y="3" width="18" height="18" rx="4" />
+        </>
+      ) : null}
+      {name === "people" ? (
+        <>
+          <circle cx="9" cy="7" r="3" />
+          <path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v3" />
+        </>
+      ) : null}
+      {name === "org" ? (
+        <>
+          <rect x="9" y="2" width="6" height="5" rx="1" />
+          <rect x="2" y="17" width="6" height="5" rx="1" />
+          <rect x="16" y="17" width="6" height="5" rx="1" />
+          <path d="M12 7v5M5 17v-5h14v5" />
+        </>
+      ) : null}
     </svg>
   );
 }

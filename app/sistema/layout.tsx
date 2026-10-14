@@ -15,7 +15,7 @@ export default async function SystemLayout({ children }: Readonly<{ children: Re
     <div className="app-shell">
       <Sidebar actor={actor} capabilities={nav.capabilities} />
       <main className="app-main">
-        <SystemBar actor={actor} roleLabel={nav.roleLabel} />
+        <SystemBar actor={actor} roleLabel={nav.roleLabel} capabilities={nav.capabilities} />
         <p className="ops-save" role="status">Pronto para uso</p>
         {env.production ? null : (
           <details className="lar-demo-note">

@@ -1,0 +1,25 @@
+/** Ferramentas que o visual v215 não mostra no menu lateral: ficam em "Opções do sistema". Módulo puro. */
+export type ToolCapabilities = {
+  audit: boolean;
+  attachments: boolean;
+  users: boolean;
+  moduleAdmin: boolean;
+  modules: { href: string; label: string }[];
+};
+
+/** Rotas de módulo que saem do menu lateral (cadastro único e decisões da Diretoria). */
+export const TOOL_MODULES = ["/sistema/trabalhadores", "/sistema/admissoes"];
+
+export function adminTools(c: ToolCapabilities) {
+  const modules = c.modules.filter((mod) => TOOL_MODULES.includes(mod.href));
+  return [
+    ...modules,
+    { href: "/sistema/auditoria", label: "Dedo-duro / Histórico", shown: c.audit },
+    { href: "/sistema/anexos", label: "Anexos no banco", shown: c.attachments },
+    { href: "/sistema/usuarios", label: "Usuários e permissões", shown: c.users },
+    { href: "/sistema/instituicao", label: "Dados da instituição", shown: c.users },
+    { href: "/sistema/sugestoes", label: "Sugestões", shown: true },
+    { href: "/sistema/modulos", label: "Módulos e ondas", shown: c.moduleAdmin },
+    { href: "/sistema/importacao", label: "Importação v215", shown: c.moduleAdmin }
+  ].filter((item) => !("shown" in item) || item.shown).map(({ href, label }) => ({ href, label }));
+}

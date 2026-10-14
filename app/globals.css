@@ -424,3 +424,35 @@ th { background: var(--surface-sunken); color: var(--text-table-head); position:
 :root[data-theme="dark"] .op-department .dept-board-head h3, :root[data-theme="dark"] .op-department .dept-board-card h4 { color: var(--blue-900); }
 :root[data-theme="dark"] .op-department .dept-board-card { border-color: var(--line); }
 :root[data-theme="dark"] .visual-suggestions .sg-heading { border-color: var(--line); }
+
+/* Topo no desenho do visual v215 (medidas tiradas do .top e do #accessSessionButton do HTML) */
+.system-bar { padding-bottom: 20px; }
+.system-bar .session-chip { gap: 9px; min-height: 54px; padding: 8px 11px; border-color: #cbdde5; color: #356f8f; font-size: 12px; font-weight: 600; }
+.system-bar .session-text strong { font-size: 14px; font-weight: 650; color: #356f8f; }
+.system-bar .session-avatar { background: #eef5f0; color: #356f52; font-weight: 700; }
+.system-bar > .button { min-height: 44px; padding: 10px 15px; font-size: 14px; font-weight: 600; color: #356f8f; border-color: #cbdde5; }
+.system-menu > summary.button { min-height: 48px; padding: 12px; font-size: 14px; font-weight: 600; color: #526f7e; border-color: #dae5e9; border-radius: 12px; }
+.system-menu > summary.button::after { content: "⌄"; margin-left: 6px; line-height: 1; }
+.system-menu-tools { display: grid; gap: 2px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.system-menu-link { padding: 8px 10px; border-radius: 8px; color: #285870; font-size: 14px; font-weight: 600; text-decoration: none; }
+.system-menu-link:hover { background: #eaf3f6; }
+.app-main > .ops-save { border-top: 1px solid #dae5e9; padding-top: 22px; }
+:root[data-theme="dark"] .system-bar .session-chip { border-color: var(--line); color: var(--blue-900); }
+:root[data-theme="dark"] .system-bar .session-text strong, :root[data-theme="dark"] .system-bar > .button, :root[data-theme="dark"] .system-menu > summary.button, :root[data-theme="dark"] .system-menu-link { color: var(--blue-900); border-color: var(--line); }
+:root[data-theme="dark"] .system-menu-link:hover { background: var(--button-hover); }
+:root[data-theme="dark"] .app-main > .ops-save { border-color: var(--line); }
+
+/* Painel de boas-vindas, indicadores e grupo Diretoria (medidas do visual v215) */
+.card.lar-welcome .op-eyebrow { font-size: 12px; color: var(--blue-800); line-height: 1.55; }
+.lar-welcome-actions .button { min-height: 44px; padding: 10px 15px; font-size: 14px; font-weight: 600; }
+.lar-welcome-actions .button:not(.primary) { color: #356f8f; border-color: #cbdde5; }
+.card.lar-welcome .lar-welcome-date { line-height: 20px; }
+.op-stat > b { line-height: 40px; letter-spacing: -.7px; margin: 4px 0 5px; }
+.op-stat > small { line-height: 20px; }
+.nav-group > summary { font-weight: 700; border-radius: 9px; }
+:root[data-theme="dark"] .lar-welcome-actions .button:not(.primary) { color: var(--blue-900); border-color: var(--line); }
+/* O .grid da Visão Geral já separa os blocos por 16px; no visual o painel fica a 24px dos indicadores. */
+.card.lar-welcome .op-eyebrow { margin: 0 0 7px; }
+.grid > .card.lar-welcome { margin-bottom: 8px; }
+.grid > .op-stats { margin-bottom: 6px; }
+.op-section h3 { font-weight: 650; line-height: 29px; }
