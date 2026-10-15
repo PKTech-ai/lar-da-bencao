@@ -6,6 +6,7 @@ import { NavIcon } from "@/components/nav-icon";
 import { SuggestionsBox } from "@/components/suggestions-box";
 import { api } from "@/lib/client-api";
 import { addDays, buildHomeStats, filterAgenda, todayInSaoPaulo, type AgendaItem } from "@/lib/home-dashboard";
+import { SYSTEM_VERSION, SYSTEM_VERSION_NOTE, SYSTEM_VERSION_UPDATED } from "@/lib/system-version";
 import { brDate, formatMoney } from "@/lib/resources/types";
 
 type Pending = { key: string; label: string; count: number; href: string; hint?: string };
@@ -311,7 +312,7 @@ export function HomeClient({ moduleCount, modules, showAccess }: { moduleCount: 
       <footer className="lar-system-footer">
         <p>Desenvolvido por <strong>PK Instituto</strong>, inspirada pela Espiritualidade Amiga.</p>
         <div className="lar-version-row">
-          <span><strong>Versão 215</strong> · Atualização: 14/09/2026</span>
+          <span><strong>Versão {SYSTEM_VERSION}</strong> · Atualização: {SYSTEM_VERSION_UPDATED}</span>
           <button className="button" type="button" onClick={() => historyRef.current?.showModal()}>Histórico de versões</button>
         </div>
       </footer>
@@ -320,14 +321,13 @@ export function HomeClient({ moduleCount, modules, showAccess }: { moduleCount: 
           <h2 id="larVersionTitle">Controle de versão do sistema</h2>
           <button className="button" type="button" onClick={() => historyRef.current?.close()}>Fechar</button>
         </div>
-        <p className="small muted">Versão em uso: 215. Histórico das atualizações mais recentes.</p>
+        <p className="small muted">Versão em uso: {SYSTEM_VERSION}. Histórico das atualizações mais recentes.</p>
         <article>
-          <h3>Versão 215 — Visual acolhedor do Lar da Bênção</h3>
-          <p className="small muted">14/09/2026</p>
+          <h3>Versão {SYSTEM_VERSION} — {SYSTEM_VERSION_NOTE}</h3>
+          <p className="small muted">{SYSTEM_VERSION_UPDATED}</p>
           <ul>
-            <li>Paleta de azul suave e verde sálvia, com fundo claro e a identidade do Lar.</li>
-            <li>Menus com ícones e telas adaptadas para celular, tablet e computador.</li>
-            <li>Formulários legíveis e a Visão Geral no mesmo desenho do visual.</li>
+            <li>Início do sistema institucional do Lar da Bênção.</li>
+            <li>Cadastros, escalas e controles passam a valer a partir desta versão.</li>
           </ul>
         </article>
       </dialog>

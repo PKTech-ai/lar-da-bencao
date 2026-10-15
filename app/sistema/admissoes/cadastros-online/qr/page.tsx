@@ -1,5 +1,6 @@
 import Link from "next/link";
 import QRCode from "qrcode";
+import { CopyLinkButton } from "@/components/copy-link-button";
 import { PrintButton } from "@/components/print-button";
 import { serverEnv } from "@/lib/env";
 import { isFlagEnabled } from "@/lib/feature-flags";
@@ -18,7 +19,7 @@ export default async function CadastroOnlineQrPage() {
       <header className="page-heading no-print">
         <div><h1>QR code do cadastro online</h1><p>Cartaz para imprimir em A4. Quem ler o código abre o formulário de cadastro no celular.</p></div>
         <div className="row-actions">
-          <Link className="button" href="/sistema/trabalhadores/cadastros-online">Voltar</Link>
+          <Link className="button" href="/sistema/admissoes/cadastros-online">Voltar</Link>
           <PrintButton label="⎙ Imprimir cartaz" />
         </div>
       </header>
@@ -32,6 +33,7 @@ export default async function CadastroOnlineQrPage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} alt={`QR code para ${url}`} style={{ width: "min(420px, 100%)", height: "auto" }} />
         <p className="small muted">{url}</p>
+        <CopyLinkButton url={url} />
       </section>
     </>
   );

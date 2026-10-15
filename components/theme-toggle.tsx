@@ -27,8 +27,9 @@ export function ThemeToggle() {
   }
 
   return (
-    <button type="button" className="button theme-toggle" onClick={toggle}>
-      {theme === "dark" ? "Tema claro" : "Tema escuro"}
+    <button type="button" className="button theme-toggle" title={theme === "dark" ? "Tema claro" : "Tema escuro"} onClick={toggle}>
+      <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z"/></svg></span>
+      <span className="nav-label">{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
     </button>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { NavIcon } from "@/components/nav-icon";
@@ -34,9 +34,9 @@ function menuLabel(href: string, fallback: string) {
 
 function NavItem({ href, label, current }: { href: string; label: string; current: boolean }) {
   return (
-    <Link className="nav-link" href={href} data-current={current}>
+    <Link className="nav-link" href={href} data-current={current} title={label}>
       <NavIcon href={href} />
-      {label}
+      <span className="nav-label">{label}</span>
     </Link>
   );
 }
@@ -44,6 +44,7 @@ function NavItem({ href, label, current }: { href: string; label: string; curren
 export function Sidebar({ capabilities }: { actor: { name: string; role: string; email: string }; capabilities: NavCapability }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const needle = query.trim().toLocaleLowerCase("pt-BR");
   const show = (label: string) => label.toLocaleLowerCase("pt-BR").includes(needle);
@@ -67,6 +68,18 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
       return (left === -1 ? 99 : left) - (right === -1 ? 99 : right);
     });
 
+  useEffect(() => {
+    setCollapsed(localStorage.getItem("sidebar-collapsed") === "1");
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      const next = !current;
+      localStorage.setItem("sidebar-collapsed", next ? "1" : "0");
+      return next;
+    });
+  }
+
   async function logout(scope: "local" | "global") {
     const supabase = createClient();
     await fetch("/api/auth/events", {
@@ -80,7 +93,11 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
   }
 
   return (
-    <aside className="sidebar">
+    <aside className={collapsed ? "sidebar is-collapsed" : "sidebar"}>
+      <button className="sidebar-collapse" type="button" aria-pressed={collapsed} aria-label={collapsed ? "Expandir menu" : "Recolher menu"} onClick={toggleCollapsed}>
+        <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h16"/></svg></span>
+        <span className="nav-label">{collapsed ? "Expandir" : "Recolher"}</span>
+      </button>
       <Brand subtitle="Sistema Integrado — Demonstração Funcional com Dados Fictícios" />
       <label className="module-search">
         Encontrar módulo
@@ -88,12 +105,13 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
       </label>
       <nav className="nav-list" aria-label="Módulos principais">
         {show("Visão Geral") ? <NavItem href="/sistema" label="Visão Geral" current={current("/sistema")} /> : null}
+        {show("Demonstração") ? <NavItem href="/visual" label="Demonstração" current={false} /> : null}
         {documentos && show(documentos.label) ? <NavItem href={documentos.href} label={documentos.label} current={current(documentos.href)} /> : null}
         {show("Organograma") ? <NavItem href="/sistema/organograma" label="Organograma" current={current("/sistema/organograma")} /> : null}
         {capabilities.users && show("Controle de Acesso") ? <NavItem href="/sistema/acesso" label="Controle de Acesso" current={current("/sistema/acesso")} /> : null}
         {diretoria.length ? (
           <details className="nav-group" open>
-            <summary>Diretoria</summary>
+            <summary><span className="nav-label">Diretoria</span></summary>
             <div className="diretoria-nav-items">
               {diretoria.map((mod) => <NavItem key={mod.href} href={mod.href} label={mod.label} current={current(mod.href)} />)}
             </div>
@@ -104,8 +122,8 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
         {tools.map((tool) => <NavItem key={tool.href} href={tool.href} label={tool.label} current={current(tool.href)} />)}
       </nav>
       <div className="sidebar-session">
-        {show("Sair deste aparelho") ? <button className="button" type="button" onClick={() => void logout("local")}>Sair deste aparelho</button> : null}
-        {show("Sair de todos os aparelhos") ? <button className="button" type="button" onClick={() => void logout("global")}>Sair de todos os aparelhos</button> : null}
+        {show("Sair deste aparelho") ? <button className="button" type="button" title="Sair deste aparelho" onClick={() => void logout("local")}><span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 7V4h10v16H10v-3M4 12h11m0 0-3-3m3 3-3 3"/></svg></span><span className="nav-label">Sair deste aparelho</span></button> : null}
+        {show("Sair de todos os aparelhos") ? <button className="button" type="button" title="Sair de todos os aparelhos" onClick={() => void logout("global")}><span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7V4h11v16H9v-3M3 12h12m0 0-3-3m3 3-3 3"/></svg></span><span className="nav-label">Sair de todos os aparelhos</span></button> : null}
         {show("Tema") ? <ThemeToggle /> : null}
       </div>
     </aside>

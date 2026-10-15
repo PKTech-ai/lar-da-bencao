@@ -42,6 +42,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  async redirects() {
+    return [
+      { source: "/sistema/trabalhadores/cadastros-online", destination: "/sistema/admissoes/cadastros-online", permanent: false },
+      { source: "/sistema/trabalhadores/cadastros-online/:path*", destination: "/sistema/admissoes/cadastros-online/:path*", permanent: false }
+    ];
+  },
   async rewrites() {
     return [{ source: "/visual", destination: "/visual-v215.html" }];
   },

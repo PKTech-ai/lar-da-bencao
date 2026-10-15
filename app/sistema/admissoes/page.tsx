@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { query } from "@/lib/db";
 import { requireModulePage } from "@/lib/page-auth";
+import { hasPermission } from "@/lib/permissions";
 import { workerPageContext } from "@/lib/worker-page";
 import { departmentsWith } from "@/lib/workers";
 import { AdmissionsClient } from "./admissions-client";
@@ -9,11 +12,20 @@ export default async function AdmissoesPage() {
   const actor = await requireModulePage("module_workers", { department: "any" });
   const context = await workerPageContext(actor);
   if (!context.canDecide && (await departmentsWith(actor, "read")) !== null) notFound();
+  const admin = await hasPermission(actor, "modules", "admin");
+  const waiting = admin
+    ? (await query<{ count: number }>("select count(*)::int as count from app.worker_submissions where status = 'received'")).rows[0].count
+    : 0;
   return (
     <>
       <header className="page-heading">
         <div><h1>Aprovação de Trabalhadores</h1><p>A Secretaria e os departamentos cadastram as fichas. A Diretoria aprova ou reprova; só depois da aprovação o trabalhador fica ativo.</p></div>
-        <span className="production-badge">Diretoria</span>
+        {admin ? (
+          <div className="row-actions">
+            <Link className="button" href="/sistema/admissoes/cadastros-online">Cadastros online{waiting ? ` (${waiting})` : ""}</Link>
+            <Link className="button" href="/sistema/admissoes/cadastros-online/qr">QR code do cadastro online</Link>
+          </div>
+        ) : <span className="production-badge">Diretoria</span>}
       </header>
       <AdmissionsClient departments={context.departments} canDecide={context.canDecide} />
     </>

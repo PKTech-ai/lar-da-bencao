@@ -17,7 +17,7 @@ const ICONS: Record<string, string> = {
 };
 
 function iconName(href: string) {
-  if (href === "/sistema") return "home";
+  if (href === "/sistema" || href === "/visual") return "home";
   if (href.includes("documentos") || href.includes("secretaria")) return "document";
   if (href.includes("organograma")) return "org";
   if (href.includes("acesso") || href.includes("usuarios")) return "lock";

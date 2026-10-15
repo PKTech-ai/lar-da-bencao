@@ -44,7 +44,7 @@ export function LoginForm() {
       <label>E-mail institucional<input name="email" type="email" autoComplete="username" required /></label>
       <label>Senha<input name="password" type="password" autoComplete="current-password" minLength={10} required /></label>
       {error ? <div className="error" role="alert">{error}</div> : null}
-      <button className="button primary" type="submit" disabled={busy}>{busy ? "Entrando…" : "Continuar"}</button>
+      <button className={busy ? "button primary is-loading" : "button primary"} type="submit" disabled={busy}>{busy ? "Entrando…" : "Continuar"}</button>
       <Link href="/recuperar" className="button">Esqueci minha senha</Link>
       <p className="small muted">Contas compartilhadas não são permitidas. Procure o Administrador para recuperar o acesso.</p>
     </form>

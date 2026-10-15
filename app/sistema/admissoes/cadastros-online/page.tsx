@@ -23,7 +23,7 @@ export default async function CadastrosOnlinePage() {
           {open
             ? "O formulário público está aberto e recebendo envios."
             : "O formulário público está fechado. Para abrir, ligue “Cadastro online de trabalhadores” em Módulos e ondas."}
-          {" "}<Link href="/sistema/trabalhadores/cadastros-online/qr">Ver QR code e cartaz</Link>
+          {" "}<Link href="/sistema/admissoes/cadastros-online/qr">Ver QR code e cartaz</Link>
         </div>
         <SubmissionsClient departments={departments.rows} />
       </div>

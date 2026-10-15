@@ -104,7 +104,7 @@ test("administrador cria a ficha a partir do primeiro envio", async () => {
 
 test("segundo envio é vinculado à ficha existente e atualiza os dados", async () => {
   await sql("update app.workers set status = 'active' where full_name = $1", [NAME]);
-  await admin.goto("/sistema/trabalhadores/cadastros-online");
+  await admin.goto("/sistema/admissoes/cadastros-online");
   const card = admin.locator("section.card", { hasText: NAME }).first();
   await expect(card.getByText("1 ficha(s) parecida(s) encontrada(s).")).toBeVisible();
   const workerId = (await sql<{ id: string }>("select id from app.workers where full_name = $1", [NAME]))[0].id;
@@ -132,16 +132,17 @@ test("segundo envio é vinculado à ficha existente e atualiza os dados", async 
 });
 
 test("QR code aponta para o endereço configurado em APP_URL", async () => {
-  await admin.goto("/sistema/trabalhadores");
+  await admin.goto("/sistema/admissoes");
   await admin.getByRole("link", { name: "QR code do cadastro online" }).click();
   await expect(admin.getByRole("img", { name: /QR code para .*\/cadastro\/trabalhador/ })).toBeVisible();
+  await expect(admin.getByRole("button", { name: "Copiar link" })).toBeVisible();
   await expect(admin.getByText(/Confira antes de imprimir/)).toBeVisible();
 });
 
 test("quem não é administrador não vê a fila", async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto("/sistema/trabalhadores/cadastros-online");
+  await page.goto("/sistema/admissoes/cadastros-online");
   await expect(page).toHaveURL(/\/login/);
   expect((await context.request.get("/api/workers/submissions", { maxRedirects: 0 })).status()).toBe(401);
   await context.close();

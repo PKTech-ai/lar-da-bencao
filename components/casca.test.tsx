@@ -41,6 +41,8 @@ describe("menu lateral como no visual", () => {
     const { Sidebar } = await import("@/components/sidebar");
     const html = renderToStaticMarkup(<Sidebar actor={{ name: "Ana", role: "administrador", email: "a@x" }}
       capabilities={{ ...capabilities, modules: [...capabilities.modules, { href: "/sistema/presidencia", label: "Presidência" }] }} />);
+    expect(html).toContain("Demonstração");
+    expect(html).toContain("Recolher");
     expect(html).toContain('<details class="nav-group" open="">');
   });
   it("subtítulo da marca igual ao visual", async () => {
