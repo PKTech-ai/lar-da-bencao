@@ -11,6 +11,8 @@ describe("porta de demonstração do HTML", () => {
     expect(html).toContain("Acesso institucional");
     expect(html).toContain("position:fixed!important");
     expect(html).toContain("gate.remove()");
+    expect(html).toContain("Já escalado em:");
+    expect(html).toContain("demo-conflict-pointer");
     expect(html).not.toContain("Esqueci minha senha");
     expect(html.indexOf('id="demo-gate"')).toBeLessThan(html.indexOf('class="app"'));
     expect(html.indexOf('id="demo-gate-ready"')).toBeGreaterThan(html.indexOf('class="app"'));

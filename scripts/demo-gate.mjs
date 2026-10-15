@@ -14,6 +14,8 @@ html:not([data-demo-open]) .app{display:none!important}
 #demo-gate button{min-height:48px!important;border-radius:10px!important;border:1px solid #356f8f!important;background:#356f8f!important;color:#fff!important;font-weight:700!important;cursor:pointer!important}
 #demo-gate button:disabled{opacity:.7!important;cursor:wait!important}
 #demo-gate .demo-fine{margin:16px 0 0!important;font-size:13px!important;color:#617683!important}
+.demo-conflict-pointer{display:block!important;margin:4px 0 6px!important;padding:4px 6px!important;border-radius:6px!important;background:#fff4b8!important;color:#7b5a00!important;font:12px/1.35 "Segoe UI",Arial,sans-serif!important;font-weight:700!important;white-space:normal!important}
+select.duplicate,select.conflict{outline:3px solid #d6a419!important;background:#fff4b8!important}
 </style>
 `;
 
@@ -59,6 +61,55 @@ document.querySelectorAll("img.brand-logo, img[alt*='Logo']").forEach(function(i
   img.src="/marca-lar-da-bencao.png";
   img.alt="Centro Espírita Filantrópico Lar da Bênção";
 });
+(function(){
+  if(typeof renderscale!=="function"||typeof cf!=="function"||typeof renderConflictDetails!=="function") return;
+  var original=renderscale;
+  renderscale=function(){
+    var changed=document.activeElement&&document.activeElement.dataset?document.activeElement.dataset.k:"";
+    original();
+    try{
+      var ym=month.value;
+      var conflicts=cf(ym)||[];
+      renderConflictDetails(ym,conflicts);
+      var same=new Set(), other=new Set();
+      conflicts.forEach(function(c){
+        (c.keys||[]).forEach(function(k){(c.type==="same_day"?same:other).add(k);});
+      });
+      document.querySelectorAll("select[data-k]").forEach(function(sel){
+        var key=sel.dataset.k;
+        sel.classList.toggle("duplicate", same.has(key));
+        sel.classList.toggle("conflict", other.has(key));
+        var note=sel.nextElementSibling;
+        if(note&&note.classList.contains("demo-conflict-pointer")) note.remove();
+        if(!same.has(key)&&!other.has(key)) return;
+        var lines=conflicts.filter(function(c){return (c.keys||[]).indexOf(key)>=0;}).flatMap(function(c){
+          return (c.locations||[]).filter(function(loc){return loc.key!==key;}).map(function(loc){
+            return loc.date+" · "+loc.dayName+" · "+(typeof slotLabel==="function"?slotLabel(loc):loc.activity);
+          });
+        });
+        if(!lines.length) return;
+        var pointer=document.createElement("div");
+        pointer.className="demo-conflict-pointer";
+        pointer.textContent="Já escalado em: "+lines.join(" | ");
+        sel.insertAdjacentElement("afterend", pointer);
+      });
+      if(changed&&(same.has(changed)||other.has(changed))){
+        var targetKey="";
+        conflicts.some(function(c){
+          if((c.keys||[]).indexOf(changed)<0) return false;
+          targetKey=(c.keys||[]).filter(function(k){return k!==changed;})[0]||changed;
+          return true;
+        });
+        var target=document.querySelector('[data-k="'+targetKey+'"]');
+        if(target){
+          target.scrollIntoView({behavior:"smooth",block:"center",inline:"center"});
+          target.style.boxShadow="0 0 0 4px rgba(214,164,25,.55)";
+          setTimeout(function(){target.style.boxShadow="";},1800);
+        }
+      }
+    }catch(e){}
+  };
+})();
 </script>
 `;
 
