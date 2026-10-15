@@ -14,13 +14,11 @@ html:not([data-demo-open]) .app{display:none!important}
 #demo-gate button{min-height:48px!important;border-radius:10px!important;border:1px solid #356f8f!important;background:#356f8f!important;color:#fff!important;font-weight:700!important;cursor:pointer!important}
 #demo-gate button:disabled{opacity:.7!important;cursor:wait!important}
 #demo-gate .demo-fine{margin:16px 0 0!important;font-size:13px!important;color:#617683!important}
-.demo-conflict-pointer,.demo-where-pointer{display:block!important;margin:4px 0 6px!important;padding:4px 6px!important;border-radius:6px!important;background:#fff4b8!important;color:#7b5a00!important;font:12px/1.35 "Segoe UI",Arial,sans-serif!important;font-weight:700!important;white-space:normal!important;text-align:left!important}
-.demo-where-pointer{background:#e7f1fb!important;color:#1d4e89!important}
-select.duplicate,select.conflict{outline:3px solid #b45309!important;background:#fde68a!important;box-shadow:inset 0 0 0 2px #b45309!important}
-select.demo-where{outline:3px solid #1d4e89!important;background:#e7f1fb!important}
-#demo-where-banner{display:block!important;margin:0 0 12px!important;padding:12px 14px!important;border:1px solid #e3c35c!important;border-radius:10px!important;background:#fff9df!important;color:#7b5a00!important;font:14px/1.45 "Segoe UI",Arial,sans-serif!important}
-#demo-where-banner strong{color:#7b5a00!important}
-#demo-where-banner button{margin:8px 8px 0 0!important}
+#sheet th.demo-sudoku-col,#sheet td.demo-sudoku-col{background:#fff4cc!important}
+#sheet th.demo-sudoku-clash-col{background:#f4b4b4!important;color:#8f1d1d!important}
+#sheet td.demo-sudoku-peer{background:#d7ebff!important;box-shadow:inset 0 0 0 2px #2b6cb0!important}
+#sheet td.demo-sudoku-clash{background:#ffc9c9!important;box-shadow:inset 0 0 0 3px #d64545!important}
+#sheet td.demo-sudoku-peer select,#sheet td.demo-sudoku-clash select{background:transparent!important;font-weight:800!important}
 </style>
 `;
 
@@ -67,23 +65,53 @@ document.querySelectorAll("img.brand-logo, img[alt*='Logo']").forEach(function(i
   img.alt="Centro Espírita Filantrópico Lar da Bênção";
 });
 (function(){
-  if(typeof renderscale!=="function"||typeof cf!=="function"||typeof renderConflictDetails!=="function"||typeof slotInfo!=="function") return;
+  if(typeof renderscale!=="function"||typeof cf!=="function") return;
   var original=renderscale, painting=false;
-  function placeText(info){
-    return info.date+" · "+info.dayName+" · "+(typeof slotLabel==="function"?slotLabel(info):info.activity);
+  function clearSudoku(){
+    document.querySelectorAll("#sheet .demo-sudoku-col,#sheet .demo-sudoku-clash-col,#sheet .demo-sudoku-peer,#sheet .demo-sudoku-clash").forEach(function(el){
+      el.classList.remove("demo-sudoku-col","demo-sudoku-clash-col","demo-sudoku-peer","demo-sudoku-clash");
+    });
   }
-  function placesOf(live, value, exceptKey){
-    if(!live||!live.a||!value||String(value).indexOf("w:")!==0) return [];
-    return Object.keys(live.a).filter(function(k){return k!==exceptKey&&live.a[k]===value;}).map(function(k){return slotInfo(month.value,k);});
+  function shadeColumn(day, clash){
+    document.querySelectorAll("#sheet table.sched").forEach(function(table){
+      var heads=Array.prototype.slice.call(table.querySelectorAll("thead th"));
+      var index=heads.findIndex(function(th){return th.textContent.trim()===String(day);});
+      if(index<0) return;
+      heads[index].classList.add("demo-sudoku-col");
+      if(clash) heads[index].classList.add("demo-sudoku-clash-col");
+      Array.prototype.forEach.call(table.querySelectorAll("tbody tr"), function(tr){
+        var td=tr.children[index];
+        if(!td) return;
+        td.classList.add("demo-sudoku-col");
+        if(clash) td.classList.add("demo-sudoku-clash-col");
+      });
+    });
   }
-  function noteAfter(sel, className, text){
-    var note=sel.nextElementSibling;
-    if(note&&(note.classList.contains("demo-conflict-pointer")||note.classList.contains("demo-where-pointer"))) note.remove();
-    if(!text) return;
-    var pointer=document.createElement("div");
-    pointer.className=className;
-    pointer.textContent=text;
-    sel.insertAdjacentElement("afterend", pointer);
+  function paintSudoku(focusValue, focusKey){
+    clearSudoku();
+    var byDay={};
+    document.querySelectorAll("#sheet select[data-k]").forEach(function(sel){
+      if(!sel.value||sel.value.indexOf("w:")!==0) return;
+      var day=sel.dataset.k.split("|")[3];
+      var id=sel.value+"|"+day;
+      (byDay[id]=byDay[id]||[]).push(sel);
+    });
+    Object.keys(byDay).forEach(function(id){
+      var group=byDay[id];
+      if(group.length<2) return;
+      shadeColumn(id.split("|")[1], true);
+      group.forEach(function(sel){
+        var td=sel.closest("td");
+        if(td) td.classList.add("demo-sudoku-clash");
+      });
+    });
+    if(!focusValue||String(focusValue).indexOf("w:")!==0) return;
+    document.querySelectorAll("#sheet select[data-k]").forEach(function(sel){
+      if(sel.value!==focusValue) return;
+      var td=sel.closest("td");
+      if(td&&!td.classList.contains("demo-sudoku-clash")) td.classList.add("demo-sudoku-peer");
+    });
+    if(focusKey) shadeColumn(focusKey.split("|")[3], false);
   }
   renderscale=function(){
     var changed=window.__larScaleChanged||"";
@@ -91,28 +119,13 @@ document.querySelectorAll("img.brand-logo, img[alt*='Logo']").forEach(function(i
     painting=true;
     try{
       original();
-      var ym=month.value, live=db.scales[ym];
-      var conflicts=cf(ym)||[];
-      renderConflictDetails(ym,conflicts);
-      var same=new Set(), other=new Set();
-      conflicts.forEach(function(c){
-        (c.keys||[]).forEach(function(k){(c.type==="same_day"?same:other).add(k);});
-      });
+      var live=db.scales[month.value];
       document.querySelectorAll("#sheet select[data-k]").forEach(function(sel){
-        var key=sel.dataset.k, parts=key.split("|"), dow=Number(parts[0]), day=Number(parts[3]);
         Array.prototype.forEach.call(sel.options, function(opt){
-          if(!opt.value||opt.value.indexOf("w:")!==0) return;
-          var sameDay=placesOf(live, opt.value, key).filter(function(info){return info.dow===dow&&info.day===day;});
-          if(!sameDay.length) return;
-          var worker=typeof wb==="function"?wb(Number(opt.value.slice(2))):null;
-          opt.textContent="Já escalado: "+sameDay.map(placeText).join(" | ")+" — "+(worker&&worker.name||"Trabalhador");
+          var name=opt.textContent.split(" — ")[0].trim();
+          if(name) opt.textContent=name;
         });
-        sel.classList.toggle("duplicate", same.has(key));
-        sel.classList.toggle("conflict", other.has(key));
-        var lines=conflicts.filter(function(c){return (c.keys||[]).indexOf(key)>=0;}).flatMap(function(c){
-          return (c.locations||[]).filter(function(loc){return loc.key!==key;}).map(placeText);
-        });
-        noteAfter(sel, "demo-conflict-pointer", lines.length?"Já escalado em: "+lines.join(" | "):"");
+        sel.addEventListener("focus", function(){paintSudoku(sel.value, sel.dataset.k);});
         sel.onchange=function(){
           var current=db.scales[month.value];
           if(!current||!current.a) return;
@@ -129,48 +142,7 @@ document.querySelectorAll("img.brand-logo, img[alt*='Logo']").forEach(function(i
           if(typeof dir==="function") dir();
         };
       });
-      var banner=document.getElementById("demo-where-banner");
-      if(!banner){
-        banner=document.createElement("div");
-        banner.id="demo-where-banner";
-        banner.hidden=true;
-        var sheet=document.getElementById("sheet");
-        if(sheet) sheet.parentElement.insertBefore(banner, sheet);
-      }
-      var changedValue=changed&&live?live.a[changed]:"";
-      var changedPlaces=placesOf(live, changedValue, changed);
-      if(banner){
-        if(!changedPlaces.length){banner.hidden=true;banner.textContent="";}
-        else{
-          var worker=typeof wb==="function"?wb(Number(String(changedValue).slice(2))):null;
-          var name=worker&&worker.name||"Esta pessoa";
-          banner.hidden=false;
-          banner.textContent="";
-          var title=document.createElement("strong");
-          title.textContent=name+" já está na escala.";
-          banner.appendChild(title);
-          changedPlaces.forEach(function(info){
-            var line=document.createElement("div");
-            line.textContent=placeText(info);
-            banner.appendChild(line);
-            var cell=document.querySelector('#sheet select[data-k="'+info.key+'"]');
-            if(cell&&!same.has(info.key)&&!other.has(info.key)){
-              cell.classList.add("demo-where");
-              noteAfter(cell, "demo-where-pointer", "Já está aqui: "+placeText(info));
-            }
-            if(!cell){
-              var jump=document.createElement("button");
-              jump.type="button";
-              jump.className="btn";
-              jump.textContent="Mostrar "+info.date+" na escala";
-              jump.onclick=function(){dow.value=String(info.dow);renderscale();};
-              banner.appendChild(jump);
-            }
-          });
-          var first=document.querySelector('#sheet select[data-k="'+changedPlaces[0].key+'"]')||document.querySelector('#sheet select[data-k="'+changed+'"]');
-          if(first) first.scrollIntoView({behavior:"smooth",block:"center",inline:"center"});
-        }
-      }
+      paintSudoku(changed&&live?live.a[changed]:"", changed);
     }catch(e){}
     finally{painting=false;}
   };
