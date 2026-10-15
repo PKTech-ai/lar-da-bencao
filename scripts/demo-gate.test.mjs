@@ -13,6 +13,8 @@ describe("porta de demonstração do HTML", () => {
     expect(html).toContain("gate.remove()");
     expect(html).toContain("Já escalado em:");
     expect(html).toContain("demo-conflict-pointer");
+    expect(html).toContain("lar-data-refreshed");
+    expect(html).toContain("current.a[sel.dataset.k]=sel.value");
     expect(html).not.toContain("Esqueci minha senha");
     expect(html.indexOf('id="demo-gate"')).toBeLessThan(html.indexOf('class="app"'));
     expect(html.indexOf('id="demo-gate-ready"')).toBeGreaterThan(html.indexOf('class="app"'));
