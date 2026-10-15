@@ -174,9 +174,21 @@ document.querySelectorAll("img.brand-logo, img[alt*='Logo']").forEach(function(i
       original();
       var live=db.scales[month.value];
       document.querySelectorAll("#sheet select[data-k]").forEach(function(sel){
+        var day=sel.dataset.k.split("|")[3];
         Array.prototype.forEach.call(sel.options, function(opt){
-          var name=opt.textContent.split(" — ")[0].trim();
-          if(name) opt.textContent=name;
+          if(!opt.value||opt.value.indexOf("w:")!==0) return;
+          var original=opt.textContent;
+          var name=original.split(" — ")[0].trim()||workerName(opt.value);
+          var activities=[];
+          document.querySelectorAll("#sheet select[data-k]").forEach(function(other){
+            if(other===sel||other.value!==opt.value||other.dataset.k.split("|")[3]!==day) return;
+            var info=typeof slotInfo==="function"?slotInfo(month.value, other.dataset.k):null;
+            var activity=info&&info.activity?info.activity:"outra atividade";
+            if(activities.indexOf(activity)<0) activities.push(activity);
+          });
+          if(activities.length) opt.textContent=name+" — já está neste dia: "+activities.join(" e ");
+          else if(original.indexOf("FOLGA:")>=0) opt.textContent=name+" — "+original.slice(original.indexOf("FOLGA:"));
+          else opt.textContent=name;
         });
         sel.addEventListener("focus", function(){explainPerson(sel.value);});
         sel.onchange=function(){

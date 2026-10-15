@@ -11,6 +11,7 @@ describe("porta de demonstração do HTML", () => {
     expect(html).toContain("Acesso institucional");
     expect(html).toContain("position:fixed!important");
     expect(html).toContain("gate.remove()");
+    expect(html).toContain("já está neste dia:");
     expect(html).toContain("demo-repeat");
     expect(html).toContain("Só as vagas dessa pessoa");
     expect(html).toContain("lar-data-refreshed");
