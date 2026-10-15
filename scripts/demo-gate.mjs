@@ -14,11 +14,14 @@ html:not([data-demo-open]) .app{display:none!important}
 #demo-gate button{min-height:48px!important;border-radius:10px!important;border:1px solid #356f8f!important;background:#356f8f!important;color:#fff!important;font-weight:700!important;cursor:pointer!important}
 #demo-gate button:disabled{opacity:.7!important;cursor:wait!important}
 #demo-gate .demo-fine{margin:16px 0 0!important;font-size:13px!important;color:#617683!important}
-#sheet th.demo-sudoku-col,#sheet td.demo-sudoku-col{background:#fff4cc!important}
-#sheet th.demo-sudoku-clash-col{background:#f4b4b4!important;color:#8f1d1d!important}
-#sheet td.demo-sudoku-peer{background:#d7ebff!important;box-shadow:inset 0 0 0 2px #2b6cb0!important}
-#sheet td.demo-sudoku-clash{background:#ffc9c9!important;box-shadow:inset 0 0 0 3px #d64545!important}
-#sheet td.demo-sudoku-peer select,#sheet td.demo-sudoku-clash select{background:transparent!important;font-weight:800!important}
+#demo-scale-note{display:block!important;margin:0 0 12px!important;padding:12px 14px!important;border-radius:12px!important;background:#fff7ed!important;border:1px solid #fdba74!important;color:#9a3412!important;font:15px/1.45 "Segoe UI",Arial,sans-serif!important}
+#demo-scale-note.is-repeat{background:#fff1f2!important;border-color:#fda4af!important;color:#9f1239!important}
+#demo-scale-note[hidden]{display:none!important}
+#sheet select.demo-repeat{outline:3px solid #e11d48!important;background:#ffe4e6!important;font-weight:800!important}
+#sheet select.demo-also{outline:3px solid #1d4e89!important;background:#e7f3ff!important;font-weight:800!important}
+#sheet .demo-slot-note{display:block!important;margin:4px 0 0!important;font:12px/1.3 "Segoe UI",Arial,sans-serif!important;font-weight:700!important;text-align:left!important;white-space:normal!important}
+#sheet .demo-slot-note.is-repeat{color:#9f1239!important}
+#sheet .demo-slot-note.is-also{color:#1d4e89!important}
 </style>
 `;
 
@@ -67,51 +70,101 @@ document.querySelectorAll("img.brand-logo, img[alt*='Logo']").forEach(function(i
 (function(){
   if(typeof renderscale!=="function"||typeof cf!=="function") return;
   var original=renderscale, painting=false;
-  function clearSudoku(){
-    document.querySelectorAll("#sheet .demo-sudoku-col,#sheet .demo-sudoku-clash-col,#sheet .demo-sudoku-peer,#sheet .demo-sudoku-clash").forEach(function(el){
-      el.classList.remove("demo-sudoku-col","demo-sudoku-clash-col","demo-sudoku-peer","demo-sudoku-clash");
-    });
+  function workerName(value){
+    var worker=typeof wb==="function"?wb(Number(String(value).slice(2))):null;
+    return worker&&worker.name||"Esta pessoa";
   }
-  function shadeColumn(day, clash){
-    document.querySelectorAll("#sheet table.sched").forEach(function(table){
-      var heads=Array.prototype.slice.call(table.querySelectorAll("thead th"));
-      var index=heads.findIndex(function(th){return th.textContent.trim()===String(day);});
-      if(index<0) return;
-      heads[index].classList.add("demo-sudoku-col");
-      if(clash) heads[index].classList.add("demo-sudoku-clash-col");
-      Array.prototype.forEach.call(table.querySelectorAll("tbody tr"), function(tr){
-        var td=tr.children[index];
-        if(!td) return;
-        td.classList.add("demo-sudoku-col");
-        if(clash) td.classList.add("demo-sudoku-clash-col");
-      });
-    });
+  function placeOf(sel){
+    var info=typeof slotInfo==="function"?slotInfo(month.value, sel.dataset.k):null;
+    var day=info?info.day:sel.dataset.k.split("|")[3];
+    var activity=info&&info.activity?info.activity:"a escala";
+    return "dia "+day+", em "+activity;
   }
-  function paintSudoku(focusValue, focusKey){
-    clearSudoku();
-    var byDay={};
+  function listPlaces(selects){
+    var labels=[];
+    selects.forEach(function(sel){
+      var label=placeOf(sel);
+      if(labels.indexOf(label)<0) labels.push(label);
+    });
+    if(labels.length<=3) return labels.join("; ");
+    return labels.slice(0,2).join("; ")+"; e em mais "+(labels.length-2)+" dias";
+  }
+  function noteUnder(sel, kind, text){
+    var next=sel.nextElementSibling;
+    if(next&&next.classList.contains("demo-slot-note")) next.remove();
+    var note=document.createElement("div");
+    note.className="demo-slot-note "+kind;
+    note.textContent=text;
+    sel.insertAdjacentElement("afterend", note);
+  }
+  function clearMarks(){
+    document.querySelectorAll("#sheet select.demo-repeat,#sheet select.demo-also").forEach(function(sel){
+      sel.classList.remove("demo-repeat","demo-also");
+    });
+    document.querySelectorAll("#sheet .demo-slot-note").forEach(function(note){note.remove();});
+  }
+  function explainPerson(focusValue){
+    clearMarks();
+    var note=document.getElementById("demo-scale-note");
+    if(!note){
+      note=document.createElement("div");
+      note.id="demo-scale-note";
+      note.hidden=true;
+      var sheet=document.getElementById("sheet");
+      if(sheet) sheet.parentElement.insertBefore(note, sheet);
+    }
+    var byPerson={};
     document.querySelectorAll("#sheet select[data-k]").forEach(function(sel){
       if(!sel.value||sel.value.indexOf("w:")!==0) return;
-      var day=sel.dataset.k.split("|")[3];
-      var id=sel.value+"|"+day;
-      (byDay[id]=byDay[id]||[]).push(sel);
+      (byPerson[sel.value]=byPerson[sel.value]||[]).push(sel);
     });
-    Object.keys(byDay).forEach(function(id){
-      var group=byDay[id];
-      if(group.length<2) return;
-      shadeColumn(id.split("|")[1], true);
-      group.forEach(function(sel){
-        var td=sel.closest("td");
-        if(td) td.classList.add("demo-sudoku-clash");
+    var repeated=[];
+    Object.keys(byPerson).forEach(function(value){
+      var byDay={};
+      byPerson[value].forEach(function(sel){
+        var day=sel.dataset.k.split("|")[3];
+        (byDay[day]=byDay[day]||[]).push(sel);
+      });
+      Object.keys(byDay).forEach(function(day){
+        if(byDay[day].length<2) return;
+        byDay[day].forEach(function(sel){
+          sel.classList.add("demo-repeat");
+          noteUnder(sel, "is-repeat", "Repetida neste dia");
+        });
+        repeated.push({value:value, day:day, selects:byDay[day]});
       });
     });
-    if(!focusValue||String(focusValue).indexOf("w:")!==0) return;
-    document.querySelectorAll("#sheet select[data-k]").forEach(function(sel){
-      if(sel.value!==focusValue) return;
-      var td=sel.closest("td");
-      if(td&&!td.classList.contains("demo-sudoku-clash")) td.classList.add("demo-sudoku-peer");
-    });
-    if(focusKey) shadeColumn(focusKey.split("|")[3], false);
+    var focus=byPerson[focusValue]||[];
+    var focusRepeat=repeated.filter(function(item){return item.value===focusValue;})[0];
+    if(!focusRepeat){
+      focus.forEach(function(sel){
+        if(focus.length<2) return;
+        sel.classList.add("demo-also");
+        noteUnder(sel, "is-also", "Já está aqui");
+      });
+    }
+    function repeatSentence(item){
+      var activities=[];
+      item.selects.forEach(function(sel){
+        var info=typeof slotInfo==="function"?slotInfo(month.value, sel.dataset.k):null;
+        var activity=info&&info.activity?info.activity:"outra atividade";
+        if(activities.indexOf(activity)<0) activities.push(activity);
+      });
+      return workerName(item.value)+" aparece "+item.selects.length+" vezes no dia "+item.day+": "+activities.join(" e ")+". Só essas vagas estão em vermelho.";
+    }
+    var shownRepeat=focusRepeat||(!focusValue?repeated[0]:null);
+    var sentence="";
+    if(shownRepeat){
+      note.classList.add("is-repeat");
+      sentence=repeatSentence(shownRepeat);
+    }else if(focus.length>1){
+      note.classList.remove("is-repeat");
+      sentence=workerName(focusValue)+" já está na escala: "+listPlaces(focus)+". Só as vagas dessa pessoa estão em azul.";
+    }else{
+      note.classList.remove("is-repeat");
+    }
+    note.hidden=!sentence;
+    note.textContent=sentence;
   }
   renderscale=function(){
     var changed=window.__larScaleChanged||"";
@@ -125,7 +178,7 @@ document.querySelectorAll("img.brand-logo, img[alt*='Logo']").forEach(function(i
           var name=opt.textContent.split(" — ")[0].trim();
           if(name) opt.textContent=name;
         });
-        sel.addEventListener("focus", function(){paintSudoku(sel.value, sel.dataset.k);});
+        sel.addEventListener("focus", function(){explainPerson(sel.value);});
         sel.onchange=function(){
           var current=db.scales[month.value];
           if(!current||!current.a) return;
@@ -142,7 +195,7 @@ document.querySelectorAll("img.brand-logo, img[alt*='Logo']").forEach(function(i
           if(typeof dir==="function") dir();
         };
       });
-      paintSudoku(changed&&live?live.a[changed]:"", changed);
+      explainPerson(changed&&live?live.a[changed]:"");
     }catch(e){}
     finally{painting=false;}
   };

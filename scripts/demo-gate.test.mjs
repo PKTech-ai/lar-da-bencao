@@ -11,8 +11,8 @@ describe("porta de demonstração do HTML", () => {
     expect(html).toContain("Acesso institucional");
     expect(html).toContain("position:fixed!important");
     expect(html).toContain("gate.remove()");
-    expect(html).toContain("demo-sudoku-clash");
-    expect(html).toContain("paintSudoku");
+    expect(html).toContain("demo-repeat");
+    expect(html).toContain("Só as vagas dessa pessoa");
     expect(html).toContain("lar-data-refreshed");
     expect(html).toContain("current.a[sel.dataset.k]=sel.value");
     expect(html).not.toContain("Esqueci minha senha");
