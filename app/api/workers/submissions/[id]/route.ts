@@ -64,7 +64,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         }, client);
       } else {
         const current = await client.query<CurrentWorker>(
-          `select w.id, w.status, w.version, w.full_name, w.email, w.phone, w.birth_date::text as birth_date, w.naturality,
+          `select w.id, w.status, w.version, w.full_name, w.cpf, w.email, w.phone, w.birth_date::text as birth_date, w.naturality,
                   w.marital_status, w.profession, w.address, w.filled_date::text as filled_date, w.volunteer_service,
                   w.accepts_volunteer_law, w.image_authorization, w.functions, w.available_days, w.notes,
                   w.contribution_cents::text as contribution_cents, w.contribution_due_day,

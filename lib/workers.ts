@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Actor } from "@/lib/auth";
+import { cpfDigits, cpfSchemaMessage, isValidCpf } from "@/lib/cpf";
 import { AppError, AuthorizationError } from "@/lib/errors";
 import { query } from "@/lib/db";
 import { departmentsWithPermission, hasPermission } from "@/lib/permissions";
@@ -12,6 +13,7 @@ const optionalText = (max: number) => z.string().trim().max(max).optional().defa
 
 export const fichaSchema = z.object({
   full_name: z.string().trim().min(2).max(160),
+  cpf: z.string().trim().refine(isValidCpf, cpfSchemaMessage).transform(cpfDigits),
   email: z.string().trim().email().optional().or(z.literal("")),
   phone: optionalText(40),
   birth_date: isoDate.optional().or(z.literal("")),
@@ -129,13 +131,13 @@ export async function insertWorker(db: Queryable, input: Ficha, options: { origi
   const inserted = await db.query(
     `insert into app.workers (full_name, email, phone, birth_date, naturality, marital_status, profession, address,
         filled_date, volunteer_service, accepts_volunteer_law, image_authorization, functions, available_days,
-        origin_department, notes, contribution_cents, contribution_due_day, status, created_by, updated_by)
-     values ($1,$2,$3,nullif($4,'')::date,$5,$6,$7,$8,coalesce(nullif($9,'')::date,$10::date),$11,$12,$13,$14,$15,$16,$17,$19,$20,'pending',$18,$18)
+        origin_department, notes, contribution_cents, contribution_due_day, status, created_by, updated_by, cpf)
+     values ($1,$2,$3,nullif($4,'')::date,$5,$6,$7,$8,coalesce(nullif($9,'')::date,$10::date),$11,$12,$13,$14,$15,$16,$17,$19,$20,'pending',$18,$18,$21)
      returning id`,
     [input.full_name, input.email || null, input.phone || null, input.birth_date ?? "", input.naturality || null,
       input.marital_status || null, input.profession || null, input.address || null, input.filled_date ?? "", todayInSaoPaulo(),
       input.volunteer_service, input.accepts_volunteer_law, input.image_authorization, input.functions, input.available_days,
-      options.origin, input.notes, options.authorId, input.contribution_cents, input.contribution_due_day]
+      options.origin, input.notes, options.authorId, input.contribution_cents, input.contribution_due_day, input.cpf]
   );
   const workerId = (inserted.rows[0] as { id: string }).id;
   for (const department of input.departments) {
@@ -155,7 +157,7 @@ export async function updateWorkerFicha(
     `update app.workers set full_name=$2, email=$3, phone=$4, birth_date=nullif($5,'')::date, naturality=$6,
         marital_status=$7, profession=$8, address=$9, filled_date=coalesce(nullif($10,'')::date, filled_date),
         volunteer_service=$11, accepts_volunteer_law=$12, image_authorization=$13, functions=$14, available_days=$15,
-        notes=$16, status=$17, contribution_cents=$20, contribution_due_day=$21,
+        notes=$16, status=$17, contribution_cents=$20, contribution_due_day=$21, cpf=$22,
         requested_at=case when $18 then now() else requested_at end,
         approved_at=case when $18 then null else approved_at end,
         updated_by=$19, updated_at=now(), version=version+1
@@ -163,7 +165,7 @@ export async function updateWorkerFicha(
     [id, input.full_name, input.email || null, input.phone || null, input.birth_date ?? "", input.naturality || null,
       input.marital_status || null, input.profession || null, input.address || null, input.filled_date ?? "",
       input.volunteer_service, input.accepts_volunteer_law, input.image_authorization, input.functions, input.available_days,
-      input.notes, options.status, options.resubmitted, options.authorId, input.contribution_cents, input.contribution_due_day]
+      input.notes, options.status, options.resubmitted, options.authorId, input.contribution_cents, input.contribution_due_day, input.cpf]
   );
   await db.query("delete from app.worker_departments where worker_id=$1", [id]);
   for (const department of input.departments) {

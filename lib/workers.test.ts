@@ -102,7 +102,7 @@ const president = () => {
   state.actorDepartments = [];
   state.role = "presidente";
 };
-const ficha = (overrides: object = {}) => ({ full_name: "Maria Teste", departments: ["doutrina"], functions: ["Passista"], ...overrides });
+const ficha = (overrides: object = {}) => ({ full_name: "Maria Teste", cpf: "529.982.247-25", departments: ["doutrina"], functions: ["Passista"], ...overrides });
 
 async function createAs(department: string, body: object = {}) {
   coordinator(department);
@@ -128,6 +128,12 @@ describe("regras puras da ficha", () => {
     const parsed = fichaSchema.parse(ficha({ departments: ["infancia"] }));
     expect(normalizeFicha(parsed).functions).toEqual([]);
     expect(normalizeFicha(fichaSchema.parse(ficha())).functions).toEqual(["Passista"]);
+  });
+
+  it("exige CPF válido e guarda só os dígitos", () => {
+    const { cpf: _cpf, ...withoutCpf } = ficha();
+    expect(fichaSchema.safeParse(withoutCpf).success).toBe(false);
+    expect(fichaSchema.parse(ficha({ cpf: "529.982.247-25" })).cpf).toBe("52998224725");
   });
 
   it("exige ao menos um departamento e funções válidas", () => {

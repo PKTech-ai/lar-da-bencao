@@ -27,6 +27,7 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: text("full_name"),
+          cpf: text("cpf"),
           phone: text("phone"),
           email: text("email"),
           birth_date: text("birth_date"),
@@ -67,6 +68,9 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
   return (
     <form className="form-stack" onSubmit={submit}>
       <label>Nome completo *<input name="full_name" required minLength={2} maxLength={160} autoComplete="name" /></label>
+      <label>CPF *
+        <input name="cpf" required inputMode="numeric" autoComplete="off" minLength={11} maxLength={14} placeholder="000.000.000-00" />
+      </label>
       <div className="form-row">
         <label>Telefone com DDD *<input name="phone" type="tel" required minLength={10} maxLength={40} inputMode="tel" autoComplete="tel" placeholder="(51) 99999-9999" /></label>
         <label>Data de nascimento *<input name="birth_date" type="date" required min="1900-01-01" autoComplete="bday" /></label>

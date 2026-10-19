@@ -1,13 +1,14 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { formatCpf } from "@/lib/cpf";
 import { parseMoney } from "@/lib/resources/types";
 import { DOCTRINE_FUNCTIONS, WEEKDAYS } from "@/lib/worker-constants";
 
 export type Option = { key: string; label: string };
 
 export type FichaValues = {
-  full_name: string; email: string | null; phone: string | null; birth_date: string | null;
+  full_name: string; cpf?: string | null; email: string | null; phone: string | null; birth_date: string | null;
   naturality: string | null; marital_status: string | null; profession: string | null; address: string | null;
   filled_date: string | null; volunteer_service: string; accepts_volunteer_law: boolean; image_authorization: boolean;
   functions: string[]; available_days: number[]; departments: string[]; notes: string;
@@ -21,6 +22,7 @@ export function readFicha(form: HTMLFormElement) {
   const text = (name: string) => String(values.get(name) ?? "");
   return {
     full_name: text("full_name"),
+    cpf: text("cpf"),
     email: text("email"),
     phone: text("phone"),
     birth_date: text("birth_date"),
@@ -71,6 +73,10 @@ export function WorkerFichaForm({
       ) : null}
       <div className="form-row">
         <label>Nome completo *<input name="full_name" defaultValue={initial?.full_name} required minLength={2} maxLength={160} /></label>
+        <label>CPF *
+          <input name="cpf" required inputMode="numeric" autoComplete="off" minLength={11} maxLength={14}
+            placeholder="000.000.000-00" defaultValue={initial?.cpf ? formatCpf(initial.cpf) : undefined} />
+        </label>
         <label>Telefone<input name="phone" defaultValue={initial?.phone ?? ""} maxLength={40} inputMode="tel" /></label>
         <label>E-mail<input name="email" type="email" defaultValue={initial?.email ?? ""} /></label>
       </div>

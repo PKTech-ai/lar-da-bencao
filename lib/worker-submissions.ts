@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cpfDigits, cpfSchemaMessage, formatCpf, isValidCpf } from "@/lib/cpf";
 import { DOCTRINE_FUNCTIONS, WEEKDAYS } from "@/lib/worker-constants";
 
 /**
@@ -32,6 +33,7 @@ function isPastDate(value: string) {
  */
 export const submissionPayloadSchema = z.object({
   full_name: z.string().trim().min(2).max(160),
+  cpf: z.string().trim().refine(isValidCpf, cpfSchemaMessage).transform(cpfDigits),
   phone: z.string().trim().max(40).refine((value) => phoneDigits(value).length >= 10, "Informe o telefone com DDD."),
   email: z.string().trim().max(320).email().optional().or(z.literal("")).default(""),
   birth_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isPastDate, "Informe uma data de nascimento válida."),
@@ -56,6 +58,7 @@ export function normalizeSubmission(input: SubmissionPayload): SubmissionPayload
   const departments = [...new Set(input.departments)].sort();
   return {
     full_name: input.full_name,
+    cpf: input.cpf,
     phone: input.phone,
     email: input.email,
     birth_date: input.birth_date,
@@ -109,7 +112,7 @@ export function suggestMatches(payload: Pick<SubmissionPayload, "full_name" | "b
 
 /** Ficha existente, no formato devolvido por GET /api/workers/[id]. */
 export type ExistingFicha = {
-  full_name: string; email: string | null; phone: string | null; birth_date: string | Date | null;
+  full_name: string; cpf?: string | null; email: string | null; phone: string | null; birth_date: string | Date | null;
   naturality: string | null; marital_status: string | null; profession: string | null; address: string | null;
   filled_date: string | Date | null; volunteer_service: string; accepts_volunteer_law: boolean; image_authorization: boolean;
   functions: string[]; available_days: number[]; departments: string[]; notes: string;
@@ -130,6 +133,7 @@ export function fichaFromSubmission(payload: SubmissionPayload, existing?: Exist
   const keep = (submitted: string, current: string | null | undefined) => submitted || current || "";
   return {
     full_name: payload.full_name,
+    cpf: payload.cpf,
     phone: payload.phone,
     email: keep(payload.email, existing?.email),
     birth_date: payload.birth_date,
@@ -166,6 +170,7 @@ export function submissionDiff(
   const days = (values: readonly number[]) => [...values].sort().map((day) => WEEKDAYS[day]).join(", ") || "—";
   const rows: FichaDiff[] = [
     { field: "full_name", label: "Nome completo", before: existing.full_name, after: next.full_name },
+    { field: "cpf", label: "CPF", before: formatCpf(existing.cpf ?? ""), after: formatCpf(next.cpf) },
     { field: "phone", label: "Telefone", before: existing.phone || "—", after: next.phone || "—" },
     { field: "email", label: "E-mail", before: existing.email || "—", after: next.email || "—" },
     { field: "birth_date", label: "Data de nascimento", before: brDate(dateOnly(existing.birth_date)), after: brDate(next.birth_date) },

@@ -128,7 +128,7 @@ const listRoute = await import("@/app/api/workers/submissions/route");
 const reviewRoute = await import("@/app/api/workers/submissions/[id]/route");
 
 const form = (overrides: object = {}) => ({
-  full_name: "José da Silva", phone: "(51) 99876-5432", email: "", birth_date: "1980-03-15", departments: ["doutrina"],
+  full_name: "José da Silva", phone: "(51) 99876-5432", email: "", birth_date: "1980-03-15", cpf: "529.982.247-25", departments: ["doutrina"],
   functions: ["Passista"], available_days: [3], accepts_volunteer_law: true, image_authorization: false, privacy_acknowledged: true,
   ...overrides
 });
@@ -179,6 +179,13 @@ describe("regras do formulário público", () => {
     expect(Object.keys(parsed)).not.toEqual(expect.arrayContaining(["contribution_cents", "contribution_due_day", "notes", "status", "privacy_acknowledged"]));
   });
 
+  it("exige CPF válido no envio público", () => {
+    expect(submissionPayloadSchema.safeParse({ ...form(), cpf: "" }).success).toBe(false);
+    const parsed = submissionPayloadSchema.safeParse({ ...form(), cpf: "529.982.247-25" });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.cpf).toBe("52998224725");
+  });
+
   it("funções só valem para quem marcou Doutrina", () => {
     expect(normalizeSubmission(submissionPayloadSchema.parse(form({ departments: ["infancia"] }))).functions).toEqual([]);
     expect(normalizeSubmission(submissionPayloadSchema.parse(form())).functions).toEqual(["Passista"]);
@@ -220,7 +227,7 @@ describe("aplicação sobre ficha existente", () => {
     full_name: "Jose Silva", email: "jose@lar.org", phone: "51 3333-0000", birth_date: "1980-03-15", naturality: "Porto Alegre",
     marital_status: null, profession: "Professor", address: null, filled_date: "2026-01-10", volunteer_service: "Passes às quartas",
     accepts_volunteer_law: false, image_authorization: true, functions: ["Passista"], available_days: [1, 3], departments: ["doutrina"],
-    notes: "Observação interna", contribution_cents: "5000", contribution_due_day: 10
+    notes: "Observação interna", contribution_cents: "5000", contribution_due_day: 10, cpf: "52998224725"
   };
   const payload = normalizeSubmission(submissionPayloadSchema.parse(form({ profession: "Diretor", available_days: [] })));
 

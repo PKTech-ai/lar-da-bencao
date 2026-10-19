@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { PrintButton } from "@/components/print-button";
+import { formatCpf } from "@/lib/cpf";
 import { appendAudit } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { requireModulePage } from "@/lib/page-auth";
@@ -9,7 +10,7 @@ import { WEEKDAYS, workerStatusLabel, type WorkerStatus } from "@/lib/worker-con
 import { departmentsWith } from "@/lib/workers";
 
 type Ficha = {
-  id: string; full_name: string; phone: string | null; email: string | null; birth_date: Date | null; naturality: string | null;
+  id: string; full_name: string; cpf: string | null; phone: string | null; email: string | null; birth_date: Date | null; naturality: string | null;
   marital_status: string | null; profession: string | null; address: string | null; filled_date: Date | null;
   volunteer_service: string; accepts_volunteer_law: boolean; image_authorization: boolean; functions: string[];
   available_days: number[]; status: WorkerStatus; approved_at: Date | null; departments: string[]; origin_label: string | null;
@@ -43,7 +44,7 @@ export default async function WorkerFichaPage({ params }: { params: Promise<{ id
   await appendAudit(actor, { category: "Impressão", action: "Impressão de ficha de trabalhador", module: "Trabalhadores", entityType: "worker", entityId: ficha.id });
   const approval = decision.rows[0];
   const rows: [string, string][] = [
-    ["Nome completo", ficha.full_name], ["Data de nascimento", br(ficha.birth_date)], ["Naturalidade", ficha.naturality ?? "Não informado"],
+    ["Nome completo", ficha.full_name], ["CPF", ficha.cpf ? formatCpf(ficha.cpf) : "Não informado"], ["Data de nascimento", br(ficha.birth_date)], ["Naturalidade", ficha.naturality ?? "Não informado"],
     ["Estado civil", ficha.marital_status ?? "Não informado"], ["Profissão", ficha.profession ?? "Não informado"],
     ["Endereço", ficha.address ?? "Não informado"], ["Contato", [ficha.phone, ficha.email].filter(Boolean).join(" · ") || "Não informado"],
     ["Preenchimento da ficha", br(ficha.filled_date)], ["Departamento solicitante", ficha.origin_label ?? "Não informado"],
