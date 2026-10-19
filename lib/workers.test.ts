@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-type Worker = { id: string; full_name: string; status: string; version: number; functions: string[]; departments: string[] };
+type Worker = { id: string; full_name: string; status: string; version: number; functions: string[]; departments: string[]; cpf: string | null };
 
 const state = vi.hoisted(() => ({
   workers: new Map<string, Worker>(),
@@ -22,7 +22,7 @@ function fakeQuery(text: string, values: unknown[] = []): { rows: unknown[]; row
   }
   if (sql.startsWith("insert into app.workers")) {
     const id = `00000000-0000-4000-8000-${String(++state.seq).padStart(12, "0")}`;
-    state.workers.set(id, { id, full_name: String(values[0]), status: sql.includes("'pending'") ? "pending" : "??", version: 1, functions: values[13] as string[], departments: [] });
+    state.workers.set(id, { id, full_name: String(values[0]), status: sql.includes("'pending'") ? "pending" : "??", version: 1, functions: values[13] as string[], departments: [], cpf: values[20] ? String(values[20]) : null });
     return { rows: [{ id }] };
   }
   if (sql.startsWith("insert into app.worker_departments")) {
@@ -50,6 +50,9 @@ function fakeQuery(text: string, values: unknown[] = []): { rows: unknown[]; row
     w.version += 1;
     return { rows: [], rowCount: 1 };
   }
+  if (sql.startsWith("select id from app.users")) return { rows: [] };
+  if (sql.startsWith("insert into app.users")) return { rows: [{ id: "user-1" }] };
+  if (sql.startsWith("insert into app.user_departments")) return { rows: [] };
   if (sql.startsWith("insert into app.worker_approval_decisions")) {
     state.decisions.push({ worker_id: String(values[0]), decision: String(values[1]), reason: String(values[4]) });
     return { rows: [] };
@@ -77,6 +80,11 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/csrf", () => ({ assertSameOrigin: () => undefined }));
 vi.mock("@/lib/auth", () => ({ requireActor: async () => actor() }));
 vi.mock("@/lib/audit", () => ({ appendAudit: async (_: unknown, input: { action: string }) => { state.audits.push(input.action); } }));
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () => ({
+    auth: { admin: { createUser: async () => ({ data: { user: { id: "auth-worker" } }, error: null }), deleteUser: async () => ({ error: null }) } }
+  })
+}));
 vi.mock("@/lib/permissions", () => ({
   hasPermission: async (_: unknown, resource: string, action: string, department?: string) =>
     state.grants.has(`${resource}:${action}`) || (department ? state.grants.has(`${resource}:${action}:${department}`) : false),

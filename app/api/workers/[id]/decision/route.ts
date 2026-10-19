@@ -1,15 +1,19 @@
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
+import { maskCpf } from "@/lib/cpf";
 import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, AuthorizationError, errorResponse } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { provisionWorkerAccess } from "@/lib/worker-access";
 import { canDecideAdmissions, decisionSchema, todayInSaoPaulo, validateDecision } from "@/lib/workers";
 
 /** Decisão da Diretoria sobre a ficha: só Presidente e Administrador. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   let actor = null;
+  let createdAuthUserId: string | undefined;
   try {
     assertSameOrigin(request);
     actor = await requireActor();
@@ -20,8 +24,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     validateDecision(input, todayInSaoPaulo());
     const author = actor;
     const outcome = await transaction(async (client) => {
-      const current = await client.query<{ full_name: string; status: string; version: number; functions: string[]; departments: string[] }>(
-        `select w.full_name, w.status, w.version, w.functions,
+      const current = await client.query<{ full_name: string; cpf: string | null; status: string; version: number; functions: string[]; departments: string[] }>(
+        `select w.full_name, w.status, w.version, w.functions, w.cpf,
                 coalesce((select array_agg(department_key order by department_key) from app.worker_departments where worker_id = w.id), '{}') as departments
            from app.workers w where w.id=$1 for update`,
         [id]
@@ -33,6 +37,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         throw new AppError("A ficha foi alterada durante a análise. Abra novamente para conferir os dados atuais.", 409, "VERSION_CONFLICT");
       }
       const approved = input.decision === "approved";
+      let accessNote = "";
+      if (approved) {
+        const access = await provisionWorkerAccess(
+          client,
+          { id, full_name: worker.full_name, cpf: worker.cpf, departments: worker.departments },
+          author.id,
+          (credentials) => createAdminClient().auth.admin.createUser(credentials)
+        );
+        if (access.createdAuthUserId) {
+          createdAuthUserId = access.createdAuthUserId;
+          accessNote = ` Acesso criado. Login pelo CPF ${maskCpf(worker.cpf ?? "")}. Troca de senha obrigatória no primeiro acesso.`;
+        }
+      }
       await client.query(
         `insert into app.worker_approval_decisions (worker_id, decision, meeting_date, minute_ref, reason, departments, functions, decided_by)
          values ($1,$2,$3::date,$4,$5,$6,$7,$8)`,
@@ -49,7 +66,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         section: "Aprovação de Trabalhadores",
         entityType: "worker",
         entityId: id,
-        details: `${worker.full_name}: ${approved ? "aprovado" : "reprovado"} pela Diretoria. Deliberação: ${input.meeting_date}.${input.minute_ref ? ` Ata: ${input.minute_ref}.` : ""}${input.reason ? ` ${input.reason}` : ""}`,
+        details: `${worker.full_name}: ${approved ? "aprovado" : "reprovado"} pela Diretoria. Deliberação: ${input.meeting_date}.${input.minute_ref ? ` Ata: ${input.minute_ref}.` : ""}${input.reason ? ` ${input.reason}` : ""}${accessNote}`,
         before: { status: "pending" },
         after: { status: approved ? "active" : "rejected", departments: worker.departments, functions: worker.functions }
       }, client);
@@ -57,6 +74,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
     return Response.json(outcome);
   } catch (error) {
+    if (createdAuthUserId) await createAdminClient().auth.admin.deleteUser(createdAuthUserId).catch(console.error);
     if (actor) {
       await appendAudit(actor, {
         category: "Edição", action: "Falha ao registrar decisão de admissão", module: "Diretoria",
