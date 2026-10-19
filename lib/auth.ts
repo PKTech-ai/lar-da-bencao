@@ -12,6 +12,7 @@ export type Actor = {
   status: "active";
   departments: string[];
   sessionId: string | null;
+  mustResetPassword: boolean;
 };
 
 type ActorRow = {
@@ -24,6 +25,7 @@ type ActorRow = {
   departments: string[] | null;
   sessions_valid_after: Date | null;
   access_allowed: boolean;
+  must_reset_password: boolean;
 };
 
 export async function requireActor(): Promise<Actor> {
@@ -33,7 +35,7 @@ export async function requireActor(): Promise<Actor> {
   const currentSession = await supabase.auth.getSession();
 
   const result = await query<ActorRow>(
-    `select u.id, u.auth_user_id, u.email, u.full_name, u.role_key, u.status, u.sessions_valid_after, app.user_access_allowed(u.id) as access_allowed,
+    `select u.id, u.auth_user_id, u.email, u.full_name, u.role_key, u.status, u.sessions_valid_after, u.must_reset_password, app.user_access_allowed(u.id) as access_allowed,
             coalesce(array_agg(ud.department_key) filter (where ud.department_key is not null), '{}') as departments
        from app.users u
        left join app.user_departments ud on ud.user_id = u.id
@@ -59,6 +61,7 @@ export async function requireActor(): Promise<Actor> {
     role: row.role_key,
     status: "active",
     departments: row.departments ?? [],
-    sessionId: sessionIdFromClaims(claims)
+    sessionId: sessionIdFromClaims(claims),
+    mustResetPassword: row.must_reset_password
   };
 }

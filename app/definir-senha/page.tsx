@@ -3,8 +3,22 @@ import { Brand } from "@/components/brand";
 import { createClient } from "@/lib/supabase/server";
 import { PasswordForm } from "./password-form";
 
-export default async function PasswordPage() {
-  const supabase = await createClient(); const user = await supabase.auth.getUser();
+export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ motivo?: string }> }) {
+  const supabase = await createClient();
+  const user = await supabase.auth.getUser();
   if (!user.data.user) redirect("/login");
-  return <main className="auth-shell"><section className="auth-card"><Brand prominent /><h1>Defina sua senha</h1><p className="muted">Use uma senha exclusiva, com pelo menos 14 caracteres.</p><PasswordForm /></section></main>;
+  const motivo = (await searchParams).motivo;
+  const intro = motivo === "primeiro-acesso"
+    ? "Sua senha inicial é o seu CPF. Troque agora por uma senha exclusiva, com pelo menos 14 caracteres, diferente do CPF."
+    : "Use uma senha exclusiva, com pelo menos 14 caracteres.";
+  return (
+    <main className="auth-shell">
+      <section className="auth-card">
+        <Brand prominent />
+        <h1>Defina sua senha</h1>
+        <p className="muted">{intro}</p>
+        <PasswordForm />
+      </section>
+    </main>
+  );
 }

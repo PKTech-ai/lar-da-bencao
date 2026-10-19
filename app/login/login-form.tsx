@@ -41,8 +41,8 @@ export function LoginForm() {
     <form className="form-stack" method="post" action="/login" onSubmit={submit}>
       {params.get("motivo") === "sessao" ? <div className="notice" role="status">Sua sessão foi encerrada. Entre novamente.</div> : null}
       {params.get("motivo") === "bienio" ? <div className="notice" role="status">Seu acesso de Diretoria está fora do biênio vigente. Procure o Administrador do Sistema.</div> : null}
-      <label>E-mail institucional<input name="email" type="email" autoComplete="username" required /></label>
-      <label>Senha<input name="password" type="password" autoComplete="current-password" minLength={10} required /></label>
+      <label>CPF ou e-mail institucional<input name="email" type="text" autoComplete="username" minLength={11} required /></label>
+      <label>Senha<input name="password" type="password" autoComplete="current-password" minLength={11} required /></label>
       {error ? <div className="error" role="alert">{error}</div> : null}
       <button className={busy ? "button primary is-loading" : "button primary"} type="submit" disabled={busy}>{busy ? "Entrando…" : "Continuar"}</button>
       <Link href="/recuperar" className="button">Esqueci minha senha</Link>

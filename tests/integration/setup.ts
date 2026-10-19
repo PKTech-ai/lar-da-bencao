@@ -66,5 +66,5 @@ export async function createActor(role = "administrador", departments: string[] 
     for (const d of departments) await client.query("insert into app.user_departments (user_id, department_key) values ($1,$2)", [inserted.rows[0].id, d]);
     return inserted.rows[0].id;
   });
-  return { id, authUserId: authId, email, name: `Teste ${role}`, role, status: "active" as const, departments, sessionId: null };
+  return { id, authUserId: authId, email, name: `Teste ${role}`, role, status: "active" as const, departments, sessionId: null, mustResetPassword: false };
 }

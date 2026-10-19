@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         `insert into app.users (auth_user_id,email,full_name,role_key,status) values ($1,$2,$3,'administrador','active') returning id`,
         [authId, input.email.toLowerCase(), input.name]
       );
-      await appendAudit({ id: inserted.rows[0].id, authUserId: authId, email: input.email, name: input.name, role: "administrador", status: "active", departments: [], sessionId: null }, {
+      await appendAudit({ id: inserted.rows[0].id, authUserId: authId, email: input.email, name: input.name, role: "administrador", status: "active", departments: [], sessionId: null, mustResetPassword: false }, {
         category: "Segurança", action: "Inicialização do Administrador", module: "Controle de Acesso", section: "Bootstrap", entityType: "user", entityId: inserted.rows[0].id, result: "success", details: "Primeiro Administrador criado. O segredo de bootstrap deve ser rotacionado."
       }, client);
     });

@@ -10,6 +10,7 @@ import { CURRENT_TERMS_VERSION } from "@/lib/terms";
 export async function requirePageActor() {
   try {
     const actor = await requireActor();
+    if (actor.mustResetPassword) redirect("/definir-senha?motivo=primeiro-acesso");
     try {
       const terms = await query<{ id: string }>(
         "select id from app.terms_acceptances where user_id=$1 and terms_version=$2 limit 1",
