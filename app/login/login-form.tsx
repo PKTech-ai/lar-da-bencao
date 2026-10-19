@@ -21,8 +21,11 @@ export function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: String(form.get("email") ?? ""), password: String(form.get("password") ?? "") })
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Não foi possível entrar.");
+      const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; next?: string };
+      if (!response.ok) {
+        const protocol = body.protocol ? ` Protocolo ${body.protocol}.` : "";
+        throw new Error(`${body.error ?? "Não foi possível entrar."}${protocol}`);
+      }
       await fetch("/api/auth/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -31,7 +34,7 @@ export function LoginForm() {
       router.replace(body.next ?? "/sistema");
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível entrar.");
+      setError(caught instanceof TypeError ? "Sem resposta do sistema. Tente de novo." : caught instanceof Error ? caught.message : "Não foi possível entrar.");
     } finally {
       setBusy(false);
     }

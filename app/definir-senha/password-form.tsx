@@ -21,12 +21,15 @@ export function PasswordForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, confirmation })
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? "Não foi possível definir a senha.");
+      const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; next?: string };
+      if (!response.ok) {
+        const protocol = body.protocol ? ` Protocolo ${body.protocol}.` : "";
+        throw new Error(`${body.error ?? "Não foi possível definir a senha."}${protocol}`);
+      }
       router.push(body.next ?? "/sistema");
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível definir a senha.");
+      setError(caught instanceof TypeError ? "Sem resposta do sistema. Tente de novo." : caught instanceof Error ? caught.message : "Não foi possível definir a senha.");
     } finally {
       setBusy(false);
     }

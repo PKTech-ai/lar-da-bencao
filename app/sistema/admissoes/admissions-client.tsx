@@ -38,20 +38,32 @@ export function AdmissionsClient({ departments, canDecide }: { departments: Opti
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/workers${status ? `?status=${status}` : ""}`, { cache: "no-store" });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error);
-    setRows(body.workers);
+    const body = await response.json().catch(() => ({})) as { error?: string; workers?: Row[] };
+    if (!response.ok) throw new Error(body.error || "Não foi possível concluir a operação.");
+    setRows(body.workers ?? []);
   }, [status]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
+  useEffect(() => { void load().catch((e) => setError(e instanceof TypeError ? "Sem resposta do sistema. Tente de novo." : e.message)); }, [load]);
 
   async function open(id: string, decision = "") {
     setError(""); setMessage("");
-    const response = await fetch(`/api/workers/${id}`, { cache: "no-store" });
-    const body = await response.json();
-    if (!response.ok) { setError(body.error); return; }
-    setSelected({ worker: body.worker, history: body.history, decision });
-    setReject(decision === "rejected");
+    try {
+      const response = await fetch(`/api/workers/${id}`, { cache: "no-store" });
+      const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; worker?: Detail; history?: Decision[] };
+      if (!response.ok) {
+        const protocol = body.protocol ? ` Protocolo ${body.protocol}.` : "";
+        setError(`${body.error || "Não foi possível concluir a operação."}${protocol}`);
+        return;
+      }
+      if (!body.worker) {
+        setError("Não foi possível concluir a operação.");
+        return;
+      }
+      setSelected({ worker: body.worker, history: body.history ?? [], decision });
+      setReject(decision === "rejected");
+    } catch (caught) {
+      setError(caught instanceof TypeError ? "Sem resposta do sistema. Tente de novo." : "Não foi possível concluir a operação.");
+    }
   }
 
   async function decide(event: FormEvent<HTMLFormElement>) {
@@ -71,13 +83,16 @@ export function AdmissionsClient({ departments, canDecide }: { departments: Opti
           version: selected.worker.version
         })
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
+      const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; name?: string; status?: string };
+      if (!response.ok) {
+        const protocol = body.protocol ? ` Protocolo ${body.protocol}.` : "";
+        throw new Error(`${body.error || "Não foi possível concluir a operação."}${protocol}`);
+      }
       setSelected(null);
       setMessage(`${body.name}: ${body.status === "active" ? "aprovado e liberado para atuação" : "reprovado; permanece sem liberação para atuação"}. Decisão da Diretoria salva.`);
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Falha ao registrar a decisão.");
+      setError(caught instanceof TypeError ? "Sem resposta do sistema. Tente de novo." : caught instanceof Error ? caught.message : "Não foi possível concluir a operação.");
     } finally {
       setBusy(false);
     }
@@ -137,7 +152,7 @@ export function AdmissionsClient({ departments, canDecide }: { departments: Opti
               <label>{reject ? "Motivo da reprovação *" : "Justificativa / observações"}
                 <textarea name="reason" rows={3} maxLength={2000} required={reject} placeholder="Na reprovação, informe o motivo para orientar a revisão da ficha." />
               </label>
-              <div className="row-actions"><button className="button primary" disabled={busy}>Salvar decisão da Diretoria</button></div>
+              <div className="row-actions"><button className={busy ? "button primary is-loading" : "button primary"} disabled={busy}>{busy ? "Salvando a decisão…" : "Salvar decisão da Diretoria"}</button></div>
             </form>
           ) : w.status !== "pending" ? (
             <p className="notice small">Decisão já registrada. Alterações de departamento ou funções, ou o reenvio de uma ficha reprovada, geram nova análise.</p>
