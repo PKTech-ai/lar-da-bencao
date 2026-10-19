@@ -92,7 +92,7 @@ export function SystemFeedback() {
       }
       const body = await response.clone().json().catch(() => null) as { error?: string; protocol?: string } | null;
       const detail = body?.error || "Não foi possível concluir a operação.";
-      const protocol = body?.protocol ? ` Protocolo ${body.protocol}.` : "";
+      const protocol = body?.protocol && !detail.includes(body.protocol) ? ` Protocolo ${body.protocol}.` : "";
       setStatus("");
       setAlert(`${detail}${protocol}`);
     };

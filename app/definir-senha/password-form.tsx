@@ -23,7 +23,7 @@ export function PasswordForm() {
       });
       const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; next?: string };
       if (!response.ok) {
-        const protocol = body.protocol ? ` Protocolo ${body.protocol}.` : "";
+        const protocol = body.protocol && !String(body.error ?? "").includes(body.protocol) ? ` Protocolo ${body.protocol}.` : "";
         throw new Error(`${body.error ?? "Não foi possível definir a senha."}${protocol}`);
       }
       router.push(body.next ?? "/sistema");

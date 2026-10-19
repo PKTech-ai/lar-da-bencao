@@ -51,8 +51,9 @@ export function AdmissionsClient({ departments, canDecide }: { departments: Opti
       const response = await fetch(`/api/workers/${id}`, { cache: "no-store" });
       const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; worker?: Detail; history?: Decision[] };
       if (!response.ok) {
-        const protocol = body.protocol ? ` Protocolo ${body.protocol}.` : "";
-        setError(`${body.error || "Não foi possível concluir a operação."}${protocol}`);
+        const detail = body.error || "Não foi possível concluir a operação.";
+        const protocol = body.protocol && !detail.includes(body.protocol) ? ` Protocolo ${body.protocol}.` : "";
+        setError(`${detail}${protocol}`);
         return;
       }
       if (!body.worker) {
@@ -85,8 +86,9 @@ export function AdmissionsClient({ departments, canDecide }: { departments: Opti
       });
       const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; name?: string; status?: string };
       if (!response.ok) {
-        const protocol = body.protocol ? ` Protocolo ${body.protocol}.` : "";
-        throw new Error(`${body.error || "Não foi possível concluir a operação."}${protocol}`);
+        const detail = body.error || "Não foi possível concluir a operação.";
+        const protocol = body.protocol && !detail.includes(body.protocol) ? ` Protocolo ${body.protocol}.` : "";
+        throw new Error(`${detail}${protocol}`);
       }
       setSelected(null);
       setMessage(`${body.name}: ${body.status === "active" ? "aprovado e liberado para atuação" : "reprovado; permanece sem liberação para atuação"}. Decisão da Diretoria salva.`);
