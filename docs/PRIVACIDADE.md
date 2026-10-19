@@ -15,7 +15,7 @@
 | Categoria | Onde | Finalidade | Base legal proposta | Retenção proposta | Quem acessa |
 |---|---|---|---|---|---|
 | Contas de usuários (nome, e-mail, perfil) | `app.users`, Supabase Auth | Acesso individual e auditoria | Legítimo interesse / execução das atividades | Enquanto vinculado + 5 anos (segurança) | Administrador |
-| Ficha de trabalhador (contato, nascimento, endereço, profissão, termos de voluntariado e imagem) | `app.workers`, decisões | Admissão e organização do voluntariado (Lei 9.608/98) | Termo de voluntariado / legítimo interesse | Enquanto voluntário + 5 anos | Departamentos vinculados, Secretaria, Presidência |
+| Ficha de trabalhador (CPF, contato, nascimento, endereço, profissão, termos de voluntariado e imagem) | `app.workers`, decisões | Admissão e organização do voluntariado (Lei 9.608/98) | Termo de voluntariado / legítimo interesse | Enquanto voluntário + 5 anos | Departamentos vinculados, Secretaria, Presidência |
 | Cadastro online de trabalhador — envio do formulário público, sem login (mesmos dados de contato e pessoais da ficha, aceite do termo de voluntariado, autorização de imagem; do IP guarda-se só o hash) | `app.worker_submissions` | Receber do próprio trabalhador os dados da ficha, para conferência antes de entrar em `app.workers` | Termo de voluntariado / legítimo interesse; ciência do aviso de privacidade registrada com a versão (`privacy_version`) | Envio aguardando conferência: até ser tratado. Envio aplicado ou descartado: 90 dias após a conferência (expurgo automático diário) | Somente o Administrador |
 | Evangelizandos — **crianças e adolescentes** (nome, nascimento, responsáveis, contatos, endereço, foto, religião) | `app.evangelizandos`, fotos em anexos | Evangelização, chamada, segurança das crianças | Consentimento específico de pelo menos um responsável (art. 14 LGPD) — **validar** | Matrícula vigente + 2 anos; foto removida ao encerrar | Coordenação do departamento; evangelizador só da própria turma |
 | Frequência (P/F) e cronograma | `app.evangelizando_attendance`, `app.education_schedule` | Acompanhamento pedagógico e relatório anual | Mesma dos evangelizandos | 5 anos (relatório anual) | Departamento |
@@ -33,6 +33,7 @@
 - Termos aceitos no primeiro acesso (versão registrada).
 - Exclusão definitiva de ficha de evangelizando (com a frequência) pela coordenação, auditada.
 - Cadastro online de trabalhadores: o formulário público só grava numa fila de revisão; nada chega à ficha sem a conferência do Administrador. O formulário abre e fecha por flag (`public_worker_form`), limita 5 envios por hora por conexão, não devolve nenhum dado na confirmação e registra cada envio no Dedo-duro sem dados pessoais. Envios tratados são expurgados em 90 dias pelo job diário.
+- O CPF é obrigatório no cadastro do trabalhador. Depois da aprovação, ele é o usuário de login; a senha inicial é o próprio CPF e o sistema exige a troca no primeiro acesso. A senha não é gravada na auditoria. Na auditoria da criação do acesso, o CPF aparece mascarado.
 
 ## 4. Atendimento ao titular
 
