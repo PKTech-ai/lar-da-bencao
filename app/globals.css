@@ -505,6 +505,12 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 .op-stat > small { line-height: 20px; }
 .nav-group > summary { font-weight: 700; border-radius: 9px; }
 :root[data-theme="dark"] .lar-welcome-actions .button:not(.primary) { color: var(--blue-900); border-color: var(--line); }
+:root[data-theme="dark"] .card.lar-welcome .op-eyebrow { color: #356f8f; }
+:root[data-theme="dark"] .home-institution-card .muted,
+:root[data-theme="dark"] .op-section .muted,
+:root[data-theme="dark"] .home-version-dialog .muted { color: #617683; }
+:root[data-theme="dark"] .button.primary { background: #356f8f; border-color: #356f8f; color: #fff; }
+:root[data-theme="dark"] .button.primary:hover { background: #2a5a78; }
 /* O .grid da Visão Geral já separa os blocos por 16px; no visual o painel fica a 24px dos indicadores. */
 .card.lar-welcome .op-eyebrow { margin: 0 0 7px; }
 .grid > .card.lar-welcome { margin-bottom: 8px; }

@@ -45,11 +45,8 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
           website: text("website")
         })
       });
-      const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string };
-      if (!response.ok) {
-        const protocol = body.protocol && !String(body.error ?? "").includes(body.protocol) ? ` Protocolo ${body.protocol}.` : "";
-        throw new Error(`${body.error ?? "Não foi possível enviar o cadastro."}${protocol}`);
-      }
+      const body = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(body.error ?? "Não foi possível enviar o cadastro.");
       setSent(true);
       window.scrollTo({ top: 0 });
     } catch (caught) {

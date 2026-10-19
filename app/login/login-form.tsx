@@ -21,11 +21,8 @@ export function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: String(form.get("email") ?? ""), password: String(form.get("password") ?? "") })
       });
-      const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; next?: string };
-      if (!response.ok) {
-        const protocol = body.protocol && !String(body.error ?? "").includes(body.protocol) ? ` Protocolo ${body.protocol}.` : "";
-        throw new Error(`${body.error ?? "Não foi possível entrar."}${protocol}`);
-      }
+      const body = await response.json().catch(() => ({})) as { error?: string; next?: string };
+      if (!response.ok) throw new Error(body.error ?? "Não foi possível entrar.");
       await fetch("/api/auth/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -44,7 +41,7 @@ export function LoginForm() {
     <form className="form-stack" method="post" action="/login" onSubmit={submit}>
       {params.get("motivo") === "sessao" ? <div className="notice" role="status">Sua sessão foi encerrada. Entre novamente.</div> : null}
       {params.get("motivo") === "bienio" ? <div className="notice" role="status">Seu acesso de Diretoria está fora do biênio vigente. Procure o Administrador do Sistema.</div> : null}
-      <label>CPF ou e-mail institucional<input name="email" type="text" autoComplete="username" minLength={11} required /></label>
+      <label>CPF<input name="email" type="text" inputMode="numeric" autoComplete="username" minLength={11} maxLength={14} placeholder="000.000.000-00" required /></label>
       <label>Senha<input name="password" type="password" autoComplete="current-password" minLength={11} required /></label>
       {error ? <div className="error" role="alert">{error}</div> : null}
       <button className={busy ? "button primary is-loading" : "button primary"} type="submit" disabled={busy}>{busy ? "Entrando…" : "Continuar"}</button>

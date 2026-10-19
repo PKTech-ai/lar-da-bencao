@@ -90,11 +90,9 @@ export function SystemFeedback() {
         setStatus("Pronto. Ação registrada.");
         return;
       }
-      const body = await response.clone().json().catch(() => null) as { error?: string; protocol?: string } | null;
-      const detail = body?.error || "Não foi possível concluir a operação.";
-      const protocol = body?.protocol && !detail.includes(body.protocol) ? ` Protocolo ${body.protocol}.` : "";
+      const body = await response.clone().json().catch(() => null) as { error?: string } | null;
       setStatus("");
-      setAlert(`${detail}${protocol}`);
+      setAlert(body?.error || "A operação falhou. Tente de novo.");
     };
 
     const failNetwork = (mark: number) => {

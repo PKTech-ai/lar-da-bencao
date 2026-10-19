@@ -1,9 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const ANA = "52998224725";
+
+function makeCpf(seed: number) {
+  const digits = String(seed).padStart(9, "0").slice(-9).split("").map(Number);
+  const check = (length: number, source: number[]) => {
+    let sum = 0;
+    for (let index = 0; index < length; index += 1) sum += source[index] * (length + 1 - index);
+    const mod = (sum * 10) % 11;
+    return mod === 10 ? 0 : mod;
+  };
+  const first = check(9, digits);
+  const second = check(10, [...digits, first]);
+  return [...digits, first, second].join("");
+}
+
 const state = vi.hoisted(() => ({
   attempts: [] as Array<{ scope: string; key_hash: string; success: boolean; at: number }>,
-  users: new Set<string>(["ana@lar.org"]),
-  passwords: new Map<string, string>([["ana@lar.org", "senha-correta-123"]]),
+  users: new Map<string, { id: string; email: string }>([["52998224725", { id: "user-1", email: "52998224725@acesso.lardabencao.org" }]]),
+  passwords: new Map<string, string>([["52998224725@acesso.lardabencao.org", "senha-correta-123"]]),
   audits: [] as Array<{ action: string; result?: string; entityId?: string }>,
   now: 0
 }));
@@ -21,7 +36,10 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/db", () => ({
   query: async (text: string, values: unknown[]) => {
-    if (text.includes("from app.users")) return { rows: state.users.has(String(values[0])) ? [{ id: "user-1" }] : [] };
+    if (text.includes("from app.users")) {
+      const user = state.users.get(String(values[0]));
+      return { rows: user ? [{ id: user.id, email: user.email, must_reset_password: false }] : [] };
+    }
     if (text.startsWith("insert into app.auth_attempts")) {
       state.attempts.push({ scope: "email", key_hash: String(values[0]), success: Boolean(values[2]), at: state.now });
       state.attempts.push({ scope: "ip", key_hash: String(values[1]), success: Boolean(values[2]), at: state.now });
@@ -75,44 +93,45 @@ describe("lockoutMinutes", () => {
 
 describe("POST /api/auth/login", () => {
   it("responde igual para conta inexistente e senha errada", async () => {
-    const wrong = await attempt("ana@lar.org", "errada-errada");
-    const ghost = await attempt("ninguem@lar.org", "errada-errada");
+    const wrong = await attempt(ANA, "errada-errada");
+    const ghost = await attempt(makeCpf(111444777), "errada-errada");
     expect(wrong.status).toBe(401);
     expect(ghost.status).toBe(401);
     expect(await wrong.json()).toEqual(await ghost.json());
     expect(state.audits.map((a) => a.action)).toEqual(["Falha de login", "Falha de login"]);
   });
 
-  it("bloqueia após 5 falhas no mesmo e-mail, mesmo com a senha correta", async () => {
-    for (let i = 0; i < 5; i += 1) expect((await attempt("ana@lar.org", "errada", `198.51.100.${i}`)).status).toBe(401);
-    const blocked = await attempt("ana@lar.org", "senha-correta-123", "198.51.100.99");
+  it("bloqueia após 5 falhas no mesmo CPF, mesmo com a senha correta", async () => {
+    for (let i = 0; i < 5; i += 1) expect((await attempt(ANA, "errada", `198.51.100.${i}`)).status).toBe(401);
+    const blocked = await attempt(ANA, "senha-correta-123", "198.51.100.99");
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get("Retry-After")).toBe("900");
     expect(state.audits.at(-1)).toMatchObject({ action: "Login bloqueado por excesso de tentativas", result: "denied", entityId: "user-1" });
   });
 
-  it("bloqueia e-mail inexistente do mesmo jeito (sem enumeração)", async () => {
-    for (let i = 0; i < 5; i += 1) await attempt("ninguem@lar.org", "x", `198.51.100.${i}`);
-    expect((await attempt("ninguem@lar.org", "x", "198.51.100.50")).status).toBe(429);
+  it("bloqueia CPF inexistente do mesmo jeito (sem enumeração)", async () => {
+    const ghost = makeCpf(111444777);
+    for (let i = 0; i < 5; i += 1) await attempt(ghost, "x", `198.51.100.${i}`);
+    expect((await attempt(ghost, "x", "198.51.100.50")).status).toBe(429);
   });
 
-  it("libera após a janela e zera contador do e-mail com login correto", async () => {
-    for (let i = 0; i < 4; i += 1) await attempt("ana@lar.org", "errada");
-    expect((await attempt("ana@lar.org", "senha-correta-123")).status).toBe(200);
-    for (let i = 0; i < 4; i += 1) await attempt("ana@lar.org", "errada");
-    expect((await attempt("ana@lar.org", "senha-correta-123")).status).toBe(200);
-    for (let i = 0; i < 5; i += 1) await attempt("ana@lar.org", "errada", `192.0.2.${i}`);
+  it("libera após a janela e zera contador do CPF com login correto", async () => {
+    for (let i = 0; i < 4; i += 1) await attempt(ANA, "errada");
+    expect((await attempt(ANA, "senha-correta-123")).status).toBe(200);
+    for (let i = 0; i < 4; i += 1) await attempt(ANA, "errada");
+    expect((await attempt(ANA, "senha-correta-123")).status).toBe(200);
+    for (let i = 0; i < 5; i += 1) await attempt(ANA, "errada", `192.0.2.${i}`);
     state.now += 16;
-    expect((await attempt("ana@lar.org", "senha-correta-123", "192.0.2.200")).status).toBe(200);
+    expect((await attempt(ANA, "senha-correta-123", "192.0.2.200")).status).toBe(200);
   });
 
-  it("bloqueia IP que testa muitos e-mails", async () => {
-    for (let i = 0; i < 20; i += 1) await attempt(`alvo${i}@lar.org`, "x");
-    expect((await attempt("ana@lar.org", "senha-correta-123")).status).toBe(429);
+  it("bloqueia IP que testa muitos CPFs", async () => {
+    for (let i = 0; i < 20; i += 1) await attempt(makeCpf(200000000 + i), "x");
+    expect((await attempt(ANA, "senha-correta-123")).status).toBe(429);
   });
 
-  it("normaliza o e-mail antes de contar", async () => {
-    for (let i = 0; i < 5; i += 1) await attempt(i % 2 ? " ANA@lar.org " : "ana@LAR.org", "x", `10.0.0.${i}`);
-    expect((await attempt("ana@lar.org", "senha-correta-123", "10.0.0.99")).status).toBe(429);
+  it("trata o CPF com ou sem pontuação como o mesmo", async () => {
+    for (let i = 0; i < 5; i += 1) await attempt(i % 2 ? "529.982.247-25" : ANA, "x", `10.0.0.${i}`);
+    expect((await attempt(ANA, "senha-correta-123", "10.0.0.99")).status).toBe(429);
   });
 });

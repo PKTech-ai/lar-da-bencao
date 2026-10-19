@@ -21,11 +21,8 @@ export function PasswordForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, confirmation })
       });
-      const body = await response.json().catch(() => ({})) as { error?: string; protocol?: string; next?: string };
-      if (!response.ok) {
-        const protocol = body.protocol && !String(body.error ?? "").includes(body.protocol) ? ` Protocolo ${body.protocol}.` : "";
-        throw new Error(`${body.error ?? "Não foi possível definir a senha."}${protocol}`);
-      }
+      const body = await response.json().catch(() => ({})) as { error?: string; next?: string };
+      if (!response.ok) throw new Error(body.error ?? "Não foi possível definir a senha.");
       router.push(body.next ?? "/sistema");
       router.refresh();
     } catch (caught) {
