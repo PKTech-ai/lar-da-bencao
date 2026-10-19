@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/sidebar";
 import { SystemBar } from "@/components/system-bar";
+import { SystemFeedback } from "@/components/system-feedback";
 import { runtimeEnvironment } from "@/lib/environment";
 import { loadNavigation } from "@/lib/navigation";
 import { requirePageActor } from "@/lib/page-auth";
@@ -16,7 +17,7 @@ export default async function SystemLayout({ children }: Readonly<{ children: Re
       <Sidebar actor={actor} capabilities={nav.capabilities} />
       <main className="app-main">
         <SystemBar actor={actor} roleLabel={nav.roleLabel} capabilities={nav.capabilities} />
-        <p className="ops-save" role="status">Pronto para uso</p>
+        <SystemFeedback />
         {env.production ? null : (
           <details className="lar-demo-note">
             <summary>Ambiente de teste · dados fictícios</summary>

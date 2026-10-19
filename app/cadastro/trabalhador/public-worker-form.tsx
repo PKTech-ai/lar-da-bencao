@@ -123,8 +123,9 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
         <label><input type="checkbox" name="privacy_acknowledged" required />Estou ciente do aviso de privacidade *</label>
         <label><input type="checkbox" name="image_authorization" />Autorizo o uso da minha imagem em registros e divulgações do Lar da Bênção (opcional)</label>
       </fieldset>
+      {busy ? <p className="ops-save" role="status">Enviando o cadastro…</p> : null}
       {error ? <div className="error" role="alert">{error}</div> : null}
-      <button className="button primary" type="submit" disabled={busy || !selected.length}>{busy ? "Enviando…" : "Enviar cadastro"}</button>
+      <button className={busy ? "button primary is-loading" : "button primary"} type="submit" disabled={busy || !selected.length}>{busy ? "Enviando…" : "Enviar cadastro"}</button>
       {!selected.length ? <p className="small muted">Marque pelo menos um departamento para enviar.</p> : null}
     </form>
   );

@@ -180,6 +180,10 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .page-heading p { margin: 0; color: #617683; font-size: 14px; }
 .ops-save, .lar-demo-note, .app-main > :not(.system-bar):not(.page-heading) { grid-column: 1 / -1; }
 .ops-save { font-size: 13px; color: #346849; margin: 0 0 16px; line-height: 1.5; }
+.route-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 80; background: #1d4e89; transform-origin: left; animation: lar-route 1s ease-in-out infinite; }
+.route-progress[hidden] { display: none; }
+@keyframes lar-route { 0% { transform: scaleX(.15); } 50% { transform: scaleX(.85); } 100% { transform: scaleX(.15); } }
+:root[data-theme="dark"] .route-progress { background: #8eb6e8; }
 .lar-demo-note { font-size: 13px; color: #617683; margin: 0 0 16px; }
 .lar-demo-note summary { cursor: pointer; min-height: 38px; padding: 8px 0; }
 .nav-group { margin: 3px 0; }

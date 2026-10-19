@@ -34,7 +34,7 @@ function menuLabel(href: string, fallback: string) {
 
 function NavItem({ href, label, current }: { href: string; label: string; current: boolean }) {
   return (
-    <Link className="nav-link" href={href} data-current={current} title={label}>
+    <Link className="nav-link" href={href} data-current={current} data-nav-label={label} title={label}>
       <NavIcon href={href} />
       <span className="nav-label">{label}</span>
     </Link>
