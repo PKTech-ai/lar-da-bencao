@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { ContributionAmountInput } from "@/components/contribution-amount-input";
+import { MaskedInput } from "@/components/masked-input";
+import { maskCpfInput } from "@/lib/cpf";
+import { maskPhoneInput } from "@/lib/input-masks";
 import { parseMoney } from "@/lib/resources/types";
 import { DOCTRINE_FUNCTIONS, WEEKDAYS } from "@/lib/worker-constants";
 
@@ -56,7 +60,6 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
           marital_status: text("marital_status"),
           profession: text("profession"),
           address: text("address"),
-          volunteer_service: text("volunteer_service"),
           departments: values.getAll("departments").map(String),
           functions: values.getAll("functions").map(String),
           available_days: values.getAll("available_days").map(Number),
@@ -92,10 +95,10 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
     <form className="form-stack" onSubmit={submit}>
       <label>Nome completo *<input name="full_name" required minLength={2} maxLength={160} autoComplete="name" /></label>
       <label>CPF *
-        <input name="cpf" required inputMode="numeric" autoComplete="off" minLength={11} maxLength={14} placeholder="000.000.000-00" />
+        <MaskedInput name="cpf" mask={maskCpfInput} required inputMode="numeric" autoComplete="off" minLength={11} maxLength={14} placeholder="000.000.000-00" />
       </label>
       <div className="form-row">
-        <label>Telefone com DDD *<input name="phone" type="tel" required minLength={10} maxLength={40} inputMode="tel" autoComplete="tel" placeholder="(51) 99999-9999" /></label>
+        <label>Telefone com DDD *<MaskedInput name="phone" mask={maskPhoneInput} type="tel" required minLength={10} maxLength={40} inputMode="tel" autoComplete="tel" placeholder="(51) 99999-9999" /></label>
         <label>Data de nascimento *<input name="birth_date" type="date" required min="1900-01-01" autoComplete="bday" /></label>
       </div>
       <label>E-mail<input name="email" type="email" maxLength={320} autoComplete="email" /></label>
@@ -131,16 +134,13 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
       </fieldset>
       <fieldset className="form-stack">
         <legend>Valor da contribuição mensal conforme seção IV do Estatuto de 09/09/2008. *</legend>
-        <label className="money-line">R$
-          <input name="contribution_cents" required inputMode="decimal" maxLength={20} autoComplete="off" placeholder="0,00" />
-        </label>
+        <ContributionAmountInput />
         <fieldset className="check-grid">
           <legend>Data da contribuição, dia 05 ou dia 10? *</legend>
           <label><input type="radio" name="contribution_due_day" value="5" required />Dia 05</label>
           <label><input type="radio" name="contribution_due_day" value="10" required />Dia 10</label>
         </fieldset>
       </fieldset>
-      <label>Serviço voluntário<textarea name="volunteer_service" rows={3} maxLength={2000} placeholder="Descreva as atividades que você realiza no Lar da Bênção" /></label>
       {/* Campo-isca contra robôs: fora da tela e fora da navegação por teclado e leitor de tela. */}
       <div aria-hidden="true" style={{ position: "absolute", left: -9999, width: 1, height: 1, overflow: "hidden" }}>
         <label>Site<input name="website" tabIndex={-1} autoComplete="off" /></label>

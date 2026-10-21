@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { MaskedInput } from "@/components/masked-input";
+import { maskPhoneInput } from "@/lib/input-masks";
 
 type Speaker = {
   id: string; full_name: string; house: string | null; city: string | null; themes: string[]; phone: string | null;
@@ -76,7 +78,7 @@ export function SpeakersClient() {
           <form className="form-stack" onSubmit={save} key={form?.id ?? "new"}>
             <div className="form-row">
               <label>Nome *<input name="full_name" required minLength={2} maxLength={160} defaultValue={form?.full_name} /></label>
-              <label>Contato<input name="phone" maxLength={40} defaultValue={form?.phone ?? ""} /></label>
+              <label>Contato<MaskedInput name="phone" mask={maskPhoneInput} maxLength={40} defaultValue={form?.phone ?? ""} inputMode="tel" placeholder="(92) 99999-9999" /></label>
             </div>
             <div className="form-row">
               <label>Casa espírita<input name="house" maxLength={160} defaultValue={form?.house ?? ""} /></label>

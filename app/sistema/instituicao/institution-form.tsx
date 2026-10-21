@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "@/lib/client-api";
+import { MaskedInput } from "@/components/masked-input";
+import { maskCnpjInput, maskPhoneInput } from "@/lib/input-masks";
 
 type Institution = { name: string; founded_on: string; motto: string; cnpj: string; address: string; phone: string; email: string; version: number };
 
@@ -41,8 +43,8 @@ export function InstitutionForm() {
         <div className="form-row">
           <label>Nome da Casa *<input name="name" required minLength={2} maxLength={160} defaultValue={data.name} /></label>
           <label>Data de fundação *<input type="date" name="founded_on" required defaultValue={data.founded_on} /></label>
-          <label>CNPJ<input name="cnpj" maxLength={20} defaultValue={data.cnpj} /></label>
-          <label>Telefone<input name="phone" maxLength={40} defaultValue={data.phone} /></label>
+          <label>CNPJ<MaskedInput name="cnpj" mask={maskCnpjInput} maxLength={18} defaultValue={data.cnpj} placeholder="00.000.000/0000-00" /></label>
+          <label>Telefone<MaskedInput name="phone" mask={maskPhoneInput} maxLength={40} defaultValue={data.phone} inputMode="tel" placeholder="(92) 99999-9999" /></label>
           <label>E-mail<input type="email" name="email" maxLength={200} defaultValue={data.email} /></label>
           <label style={{ gridColumn: "1 / -1" }}>Endereço<input name="address" maxLength={300} defaultValue={data.address} /></label>
           <label style={{ gridColumn: "1 / -1" }}>Frase da Casa<input name="motto" maxLength={200} defaultValue={data.motto} /></label>

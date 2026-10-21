@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, postJson } from "@/lib/client-api";
+import { MaskedInput } from "@/components/masked-input";
+import { maskPhoneInput } from "@/lib/input-masks";
 
 type Message = {
   id: string; scope: string; recipient_name: string; phone: string; body: string; consent_source: string;
@@ -65,7 +67,7 @@ export function WhatsappQueue({ scope }: { scope: "tesouraria" | "doutrina" }) {
         <form className="form-stack" onSubmit={submit}>
           <div className="form-row">
             <label>Destinatário *<input name="recipient_name" required maxLength={160} /></label>
-            <label>WhatsApp com DDD *<input name="phone" required maxLength={40} inputMode="tel" placeholder="(31) 99999-9999" /></label>
+            <label>WhatsApp com DDD *<MaskedInput name="phone" mask={maskPhoneInput} required maxLength={40} inputMode="tel" placeholder="(31) 99999-9999" /></label>
             <label>Como o consentimento foi obtido *<input name="consent_source" required maxLength={200} placeholder="Ex.: autorização assinada na ficha" /></label>
             <label style={{ gridColumn: "1 / -1" }}>Mensagem *<textarea name="body" required minLength={5} maxLength={1000} rows={4} /></label>
           </div>

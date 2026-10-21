@@ -1,7 +1,10 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { formatCpf } from "@/lib/cpf";
+import { ContributionAmountInput } from "@/components/contribution-amount-input";
+import { MaskedInput } from "@/components/masked-input";
+import { maskCpfInput } from "@/lib/cpf";
+import { maskPhoneInput } from "@/lib/input-masks";
 import { parseMoney } from "@/lib/resources/types";
 import { DOCTRINE_FUNCTIONS, WEEKDAYS } from "@/lib/worker-constants";
 
@@ -100,10 +103,10 @@ export function WorkerFichaForm({
       <div className="form-row">
         <label>Nome completo *<input name="full_name" defaultValue={initial?.full_name} required minLength={2} maxLength={160} /></label>
         <label>CPF *
-          <input name="cpf" required inputMode="numeric" autoComplete="off" minLength={11} maxLength={14}
-            placeholder="000.000.000-00" defaultValue={initial?.cpf ? formatCpf(initial.cpf) : undefined} />
+          <MaskedInput name="cpf" mask={maskCpfInput} required inputMode="numeric" autoComplete="off" minLength={11} maxLength={14}
+            placeholder="000.000.000-00" defaultValue={initial?.cpf ?? ""} />
         </label>
-        <label>Telefone<input name="phone" defaultValue={initial?.phone ?? ""} maxLength={40} inputMode="tel" /></label>
+        <label>Telefone<MaskedInput name="phone" mask={maskPhoneInput} defaultValue={initial?.phone ?? ""} maxLength={40} inputMode="tel" placeholder="(92) 99999-9999" /></label>
         <label>E-mail<input name="email" type="email" defaultValue={initial?.email ?? ""} /></label>
       </div>
       <div className="form-row">
@@ -141,10 +144,7 @@ export function WorkerFichaForm({
       </fieldset>
       <fieldset className="form-stack">
         <legend>Valor da contribuição mensal conforme seção IV do Estatuto de 09/09/2008. *</legend>
-        <label className="money-line">R$
-          <input name="contribution_cents" required inputMode="decimal" maxLength={20} autoComplete="off" placeholder="0,00"
-            defaultValue={cents > 0 ? (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : ""} />
-        </label>
+        <ContributionAmountInput defaultValue={cents > 0 ? (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : ""} />
         <fieldset className="check-grid">
           <legend>Data da contribuição, dia 05 ou dia 10? *</legend>
           <label><input type="radio" name="contribution_due_day" value="5" required defaultChecked={dueDay === 5} />Dia 05</label>

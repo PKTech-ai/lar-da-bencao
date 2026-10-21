@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cpfDigits, formatCpf, isValidCpf, maskCpf } from "./cpf";
+import { cpfDigits, formatCpf, isValidCpf, maskCpf, maskCpfInput } from "./cpf";
 
 describe("cpf", () => {
   it("aceita um CPF com dígitos verificadores", () => {
@@ -16,5 +16,12 @@ describe("cpf", () => {
 
   it("mascara deixando só o fim", () => {
     expect(maskCpf("52998224725")).toBe("***.***.***-25");
+  });
+
+  it("formata o CPF enquanto é digitado", () => {
+    expect(maskCpfInput("529")).toBe("529");
+    expect(maskCpfInput("529982")).toBe("529.982");
+    expect(maskCpfInput("52998224725")).toBe("529.982.247-25");
+    expect(maskCpfInput("529.982.247-25")).toBe("529.982.247-25");
   });
 });

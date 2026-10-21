@@ -82,6 +82,28 @@ export function formatMoney(cents: number | string | null | undefined) {
   return (Number(cents) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/** Máscara de reais enquanto a pessoa digita: 1000 vira 1.000 e 1000,5 vira 1.000,5. */
+export function maskMoneyInput(raw: string) {
+  const cleaned = raw.replace(/[^\d,]/g, "");
+  const comma = cleaned.indexOf(",");
+  const reaisDigits = (comma === -1 ? cleaned : cleaned.slice(0, comma)).replace(/^0+(?=\d)/, "");
+  const decimals = comma === -1 ? "" : cleaned.slice(comma + 1).replace(/\D/g, "").slice(0, 2);
+  const grouped = reaisDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (comma === -1) return grouped;
+  return `${grouped || "0"},${decimals}`;
+}
+
+/** Completa os centavos ao sair do campo: 1.000 vira 1.000,00. */
+export function completeMoneyInput(masked: string) {
+  if (!masked.trim()) return "";
+  if (!masked.includes(",")) return `${masked},00`;
+  if (masked.endsWith(",")) return `${masked}00`;
+  if (/,\d$/.test(masked)) return `${masked}0`;
+  return masked;
+}
+
+export const contributionMinimumMessage = "O valor da contribuição não pode ser inferior a 1 centavo.";
+
 export function brDate(value: string | null | undefined) {
   return value ? String(value).slice(0, 10).split("-").reverse().join("/") : "—";
 }

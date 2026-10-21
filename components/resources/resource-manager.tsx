@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { RESOURCES } from "@/lib/resources/registry";
-import { brDate, fieldDisplay, formatMoney, parseMoney, type Field, type ResourceDef } from "@/lib/resources/types";
+import { MaskedInput } from "@/components/masked-input";
+import { maskPhoneInput } from "@/lib/input-masks";
+import { completeMoneyInput, maskMoneyInput, brDate, fieldDisplay, formatMoney, parseMoney, type Field, type ResourceDef } from "@/lib/resources/types";
 import { api } from "@/lib/client-api";
 import { uploadAttachment } from "@/lib/upload-client";
 
@@ -21,11 +23,11 @@ function FieldInput({ field, value, disabled, departments, workers, references }
   switch (field.type) {
     case "textarea": input = <textarea {...common} rows={3} maxLength={field.max} defaultValue={text} placeholder={field.placeholder} />; break;
     case "text": input = <input {...common} maxLength={field.max} defaultValue={text} placeholder={field.placeholder} />; break;
-    case "phone": input = <input {...common} type="tel" inputMode="tel" maxLength={40} defaultValue={text} />; break;
+    case "phone": input = <MaskedInput {...common} mask={maskPhoneInput} type="tel" inputMode="tel" maxLength={40} defaultValue={text} placeholder="(92) 99999-9999" />; break;
     case "email": input = <input {...common} type="email" maxLength={200} defaultValue={text} />; break;
     case "date": input = <input {...common} type="date" defaultValue={text.slice(0, 10)} max={field.notFuture ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()) : undefined} />; break;
     case "month": input = <input {...common} type="month" defaultValue={text} />; break;
-    case "money": input = <input {...common} inputMode="decimal" maxLength={20} placeholder="Ex.: 1.250,00" defaultValue={value === null || value === undefined ? "" : (Number(value) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} />; break;
+    case "money": input = <MaskedInput {...common} mask={maskMoneyInput} complete={completeMoneyInput} inputMode="decimal" maxLength={20} placeholder="1.250,00" defaultValue={value === null || value === undefined || value === "" ? "" : (Number(value) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} />; break;
     case "integer": input = <input {...common} type="number" min={field.min ?? 0} max={field.max} step={1} defaultValue={text} />; break;
     case "select": input = <select {...common} defaultValue={text}><option value="">Selecione</option>{field.options.map((o) => <option key={o}>{o}</option>)}</select>; break;
     case "department": input = <select {...common} defaultValue={text}><option value="">Selecione o departamento</option>{departments.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}</select>; break;

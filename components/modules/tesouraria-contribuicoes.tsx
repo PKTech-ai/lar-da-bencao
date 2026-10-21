@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, postJson, todayLocal } from "@/lib/client-api";
 import { PAYMENT_METHODS } from "@/lib/resources/defs/tesouraria";
-import { brDate, formatMoney, parseMoney } from "@/lib/resources/types";
+import { MaskedInput } from "@/components/masked-input";
+import { brDate, completeMoneyInput, formatMoney, maskMoneyInput, parseMoney } from "@/lib/resources/types";
 
 type Row = {
   worker_id: string; full_name: string; ficha_cents: string; contribution_due_day: number | null;
@@ -92,11 +93,11 @@ export function ContributionsPanel() {
           <form className="form-stack" onSubmit={save} key={editing.worker_id}>
             <div className="form-row">
               <label>Combinado no mês
-                <input name="expected" inputMode="decimal" maxLength={20}
+                <MaskedInput name="expected" mask={maskMoneyInput} complete={completeMoneyInput} inputMode="decimal" maxLength={20} placeholder="0,00"
                   defaultValue={Number(editing.expected_cents) ? (Number(editing.expected_cents) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : ""} />
               </label>
               <label>Recebido
-                <input name="paid" inputMode="decimal" maxLength={20}
+                <MaskedInput name="paid" mask={maskMoneyInput} complete={completeMoneyInput} inputMode="decimal" maxLength={20} placeholder="0,00"
                   defaultValue={Number(editing.paid_cents) ? (Number(editing.paid_cents) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : ""} />
                 <span className="small muted">Em branco ou zero = não recebido neste mês.</span>
               </label>
