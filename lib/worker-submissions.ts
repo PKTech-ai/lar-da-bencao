@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cpfDigits, cpfSchemaMessage, formatCpf, isValidCpf } from "@/lib/cpf";
+import { formatMoney, parseMoney } from "@/lib/resources/types";
 import { DOCTRINE_FUNCTIONS, WEEKDAYS } from "@/lib/worker-constants";
 
 /**
@@ -27,11 +28,49 @@ function isPastDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value && value >= "1900-01-01" && value <= todayInSaoPaulo();
 }
 
+const contributionCents = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    try { return parseMoney(value); } catch { return value; }
+  }
+  return value;
+}, z.number().int().min(0).max(99_999_999_999));
+
+const contributionDay = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") return null;
+  if (value === 5 || value === "5") return 5;
+  if (value === 10 || value === "10") return 10;
+  return value;
+}, z.union([z.literal(5), z.literal(10), z.null()]));
+
+function contributionPair(data: { contribution_cents: number; contribution_due_day: 5 | 10 | null }, ctx: z.RefinementCtx) {
+  if (data.contribution_cents > 0 && !data.contribution_due_day) {
+    ctx.addIssue({ code: "custom", path: ["contribution_due_day"], message: "Informe se a contribuição é no dia 05 ou no dia 10." });
+  }
+  if (data.contribution_due_day && data.contribution_cents <= 0) {
+    ctx.addIssue({ code: "custom", path: ["contribution_cents"], message: "Informe o valor da contribuição mensal." });
+  }
+}
+
+/** No formulário público os dois campos são obrigatórios e o valor mínimo é 1 centavo. */
+function requiredContribution(data: { contribution_cents: number; contribution_due_day: 5 | 10 | null }, ctx: z.RefinementCtx) {
+  if (data.contribution_due_day !== 5 && data.contribution_due_day !== 10) {
+    ctx.addIssue({ code: "custom", path: ["contribution_due_day"], message: "Informe se a contribuição é no dia 05 ou no dia 10." });
+  }
+  if (data.contribution_cents < 1) {
+    ctx.addIssue({ code: "custom", path: ["contribution_cents"], message: "O valor da contribuição não pode ser inferior a 1 centavo." });
+  }
+}
+
 /**
- * Campos que o trabalhador informa. Contribuição, observações internas e status não fazem parte:
+ * Campos que o trabalhador informa. Observações internas e status não fazem parte:
  * chaves desconhecidas são descartadas pelo zod e nunca chegam à fila.
+ * A contribuição mensal segue a seção IV do Estatuto de 09/09/2008.
+ * No envio público o valor (no mínimo 1 centavo) e o dia 05 ou 10 são obrigatórios.
+ * Envio antigo sem esses campos não apaga o que já está na ficha.
  */
-export const submissionPayloadSchema = z.object({
+const submissionFields = z.object({
   full_name: z.string().trim().min(2).max(160),
   cpf: z.string().trim().refine(isValidCpf, cpfSchemaMessage).transform(cpfDigits),
   phone: z.string().trim().max(40).refine((value) => phoneDigits(value).length >= 10, "Informe o telefone com DDD."),
@@ -45,11 +84,14 @@ export const submissionPayloadSchema = z.object({
   departments: z.array(z.string().regex(/^[a-z_]+$/)).min(1, "Selecione pelo menos um departamento.").max(12),
   functions: z.array(z.enum(DOCTRINE_FUNCTIONS)).max(DOCTRINE_FUNCTIONS.length).default([]),
   available_days: z.array(z.number().int().min(0).max(6)).max(7).default([]),
+  contribution_cents: contributionCents.default(0),
+  contribution_due_day: contributionDay.default(null),
   accepts_volunteer_law: z.literal(true),
   image_authorization: z.boolean().default(false)
 });
 
-export const publicSubmissionSchema = submissionPayloadSchema.extend({ privacy_acknowledged: z.literal(true) });
+export const submissionPayloadSchema = submissionFields.superRefine(contributionPair);
+export const publicSubmissionSchema = submissionFields.extend({ privacy_acknowledged: z.literal(true) }).superRefine(requiredContribution);
 
 export type SubmissionPayload = z.infer<typeof submissionPayloadSchema>;
 
@@ -70,6 +112,8 @@ export function normalizeSubmission(input: SubmissionPayload): SubmissionPayload
     departments,
     functions: departments.includes("doutrina") ? [...new Set(input.functions)].sort() : [],
     available_days: [...new Set(input.available_days)].sort(),
+    contribution_cents: input.contribution_cents,
+    contribution_due_day: input.contribution_due_day,
     accepts_volunteer_law: true,
     image_authorization: input.image_authorization
   };
@@ -127,7 +171,7 @@ const dateOnly = (value: string | Date | null | undefined) => {
 /**
  * Monta a ficha (entrada do `fichaSchema`) a partir do envio.
  * Com ficha existente: o que o trabalhador informou prevalece; campo opcional deixado em branco
- * não apaga o que já estava cadastrado; contribuição, observações e data de preenchimento ficam como estão.
+ * não apaga o que já estava cadastrado. Contribuição em branco e observações internas ficam como estão.
  */
 export function fichaFromSubmission(payload: SubmissionPayload, existing?: ExistingFicha) {
   const keep = (submitted: string, current: string | null | undefined) => submitted || current || "";
@@ -149,8 +193,8 @@ export function fichaFromSubmission(payload: SubmissionPayload, existing?: Exist
     available_days: payload.available_days.length || !existing ? [...payload.available_days] : [...existing.available_days],
     departments: [...payload.departments],
     notes: existing?.notes ?? "",
-    contribution_cents: Number(existing?.contribution_cents ?? 0),
-    contribution_due_day: existing?.contribution_due_day ?? null
+    contribution_cents: payload.contribution_cents > 0 ? payload.contribution_cents : Number(existing?.contribution_cents ?? 0),
+    contribution_due_day: payload.contribution_due_day ?? existing?.contribution_due_day ?? null
   };
 }
 
@@ -159,6 +203,7 @@ export type FichaDiff = { field: string; label: string; before: string; after: s
 const yesNo = (value: boolean) => (value ? "Sim" : "Não");
 const list = (values: readonly string[]) => [...values].sort().join(", ") || "—";
 const brDate = (value: string) => (value ? value.split("-").reverse().join("/") : "—");
+const dueDay = (value: number | null | undefined) => (value ? `Dia ${String(value).padStart(2, "0")}` : "—");
 
 /** Diferença campo a campo entre a ficha atual e o que será gravado ao aplicar o envio. */
 export function submissionDiff(
@@ -181,6 +226,8 @@ export function submissionDiff(
     { field: "departments", label: "Departamentos", before: list(existing.departments.map(departmentLabel)), after: list(next.departments.map(departmentLabel)) },
     { field: "functions", label: "Funções na Doutrina", before: list(existing.functions), after: list(next.functions) },
     { field: "available_days", label: "Dias disponíveis", before: days(existing.available_days), after: days(next.available_days) },
+    { field: "contribution_cents", label: "Valor da contribuição mensal", before: formatMoney(existing.contribution_cents), after: formatMoney(next.contribution_cents) },
+    { field: "contribution_due_day", label: "Data da contribuição", before: dueDay(existing.contribution_due_day), after: dueDay(next.contribution_due_day) },
     { field: "volunteer_service", label: "Serviço voluntário", before: existing.volunteer_service || "—", after: next.volunteer_service || "—" },
     { field: "accepts_volunteer_law", label: "Termo de voluntariado", before: yesNo(existing.accepts_volunteer_law), after: yesNo(next.accepts_volunteer_law) },
     { field: "image_authorization", label: "Autorização de imagem", before: yesNo(existing.image_authorization), after: yesNo(next.image_authorization) }

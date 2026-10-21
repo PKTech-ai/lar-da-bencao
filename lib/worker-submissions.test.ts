@@ -132,6 +132,7 @@ const form = (overrides: object = {}) => ({
   functions: ["Passista"], available_days: [3], accepts_volunteer_law: true, image_authorization: false, privacy_acknowledged: true,
   ...overrides
 });
+const publicBody = (overrides: object = {}) => form({ contribution_cents: 5000, contribution_due_day: 10, ...overrides });
 const send = (body: object, ip = "203.0.113.7") =>
   publicRoute.POST(new Request("https://app.test/api/public/worker-submissions", { method: "POST", headers: { "x-real-ip": ip }, body: JSON.stringify(body) }));
 const review = (id: string, body: object) =>
@@ -146,7 +147,7 @@ function seedWorker(overrides: Partial<Worker> = {}) {
   return id;
 }
 async function submitted(overrides: object = {}) {
-  expect((await send(form(overrides))).status).toBe(201);
+  expect((await send(publicBody(overrides))).status).toBe(201);
   return state.submissions.at(-1)!;
 }
 
@@ -161,8 +162,8 @@ beforeEach(() => {
 
 describe("regras do formulário público", () => {
   it("exige nome, telefone com DDD, nascimento válido, departamento e os aceites", () => {
-    const fails = (overrides: object) => expect(publicSubmissionSchema.safeParse(form(overrides)).success).toBe(false);
-    expect(publicSubmissionSchema.safeParse(form()).success).toBe(true);
+    const fails = (overrides: object) => expect(publicSubmissionSchema.safeParse(publicBody(overrides)).success).toBe(false);
+    expect(publicSubmissionSchema.safeParse(publicBody()).success).toBe(true);
     fails({ full_name: "J" });
     fails({ phone: "9876-5432" });
     fails({ birth_date: "" });
@@ -174,9 +175,22 @@ describe("regras do formulário público", () => {
     fails({ privacy_acknowledged: false });
   });
 
-  it("descarta campos que o trabalhador não pode informar", () => {
-    const parsed = normalizeSubmission(publicSubmissionSchema.parse(form({ contribution_cents: 99, contribution_due_day: 5, notes: "x", status: "active" })));
-    expect(Object.keys(parsed)).not.toEqual(expect.arrayContaining(["contribution_cents", "contribution_due_day", "notes", "status", "privacy_acknowledged"]));
+  it("descarta observações e status, e guarda a contribuição do Estatuto", () => {
+    const parsed = normalizeSubmission(publicSubmissionSchema.parse(form({ contribution_cents: "80,00", contribution_due_day: "5", notes: "x", status: "active" })));
+    expect(parsed.contribution_cents).toBe(8000);
+    expect(parsed.contribution_due_day).toBe(5);
+    expect(Object.keys(parsed)).not.toEqual(expect.arrayContaining(["notes", "status", "privacy_acknowledged"]));
+  });
+
+  it("exige valor de pelo menos 1 centavo e o dia 05 ou 10", () => {
+    expect(publicSubmissionSchema.safeParse(form()).success).toBe(false);
+    expect(publicSubmissionSchema.safeParse(publicBody({ contribution_cents: 0 })).success).toBe(false);
+    expect(publicSubmissionSchema.safeParse(publicBody({ contribution_cents: "0,00" })).success).toBe(false);
+    expect(publicSubmissionSchema.safeParse(publicBody({ contribution_due_day: 15 })).success).toBe(false);
+    expect(publicSubmissionSchema.safeParse(publicBody({ contribution_due_day: null })).success).toBe(false);
+    const cent = publicSubmissionSchema.safeParse(publicBody({ contribution_cents: "0,01", contribution_due_day: "5" }));
+    expect(cent.success).toBe(true);
+    if (cent.success) expect(cent.data.contribution_cents).toBe(1);
   });
 
   it("exige CPF válido no envio público", () => {
@@ -247,16 +261,27 @@ describe("aplicação sobre ficha existente", () => {
   it("mostra só os campos que mudam", () => {
     expect(submissionDiff(existing, payload).map((row) => row.field)).toEqual(["full_name", "phone", "profession", "accepts_volunteer_law", "image_authorization"]);
   });
+
+  it("substitui a contribuição quando o trabalhador informa valor e dia", () => {
+    const informed = normalizeSubmission(submissionPayloadSchema.parse(form({ contribution_cents: "80,00", contribution_due_day: 5 })));
+    const next = fichaFromSubmission(informed, existing);
+    expect(next.contribution_cents).toBe(8000);
+    expect(next.contribution_due_day).toBe(5);
+    const rows = submissionDiff(existing, informed);
+    expect(rows.find((row) => row.field === "contribution_cents")).toMatchObject({ before: "R$\u00a050,00", after: "R$\u00a080,00" });
+    expect(rows.find((row) => row.field === "contribution_due_day")).toMatchObject({ before: "Dia 10", after: "Dia 05" });
+  });
 });
 
 describe("envio público", () => {
   it("grava só na fila, sem tocar em app.workers, e audita sem dados pessoais", async () => {
-    const response = await send(form({ contribution_cents: 99999, status: "active" }));
+    const response = await send(form({ contribution_cents: 99999, contribution_due_day: 10, status: "active" }));
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ status: "received" });
     expect(state.workers.size).toBe(0);
     expect(state.submissions).toHaveLength(1);
-    expect(state.submissions[0].payload).not.toHaveProperty("contribution_cents");
+    expect(state.submissions[0].payload).toMatchObject({ contribution_cents: 99999, contribution_due_day: 10 });
+    expect(state.submissions[0].payload).not.toHaveProperty("status");
     expect(state.submissions[0].ip_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(state.audits).toEqual([expect.objectContaining({ action: "Envio de cadastro online de trabalhador", entityId: state.submissions[0].id })]);
     expect(JSON.stringify(state.audits)).not.toMatch(/Silva|99876/);
@@ -284,13 +309,13 @@ describe("envio público", () => {
   });
 
   it("limita os envios por IP na janela", async () => {
-    for (let i = 0; i < SUBMISSION_LIMIT.max; i += 1) expect((await send(form())).status).toBe(201);
-    const blocked = await send(form());
+    for (let i = 0; i < SUBMISSION_LIMIT.max; i += 1) expect((await send(publicBody())).status).toBe(201);
+    const blocked = await send(publicBody());
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get("Retry-After")).toBe(String(SUBMISSION_LIMIT.windowMinutes * 60));
     expect(state.submissions).toHaveLength(SUBMISSION_LIMIT.max);
     expect(state.audits.at(-1)).toMatchObject({ result: "denied", reasonCode: "SUBMISSION_THROTTLED" });
-    expect((await send(form(), "198.51.100.9")).status).toBe(201);
+    expect((await send(publicBody(), "198.51.100.9")).status).toBe(201);
   });
 });
 
@@ -319,7 +344,7 @@ describe("revisão pelo Administrador", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body).toMatchObject({ result: "created", status: "pending" });
-    expect(state.workers.get(body.worker_id)).toMatchObject({ status: "pending", departments: ["doutrina", "infancia"], contribution_cents: "0", notes: "" });
+    expect(state.workers.get(body.worker_id)).toMatchObject({ status: "pending", departments: ["doutrina", "infancia"], contribution_cents: "5000", notes: "" });
     expect(state.submissions[0]).toMatchObject({ status: "applied", matched_worker_id: body.worker_id });
     expect(state.audits.map((a) => a.action)).toContain("Ficha de trabalhador criada a partir do cadastro online");
   });

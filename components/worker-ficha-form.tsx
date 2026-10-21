@@ -38,10 +38,22 @@ export function readFicha(form: HTMLFormElement) {
     available_days: values.getAll("available_days").map(Number),
     departments: values.getAll("departments").map(String),
     notes: text("notes"),
-    // Contribuição combinada da pessoa (a Tesouraria acompanha mês a mês).
-    contribution_cents: text("contribution_cents") ? parseMoney(text("contribution_cents")) : 0,
-    contribution_due_day: text("contribution_due_day") ? Number(text("contribution_due_day")) : null
+    contribution_cents: contributionAmount(text("contribution_cents")),
+    contribution_due_day: contributionDay(text("contribution_due_day"))
   };
+}
+
+function contributionAmount(value: string) {
+  const amount = value.trim();
+  if (!amount) throw new Error("Informe o valor da contribuição mensal.");
+  const cents = parseMoney(amount);
+  if (cents < 1) throw new Error("O valor da contribuição não pode ser inferior a 1 centavo.");
+  return cents;
+}
+
+function contributionDay(value: string) {
+  if (value !== "5" && value !== "10") throw new Error("Informe se a contribuição é no dia 05 ou no dia 10.");
+  return Number(value);
 }
 
 export function WorkerFichaForm({
@@ -58,11 +70,25 @@ export function WorkerFichaForm({
   onCancel?: () => void;
 }) {
   const [selected, setSelected] = useState<string[]>(initial?.departments ?? (originOptions?.[0] ? [originOptions[0].key] : []));
+  const [error, setError] = useState("");
   const doctrine = selected.includes("doutrina");
+  const cents = Number(initial?.contribution_cents ?? 0);
+  const dueDay = initial?.contribution_due_day;
   const toggle = (key: string, checked: boolean) => setSelected((current) => (checked ? [...current, key] : current.filter((item) => item !== key)));
 
+  function submit(event: FormEvent<HTMLFormElement>) {
+    try {
+      readFicha(event.currentTarget);
+      setError("");
+      onSubmit(event);
+    } catch (caught) {
+      event.preventDefault();
+      setError(caught instanceof Error ? caught.message : "Informe o valor da contribuição mensal.");
+    }
+  }
+
   return (
-    <form className="form-stack" onSubmit={onSubmit}>
+    <form className="form-stack" onSubmit={submit}>
       {notice ? <div className="notice">{notice}</div> : null}
       {originOptions ? (
         <label>Departamento solicitante
@@ -113,16 +139,18 @@ export function WorkerFichaForm({
           <label key={day}><input type="checkbox" name="available_days" value={index} defaultChecked={(initial?.available_days ?? [0, 1, 3, 4, 5, 6]).includes(index)} />{day}</label>
         ))}
       </fieldset>
-      <div className="form-row">
-        <label>Contribuição mensal combinada
-          <input name="contribution_cents" inputMode="decimal" maxLength={20} placeholder="Ex.: 50,00"
-            defaultValue={initial?.contribution_cents ? (Number(initial.contribution_cents) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : ""} />
-          <span className="small muted">Deixe em branco se a pessoa não contribui com valor fixo.</span>
+      <fieldset className="form-stack">
+        <legend>Valor da contribuição mensal conforme seção IV do Estatuto de 09/09/2008. *</legend>
+        <label className="money-line">R$
+          <input name="contribution_cents" required inputMode="decimal" maxLength={20} autoComplete="off" placeholder="0,00"
+            defaultValue={cents > 0 ? (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : ""} />
         </label>
-        <label>Dia previsto
-          <input name="contribution_due_day" type="number" min={1} max={31} defaultValue={initial?.contribution_due_day ?? ""} />
-        </label>
-      </div>
+        <fieldset className="check-grid">
+          <legend>Data da contribuição, dia 05 ou dia 10? *</legend>
+          <label><input type="radio" name="contribution_due_day" value="5" required defaultChecked={dueDay === 5} />Dia 05</label>
+          <label><input type="radio" name="contribution_due_day" value="10" required defaultChecked={dueDay === 10} />Dia 10</label>
+        </fieldset>
+      </fieldset>
       <label>Serviço voluntário<textarea name="volunteer_service" rows={2} maxLength={2000} defaultValue={initial?.volunteer_service ?? ""} placeholder="Descrição das atividades voluntárias" /></label>
       <fieldset className="check-grid">
         <legend>Termos</legend>
@@ -130,6 +158,7 @@ export function WorkerFichaForm({
         <label><input type="checkbox" name="image_authorization" defaultChecked={initial?.image_authorization} />Autorização de uso de imagem</label>
       </fieldset>
       <label>Observações<textarea name="notes" rows={2} maxLength={2000} defaultValue={initial?.notes ?? ""} /></label>
+      {error ? <div className="error" role="alert">{error}</div> : null}
       <div className="row-actions">
         <button className="button primary" disabled={busy || !selected.length}>{submitLabel}</button>
         {onCancel ? <button type="button" className="button" onClick={onCancel}>Cancelar</button> : null}

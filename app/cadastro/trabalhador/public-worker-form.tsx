@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { parseMoney } from "@/lib/resources/types";
 import { DOCTRINE_FUNCTIONS, WEEKDAYS } from "@/lib/worker-constants";
 
 type Option = { key: string; label: string };
@@ -19,6 +20,26 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
     const text = (name: string) => String(values.get(name) ?? "");
+    const amount = text("contribution_cents").trim();
+    const dueDay = text("contribution_due_day");
+    if (dueDay !== "5" && dueDay !== "10") {
+      setError("Informe se a contribuição é no dia 05 ou no dia 10.");
+      return;
+    }
+    if (!amount) {
+      setError("Informe o valor da contribuição mensal.");
+      return;
+    }
+    let contributionCents = 0;
+    try { contributionCents = parseMoney(amount); }
+    catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Informe um valor válido.");
+      return;
+    }
+    if (contributionCents < 1) {
+      setError("O valor da contribuição não pode ser inferior a 1 centavo.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -39,6 +60,8 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
           departments: values.getAll("departments").map(String),
           functions: values.getAll("functions").map(String),
           available_days: values.getAll("available_days").map(Number),
+          contribution_cents: contributionCents,
+          contribution_due_day: Number(dueDay),
           accepts_volunteer_law: values.get("accepts_volunteer_law") === "on",
           image_authorization: values.get("image_authorization") === "on",
           privacy_acknowledged: values.get("privacy_acknowledged") === "on",
@@ -106,6 +129,17 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
         <legend>Dias disponíveis</legend>
         {WEEKDAYS.map((day, index) => <label key={day}><input type="checkbox" name="available_days" value={index} />{day}</label>)}
       </fieldset>
+      <fieldset className="form-stack">
+        <legend>Valor da contribuição mensal conforme seção IV do Estatuto de 09/09/2008. *</legend>
+        <label className="money-line">R$
+          <input name="contribution_cents" required inputMode="decimal" maxLength={20} autoComplete="off" placeholder="0,00" />
+        </label>
+        <fieldset className="check-grid">
+          <legend>Data da contribuição, dia 05 ou dia 10? *</legend>
+          <label><input type="radio" name="contribution_due_day" value="5" required />Dia 05</label>
+          <label><input type="radio" name="contribution_due_day" value="10" required />Dia 10</label>
+        </fieldset>
+      </fieldset>
       <label>Serviço voluntário<textarea name="volunteer_service" rows={3} maxLength={2000} placeholder="Descreva as atividades que você realiza no Lar da Bênção" /></label>
       {/* Campo-isca contra robôs: fora da tela e fora da navegação por teclado e leitor de tela. */}
       <div aria-hidden="true" style={{ position: "absolute", left: -9999, width: 1, height: 1, overflow: "hidden" }}>
@@ -115,7 +149,7 @@ export function PublicWorkerForm({ departments }: { departments: Option[] }) {
         <strong>Termo de voluntariado.</strong> O serviço voluntário no Lar da Bênção é prestado de forma espontânea e não remunerada, nos termos da Lei nº 9.608/98, e não gera vínculo empregatício nem obrigação trabalhista ou previdenciária.
       </div>
       <div className="notice">
-        <strong>Aviso de privacidade.</strong> O Centro Espírita Filantrópico Lar da Bênção usa os dados deste formulário apenas para organizar o trabalho voluntário (ficha do trabalhador, escalas e contato). Eles são conferidos pela administração antes de entrar no cadastro e ficam restritos aos responsáveis pelos departamentos em que você atua, à Secretaria e à Diretoria. Para consultar, corrigir ou pedir a exclusão dos seus dados, procure a administração do Lar da Bênção.
+        <strong>Aviso de privacidade.</strong> O Centro Espírita Filantrópico Lar da Bênção usa os dados deste formulário para organizar o trabalho voluntário (ficha do trabalhador, escalas e contato) e registrar a contribuição mensal prevista no Estatuto. Eles são conferidos pela administração antes de entrar no cadastro e ficam restritos aos responsáveis pelos departamentos em que você atua, à Secretaria e à Diretoria. Para consultar, corrigir ou pedir a exclusão dos seus dados, procure a administração do Lar da Bênção.
       </div>
       <fieldset className="check-grid">
         <legend>Termos</legend>

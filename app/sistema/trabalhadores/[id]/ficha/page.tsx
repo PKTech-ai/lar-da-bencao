@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { PrintButton } from "@/components/print-button";
 import { formatCpf } from "@/lib/cpf";
+import { formatMoney } from "@/lib/resources/types";
 import { appendAudit } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { requireModulePage } from "@/lib/page-auth";
@@ -13,7 +14,8 @@ type Ficha = {
   id: string; full_name: string; cpf: string | null; phone: string | null; email: string | null; birth_date: Date | null; naturality: string | null;
   marital_status: string | null; profession: string | null; address: string | null; filled_date: Date | null;
   volunteer_service: string; accepts_volunteer_law: boolean; image_authorization: boolean; functions: string[];
-  available_days: number[]; status: WorkerStatus; approved_at: Date | null; departments: string[]; origin_label: string | null;
+  available_days: number[]; contribution_cents: string | number | null; contribution_due_day: number | null;
+  status: WorkerStatus; approved_at: Date | null; departments: string[]; origin_label: string | null;
 };
 
 const br = (value: Date | null) => (value ? new Date(value).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "Não informado");
@@ -50,6 +52,8 @@ export default async function WorkerFichaPage({ params }: { params: Promise<{ id
     ["Preenchimento da ficha", br(ficha.filled_date)], ["Departamento solicitante", ficha.origin_label ?? "Não informado"],
     ["Departamentos vinculados", ficha.departments.join(", ")], ["Funções na Doutrina", ficha.functions.join(", ") || "—"],
     ["Dias disponíveis", ficha.available_days.map((d) => WEEKDAYS[d]).join(", ") || "—"],
+    ["Valor da contribuição mensal", ficha.contribution_cents ? formatMoney(ficha.contribution_cents) : "Não informado"],
+    ["Data da contribuição", ficha.contribution_due_day ? `Dia ${String(ficha.contribution_due_day).padStart(2, "0")}` : "Não informado"],
     ["Serviço voluntário", ficha.volunteer_service || "Não informado"],
     ["Termo de voluntariado", ficha.accepts_volunteer_law ? "Aceite registrado" : "Aceite não registrado"],
     ["Autorização de imagem", ficha.image_authorization ? "Autorização registrada" : "Autorização não registrada"],

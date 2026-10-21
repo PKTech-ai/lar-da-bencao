@@ -3,12 +3,20 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { readFicha, WorkerFichaForm, type FichaValues, type Option } from "@/components/worker-ficha-form";
+import { formatMoney } from "@/lib/resources/types";
 import { workerStatusLabel, workerStatusTone, type WorkerStatus } from "@/lib/worker-constants";
 
 type WorkerRow = {
   id: string; full_name: string; phone: string | null; status: WorkerStatus; functions: string[];
   departments: string[]; origin_department: string | null; requested_at: string; version: number;
+  contribution_cents: string | number | null; contribution_due_day: number | null;
 };
+
+function contributionLabel(cents: string | number | null | undefined, day: number | null | undefined) {
+  const value = Number(cents);
+  if (!value) return "—";
+  return `${formatMoney(value)}${day ? ` · Dia ${String(day).padStart(2, "0")}` : ""}`;
+}
 type WorkerDetail = FichaValues & { id: string; status: WorkerStatus; version: number };
 
 export function WorkersClient({ departments, originOptions, updateScope }: {
@@ -145,13 +153,14 @@ export function WorkersClient({ departments, originOptions, updateScope }: {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Nome</th><th>Departamentos</th><th>Funções (Doutrina)</th><th>Situação</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Nome</th><th>Departamentos</th><th>Funções (Doutrina)</th><th>Contribuição</th><th>Situação</th><th>Ações</th></tr></thead>
             <tbody>
               {visible.map((w) => (
                 <tr key={w.id}>
                   <td><strong>{w.full_name}</strong><br /><span className="muted small">{w.phone || "—"}</span></td>
                   <td>{w.departments.map(label).join(", ")}<br /><span className="muted small">Solicitante: {w.origin_department ? label(w.origin_department) : "—"}</span></td>
                   <td>{w.functions.join(", ") || "—"}</td>
+                  <td>{contributionLabel(w.contribution_cents, w.contribution_due_day)}</td>
                   <td><span className={`status ${workerStatusTone[w.status]}`}>{workerStatusLabel[w.status]}</span></td>
                   <td>
                     <div className="row-actions">
@@ -163,7 +172,7 @@ export function WorkersClient({ departments, originOptions, updateScope }: {
                   </td>
                 </tr>
               ))}
-              {!visible.length ? <tr><td colSpan={5}>Nenhuma ficha encontrada neste filtro.</td></tr> : null}
+              {!visible.length ? <tr><td colSpan={6}>Nenhuma ficha encontrada neste filtro.</td></tr> : null}
             </tbody>
           </table>
         </div>

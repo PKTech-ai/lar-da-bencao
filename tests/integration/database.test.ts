@@ -562,9 +562,18 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
       method: "POST", headers: { "Content-Type": "application/json", "x-real-ip": ip, "user-agent": "vitest" }, body: JSON.stringify(body)
     }));
     const name = `Cadastro Online ${randomUUID().slice(0, 8)}`;
+    const cpfBase = randomUUID().replace(/\D/g, "").padEnd(9, "7").slice(0, 9);
+    const cpfDigit = (length: number, source: string) => {
+      let sum = 0;
+      for (let index = 0; index < length; index += 1) sum += Number(source[index]) * (length + 1 - index);
+      const mod = (sum * 10) % 11;
+      return mod === 10 ? 0 : mod;
+    };
+    const cpfFirst = cpfDigit(9, cpfBase);
     const form = {
-      full_name: name, phone: "(51) 99876-5432", birth_date: "1980-03-15", departments: ["doutrina"], functions: ["Passista"],
-      available_days: [3], accepts_volunteer_law: true, privacy_acknowledged: true, contribution_cents: 99999
+      full_name: name, cpf: `${cpfBase}${cpfFirst}${cpfDigit(10, cpfBase + cpfFirst)}`,
+      phone: "(51) 99876-5432", birth_date: "1980-03-15", departments: ["doutrina"], functions: ["Passista"],
+      available_days: [3], accepts_volunteer_law: true, privacy_acknowledged: true, contribution_cents: 99999, contribution_due_day: 10
     };
 
     // A flag nasce desligada: formulário fechado.
@@ -582,7 +591,7 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     current.actor = admin;
     const queue = (await (await list.GET()).json()).submissions.filter((s: { payload: { full_name: string } }) => s.payload.full_name === name);
     expect(queue).toHaveLength(2);
-    expect(queue[0].payload).not.toHaveProperty("contribution_cents");
+    expect(queue[0].payload).toMatchObject({ contribution_cents: 99999, contribution_due_day: 10 });
 
     const post = (id: string, body: object) => review.POST(json("POST", body), { params: Promise.resolve({ id }) });
     const created = await (await post(queue[0].id, { action: "create" })).json();

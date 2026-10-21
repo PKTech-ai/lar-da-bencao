@@ -5,6 +5,17 @@ test.describe.configure({ mode: "serial" });
 
 const ADMIN = "admin.e2e@lar.local";
 const NAME = `Trabalhadora Online ${Date.now()}`;
+const CPF = (() => {
+  const base = String(Date.now()).slice(-9);
+  const digit = (length: number, source: string) => {
+    let sum = 0;
+    for (let index = 0; index < length; index += 1) sum += Number(source[index]) * (length + 1 - index);
+    const mod = (sum * 10) % 11;
+    return mod === 10 ? 0 : mod;
+  };
+  const first = digit(9, base);
+  return `${base}${first}${digit(10, `${base}${first}`)}`;
+})();
 let adminContext: BrowserContext;
 let admin: Page;
 
@@ -16,12 +27,15 @@ async function phone(browser: Browser, colorScheme: "light" | "dark") {
 
 async function fillForm(page: Page, departments: string[]) {
   await page.getByLabel(/Nome completo/).fill(NAME);
+  await page.getByLabel(/^CPF/).fill(CPF);
   await page.getByLabel(/Telefone/).fill("(51) 99876-5432");
   await page.getByLabel(/Data de nascimento/).fill("1980-03-15");
   await page.getByLabel("Profissão").fill("Professora");
   for (const department of departments) await page.getByRole("checkbox", { name: department, exact: true }).check();
   await page.getByRole("checkbox", { name: "Passista" }).check();
   await page.getByRole("checkbox", { name: "Quarta" }).check();
+  await page.getByLabel(/^R\$/).fill("50,00");
+  await page.getByRole("radio", { name: "Dia 10" }).check();
   await page.getByRole("checkbox", { name: /termo de voluntariado/ }).check();
   await page.getByRole("checkbox", { name: /aviso de privacidade/ }).check();
 }
@@ -99,7 +113,7 @@ test("administrador cria a ficha a partir do primeiro envio", async () => {
   await card.getByRole("button", { name: "Criar nova ficha" }).click();
   await expect(admin.getByText("Ficha criada. O trabalhador fica PENDENTE")).toBeVisible();
   const worker = await sql<{ status: string; contribution_cents: string }>("select status, contribution_cents::text from app.workers where full_name = $1", [NAME]);
-  expect(worker).toEqual([{ status: "pending", contribution_cents: "0" }]);
+  expect(worker).toEqual([{ status: "pending", contribution_cents: "5000" }]);
 });
 
 test("segundo envio é vinculado à ficha existente e atualiza os dados", async () => {

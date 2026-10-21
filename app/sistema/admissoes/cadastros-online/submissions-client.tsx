@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, postJson } from "@/lib/client-api";
+import { formatMoney } from "@/lib/resources/types";
 import { WEEKDAYS, workerStatusLabel, type WorkerStatus } from "@/lib/worker-constants";
 import {
   submissionDiff, type ExistingFicha, type MatchSuggestion, type SubmissionPayload, type WorkerSummary
@@ -108,6 +109,8 @@ function SubmissionCard({ submission, workers, label, busy, onReview, onError }:
     ["Profissão", payload.profession || "—"], ["Endereço", payload.address || "—"],
     ["Departamentos", payload.departments.map(label).join(", ")], ["Funções na Doutrina", payload.functions.join(", ") || "—"],
     ["Dias disponíveis", payload.available_days.map((day) => WEEKDAYS[day]).join(", ") || "—"],
+    ["Valor da contribuição mensal", payload.contribution_cents ? formatMoney(payload.contribution_cents) : "—"],
+    ["Data da contribuição", payload.contribution_due_day ? `Dia ${String(payload.contribution_due_day).padStart(2, "0")}` : "—"],
     ["Serviço voluntário", payload.volunteer_service || "—"],
     ["Termo de voluntariado", "Aceito"], ["Autorização de imagem", payload.image_authorization ? "Sim" : "Não"]
   ];
