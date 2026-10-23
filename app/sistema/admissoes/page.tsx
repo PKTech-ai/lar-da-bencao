@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { query } from "@/lib/db";
-import { requireModulePage } from "@/lib/page-auth";
+import { isFlagEnabled } from "@/lib/feature-flags";
+import { requirePageActor } from "@/lib/page-auth";
 import { hasPermission } from "@/lib/permissions";
 import { workerPageContext } from "@/lib/worker-page";
-import { departmentsWith } from "@/lib/workers";
+import { canSeeAdmissions } from "@/lib/workers";
 import { AdmissionsClient } from "./admissions-client";
 
-/** Diretoria → Aprovação de Trabalhadores (consulta ampla: Diretoria, Secretaria e administrador). */
+/** Aprovação de Trabalhadores: Administrador e Presidente, ou quem teve o acesso marcado no convite. */
 export default async function AdmissoesPage() {
-  const actor = await requireModulePage("module_workers", { department: "any" });
+  const actor = await requirePageActor();
+  if (!(await isFlagEnabled("module_workers")) || !(await canSeeAdmissions(actor))) notFound();
   const context = await workerPageContext(actor);
-  if (!context.canDecide && (await departmentsWith(actor, "read")) !== null) notFound();
   const admin = await hasPermission(actor, "modules", "admin");
   const waiting = admin
     ? (await query<{ count: number }>("select count(*)::int as count from app.worker_submissions where status = 'received'")).rows[0].count
@@ -19,7 +20,7 @@ export default async function AdmissoesPage() {
   return (
     <>
       <header className="page-heading">
-        <div><h1>Aprovação de Trabalhadores</h1><p>A Secretaria e os departamentos cadastram as fichas. A Diretoria aprova ou reprova; só depois da aprovação o trabalhador fica ativo.</p></div>
+        <div><h1>Aprovação de Trabalhadores</h1><p>A Secretaria e os departamentos cadastram as fichas. O Administrador edita a ficha aqui e em Trabalhadores; salvar uma ficha que ainda não está aprovada a aprova. Aprovar e Reprovar aparecem nas fichas que ainda aguardam a Diretoria, para o Administrador e o Presidente.</p></div>
         {admin ? (
           <div className="row-actions">
             <Link className="button" href="/sistema/admissoes/cadastros-online">Cadastros online{waiting ? ` (${waiting})` : ""}</Link>
@@ -27,7 +28,7 @@ export default async function AdmissoesPage() {
           </div>
         ) : <span className="production-badge">Diretoria</span>}
       </header>
-      <AdmissionsClient departments={context.departments} canDecide={context.canDecide} />
+      <AdmissionsClient departments={context.departments} canDecide={context.canDecide} canEditFicha={context.canEditFicha} />
     </>
   );
 }

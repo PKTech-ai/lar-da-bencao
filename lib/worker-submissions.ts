@@ -236,7 +236,7 @@ export function submissionDiff(
 }
 
 export const reviewSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("create"), origin_department: z.string().regex(/^[a-z_]+$/).optional() }),
-  z.object({ action: z.literal("apply"), worker_id: z.string().uuid(), version: z.number().int().positive() }),
+  z.object({ action: z.literal("create"), origin_department: z.string().regex(/^[a-z_]+$/).optional(), ficha: z.unknown().optional() }),
+  z.object({ action: z.literal("apply"), worker_id: z.string().uuid(), version: z.number().int().positive(), ficha: z.unknown().optional() }),
   z.object({ action: z.literal("discard"), note: z.string().trim().min(3, "Informe o motivo do descarte.").max(500) })
 ]);

@@ -15,7 +15,7 @@ export default async function CadastrosOnlinePage() {
   return (
     <>
       <header className="page-heading">
-        <div><h1>Cadastros online</h1><p>Envios do formulário público. Nada entra na ficha do trabalhador antes da sua conferência.</p></div>
+        <div><h1>Cadastros online</h1><p>Envios do formulário público. O Administrador corrige qualquer campo antes de gravar a ficha.</p></div>
         <span className="production-badge">Somente administrador</span>
       </header>
       <div className="grid">

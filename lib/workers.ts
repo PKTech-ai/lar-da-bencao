@@ -85,10 +85,28 @@ export function todayInSaoPaulo(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(now);
 }
 
+/** Correção da ficha, inclusive a que chegou pelo formulário: somente o Administrador do Sistema. */
+export function canEditWorkerFicha(actor: Actor) {
+  return actor.role === "administrador";
+}
+
 /** Decisões da Diretoria (admissões, baixas): somente Administrador e Presidente com acesso total à Presidência. */
 export async function canDecideAdmissions(actor: Actor) {
   if (!["administrador", "presidente"].includes(actor.role)) return false;
   return hasPermission(actor, "presidencia", "approve");
+}
+
+/**
+ * Ver a área de Admissões: quem decide sempre entra.
+ * Os demais só entram se o convite (ou a edição do acesso) marcou o flag.
+ */
+export async function canSeeAdmissions(actor: Actor) {
+  if (await canDecideAdmissions(actor)) return true;
+  const found = await query<{ admissions_access: boolean }>(
+    "select admissions_access from app.users where id = $1",
+    [actor.id]
+  );
+  return found.rows[0]?.admissions_access === true;
 }
 
 /** Departamentos do ator em que ele tem a ação; `null` quando vale para todos. */

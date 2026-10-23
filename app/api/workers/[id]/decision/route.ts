@@ -48,6 +48,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         if (access.createdAuthUserId) {
           createdAuthUserId = access.createdAuthUserId;
           accessNote = ` Acesso criado. Login pelo CPF ${maskCpf(worker.cpf ?? "")}. Troca de senha obrigatória no primeiro acesso.`;
+        } else if (access.linkedExisting) {
+          accessNote = " Ficha vinculada ao acesso que este CPF já possui. Login e perfil permanecem os mesmos.";
         }
       }
       await client.query(
@@ -70,7 +72,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         before: { status: "pending" },
         after: { status: approved ? "active" : "rejected", departments: worker.departments, functions: worker.functions }
       }, client);
-      return { status: approved ? "active" : "rejected", name: worker.full_name };
+      return { status: approved ? "active" : "rejected", name: worker.full_name, linkedExisting: approved && accessNote.includes("vinculada") };
     });
     return Response.json(outcome);
   } catch (error) {

@@ -338,6 +338,19 @@ describe("revisão pelo Administrador", () => {
     expect(body.submissions[0].suggestions).toEqual([{ worker_id: workerId, reasons: ["mesmo nome", "mesmo nascimento e telefone"] }]);
   });
 
+  it("grava a correção do administrador no lugar da cópia do formulário", async () => {
+    const submission = await submitted();
+    const received = submissionPayloadSchema.parse(submission.payload);
+    const response = await review(submission.id, {
+      action: "create",
+      origin_department: "doutrina",
+      ficha: { ...fichaFromSubmission(received), full_name: "José Corrigido", phone: "(92) 99999-0000", profession: "Marceneiro" }
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(state.workers.get(body.worker_id)).toMatchObject({ full_name: "José Corrigido", phone: "(92) 99999-0000", status: "pending" });
+  });
+
   it("criar ficha nova: nasce pendente e o envio fica aplicado", async () => {
     const submission = await submitted({ departments: ["infancia", "doutrina"] });
     const response = await review(submission.id, { action: "create", origin_department: "infancia" });

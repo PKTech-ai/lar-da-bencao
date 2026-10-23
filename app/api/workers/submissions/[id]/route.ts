@@ -47,11 +47,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       }
 
       const payload = submissionPayloadSchema.parse(submission.payload);
+      const edited = review.ficha === undefined ? undefined : normalizeFicha(fichaSchema.parse(review.ficha));
       let workerId: string;
       let status: WorkerStatus = "pending";
       let resubmitted = false;
       if (review.action === "create") {
-        const input = normalizeFicha(fichaSchema.parse(fichaFromSubmission(payload)));
+        const input = edited ?? normalizeFicha(fichaSchema.parse(fichaFromSubmission(payload)));
         const origin = review.origin_department ?? input.departments[0];
         if (!input.departments.includes(origin)) throw new AppError("O departamento solicitante precisa estar entre os departamentos da ficha.");
         workerId = await insertWorker(client, input, { origin, authorId: admin.id });
@@ -75,7 +76,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         const before = current.rows[0];
         if (!before) throw new AppError("Trabalhador não encontrado.", 404, "NOT_FOUND");
         if (before.version !== review.version) throw new AppError("A ficha foi alterada por outra sessão. Recarregue a página.", 409, "VERSION_CONFLICT");
-        const input = normalizeFicha(fichaSchema.parse(fichaFromSubmission(payload, before)));
+        const input = edited ?? normalizeFicha(fichaSchema.parse(fichaFromSubmission(payload, before)));
         ({ status, resubmitted } = statusAfterEdit(before.status, before, input));
         workerId = before.id;
         await updateWorkerFicha(client, workerId, input, { status, resubmitted, authorId: admin.id });

@@ -33,8 +33,17 @@ export async function provisionWorkerAccess(
   const linkedId = (linked.rows[0] as { id: string } | undefined)?.id;
   if (linkedId) return { userId: linkedId };
 
-  const taken = await db.query("select id from app.users where cpf = $1", [cpf]);
-  if (taken.rows[0]) throw new AppError("Este CPF já tem acesso ao sistema.", 409, "CPF_IN_USE");
+  const taken = await db.query("select id, worker_id from app.users where cpf = $1", [cpf]);
+  const existing = taken.rows[0] as { id: string; worker_id: string | null } | undefined;
+  if (existing?.worker_id) throw new AppError("Este CPF já tem acesso ao sistema, vinculado a outra ficha.", 409, "CPF_IN_USE");
+  if (existing) {
+    const linkedAccount = await db.query(
+      "update app.users set worker_id=$2, updated_by=$3 where id=$1 and worker_id is null returning id",
+      [existing.id, worker.id, authorId]
+    );
+    if (!linkedAccount.rows[0]) throw new AppError("Este CPF já tem acesso ao sistema, vinculado a outra ficha.", 409, "CPF_IN_USE");
+    return { userId: existing.id, linkedExisting: true as const };
+  }
 
   const email = accessEmailForCpf(cpf);
   const created = await createAuthUser({ email, password: initialPasswordForCpf(cpf), email_confirm: true });

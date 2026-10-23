@@ -50,6 +50,16 @@ function fakeQuery(text: string, values: unknown[] = []): { rows: unknown[]; row
     w.version += 1;
     return { rows: [], rowCount: 1 };
   }
+  if (sql.startsWith("select full_name from app.workers")) {
+    const w = state.workers.get(String(values[0]));
+    return { rows: w ? [{ full_name: w.full_name }] : [] };
+  }
+  if (sql.startsWith("select app.delete_worker_ficha")) {
+    state.workers.delete(String(values[0]));
+    return { rows: [] };
+  }
+  if (sql.startsWith("select id, worker_id from app.users")) return { rows: [] };
+  if (sql.startsWith("update app.users set worker_id")) return { rows: [{ id: "user-1" }] };
   if (sql.startsWith("select id from app.users")) return { rows: [] };
   if (sql.startsWith("insert into app.users")) return { rows: [{ id: "user-1" }] };
   if (sql.startsWith("insert into app.user_departments")) return { rows: [] };
@@ -209,17 +219,33 @@ describe("fluxo de admissão", () => {
     expect(stale.status).toBe(409);
   });
 
-  it("editar funções de aprovado devolve para a Diretoria; reprovado reenviado também", async () => {
+  it("só o administrador edita a ficha; mudar funções de aprovado devolve para a Diretoria", async () => {
     const { id } = await createAs("doutrina");
     await decide(id, { decision: "approved" });
     coordinator("doutrina");
+    const denied = await workerRoute.PATCH(json("PATCH", ficha({ functions: ["Palestrante"], version: state.workers.get(id)!.version })), params(id));
+    expect(denied.status).toBe(403);
+    expect(state.workers.get(id)?.status).toBe("active");
+
+    state.role = "administrador";
     const edited = await workerRoute.PATCH(json("PATCH", ficha({ functions: ["Palestrante"], version: state.workers.get(id)!.version })), params(id));
     expect(await edited.json()).toMatchObject({ status: "pending", resubmitted: true });
 
     await decide(id, { decision: "rejected", reason: "Rever funções" });
-    coordinator("doutrina");
+    state.role = "administrador";
     const resent = await workerRoute.PATCH(json("PATCH", ficha({ version: state.workers.get(id)!.version })), params(id));
-    expect(await resent.json()).toMatchObject({ status: "pending", resubmitted: true });
+    expect(await resent.json()).toMatchObject({ status: "active", approved: true });
+    expect(state.workers.get(id)?.status).toBe("active");
+  });
+
+  it("salvar ficha pendente aprova na hora", async () => {
+    const { id } = await createAs("doutrina");
+    state.role = "administrador";
+    const saved = await workerRoute.PATCH(json("PATCH", ficha({ version: 1 })), params(id));
+    expect(await saved.json()).toMatchObject({ status: "active", approved: true });
+    expect(state.workers.get(id)?.status).toBe("active");
+    expect(state.decisions).toEqual([expect.objectContaining({ worker_id: id, decision: "approved" })]);
+    expect(state.audits).toContain("Ficha editada e aprovada");
   });
 
   it("não ativa ficha pendente pela edição", async () => {
@@ -227,6 +253,18 @@ describe("fluxo de admissão", () => {
     const response = await workerRoute.PATCH(json("PATCH", ficha({ active: true, version: 1 })), params(id));
     expect(response.status).toBe(409);
     expect(state.workers.get(id)?.status).toBe("pending");
+  });
+
+  it("só o administrador exclui a ficha", async () => {
+    const { id } = await createAs("doutrina");
+    coordinator("doutrina");
+    expect((await workerRoute.DELETE(json("DELETE", {}), params(id))).status).toBe(403);
+    expect(state.workers.has(id)).toBe(true);
+
+    state.role = "administrador";
+    expect((await workerRoute.DELETE(json("DELETE", {}), params(id))).status).toBe(200);
+    expect(state.workers.has(id)).toBe(false);
+    expect(state.audits).toContain("Ficha de trabalhador excluída");
   });
 
   it("coordenador de outro departamento não edita a ficha", async () => {

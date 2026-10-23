@@ -1,6 +1,6 @@
 import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { canDecideAdmissions, departmentsWith } from "@/lib/workers";
+import { canDecideAdmissions, canEditWorkerFicha, departmentsWith } from "@/lib/workers";
 
 export type DepartmentOption = { key: string; label: string };
 
@@ -13,5 +13,5 @@ export async function workerPageContext(actor: Actor) {
     canDecideAdmissions(actor)
   ]);
   const originOptions = createScope === null ? departments : departments.filter((d) => createScope.includes(d.key));
-  return { departments, originOptions, updateScope, canDecide };
+  return { departments, originOptions, updateScope, canDecide, canEditFicha: canEditWorkerFicha(actor) };
 }

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { PasswordField } from "@/components/password-field";
 
 export function PasswordForm() {
   const router = useRouter();
@@ -34,8 +35,8 @@ export function PasswordForm() {
 
   return (
     <form className="form-stack" onSubmit={submit}>
-      <label>Nova senha<input name="password" type="password" autoComplete="new-password" minLength={14} required /></label>
-      <label>Confirme a senha<input name="confirmation" type="password" autoComplete="new-password" minLength={14} required /></label>
+      <label>Nova senha<PasswordField name="password" autoComplete="new-password" minLength={6} required /></label>
+      <label>Confirme a senha<PasswordField name="confirmation" autoComplete="new-password" minLength={6} required /></label>
       {error ? <div className="error" role="alert">{error}</div> : null}
       <button className={busy ? "button primary is-loading" : "button primary"} type="submit" disabled={busy}>{busy ? "Salvando a nova senha…" : "Salvar senha"}</button>
     </form>

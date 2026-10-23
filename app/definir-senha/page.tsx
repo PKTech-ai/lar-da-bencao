@@ -9,8 +9,8 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
   if (!user.data.user) redirect("/login");
   const motivo = (await searchParams).motivo;
   const intro = motivo === "primeiro-acesso"
-    ? "Sua senha inicial é o seu CPF. Troque agora por uma senha exclusiva, com pelo menos 14 caracteres, diferente do CPF."
-    : "Use uma senha exclusiva, com pelo menos 14 caracteres.";
+    ? "Sua senha inicial é o seu CPF. Troque agora por uma senha com pelo menos 6 caracteres."
+    : "Escolha uma senha com pelo menos 6 caracteres.";
   return (
     <main className="auth-shell">
       <section className="auth-card">

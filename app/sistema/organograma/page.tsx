@@ -5,7 +5,7 @@ export default async function OrganogramPage() {
   await requirePageActor();
   return (
     <>
-      <header className="page-heading"><div><h1>Organograma</h1><p>Diretoria do biênio e coordenação de cada departamento.</p></div></header>
+      <header className="page-heading"><div><h1>Organograma</h1><p>Visão sintética e analítica da estrutura institucional conforme Estatuto e Regimento.</p></div></header>
       <OrganogramClient />
     </>
   );

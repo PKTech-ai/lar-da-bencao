@@ -19,3 +19,7 @@ Thumbs.db
 /backups-pessoais/
 .vercel
 .env*
+
+# cache local do pnpm e saídas de teste
+.pnpm-store/
+test-results/

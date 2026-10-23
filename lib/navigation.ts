@@ -4,6 +4,7 @@ import { query } from "@/lib/db";
 import { listEnabledFlags } from "@/lib/feature-flags";
 import { moduleCatalog } from "@/lib/modules";
 import { hasAnyDepartmentPermission, hasPermission } from "@/lib/permissions";
+import { canSeeAdmissions } from "@/lib/workers";
 
 export type VisibleModule = { href: string; label: string };
 
@@ -32,6 +33,10 @@ export const loadNavigation = cache(async (actor: Actor) => {
   for (const mod of moduleCatalog) {
     if (mod.key === "home") continue;
     if (!flags.get(mod.flagKey)) continue;
+    if (mod.key === "admissoes") {
+      if (await canSeeAdmissions(actor)) modules.push({ href: mod.href, label: mod.label });
+      continue;
+    }
     const allowed = mod.department
       ? await hasPermission(actor, mod.permissionResource, "read", mod.department)
       : mod.permissionResource === "department"

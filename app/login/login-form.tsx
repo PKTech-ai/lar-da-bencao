@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MaskedInput } from "@/components/masked-input";
+import { PasswordField } from "@/components/password-field";
 import { maskCpfInput } from "@/lib/cpf";
 
 export function LoginForm() {
@@ -44,7 +45,7 @@ export function LoginForm() {
       {params.get("motivo") === "sessao" ? <div className="notice" role="status">Sua sessão foi encerrada. Entre novamente.</div> : null}
       {params.get("motivo") === "bienio" ? <div className="notice" role="status">Seu acesso de Diretoria está fora do biênio vigente. Procure o Administrador do Sistema.</div> : null}
       <label>CPF<MaskedInput name="email" mask={maskCpfInput} type="text" inputMode="numeric" autoComplete="username" minLength={11} maxLength={14} placeholder="000.000.000-00" required /></label>
-      <label>Senha<input name="password" type="password" autoComplete="current-password" minLength={11} required /></label>
+      <label>Senha<PasswordField name="password" autoComplete="current-password" minLength={6} required /></label>
       {error ? <div className="error" role="alert">{error}</div> : null}
       <button className={busy ? "button primary is-loading" : "button primary"} type="submit" disabled={busy}>{busy ? "Entrando…" : "Continuar"}</button>
       <Link href="/recuperar" className="button">Esqueci minha senha</Link>

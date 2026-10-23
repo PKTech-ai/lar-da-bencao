@@ -7,6 +7,7 @@ import { ResourceManager } from "@/components/resources/resource-manager";
 import { findModulePage, SECTOR_ROLE_RESOURCE, type SectionAccess } from "@/lib/module-pages";
 import { requireModulePage } from "@/lib/page-auth";
 import { hasPermission } from "@/lib/permissions";
+import { canSeeAdmissions } from "@/lib/workers";
 import { RESOURCES } from "@/lib/resources/registry";
 
 type Params = { params: Promise<{ modulo: string; secao?: string[] }> };
@@ -22,6 +23,7 @@ export default async function ModuleSectionPage({ params }: Params) {
   const visible = [];
   for (const section of page.sections) {
     if (sectorResource && section.access?.resource !== sectorResource) continue;
+    if (section.panel === "admissoes-atalho" && !(await canSeeAdmissions(actor))) continue;
     if (await can(section.access)) visible.push(section);
   }
   const current = visible.find((s) => s.slug === (secao?.[0] ?? ""));

@@ -17,7 +17,7 @@ type StoredUser = {
   role_key: string;
   status: string;
   cpf: string;
-  worker_id: string;
+  worker_id: string | null;
   must_reset_password: boolean;
   created_by: string;
   departments: string[];
@@ -32,9 +32,15 @@ function memoryDb(seed: StoredUser[] = []) {
       const found = users.find((user) => user.worker_id === values[0]);
       return { rows: found ? [{ id: found.id }] : [] };
     }
-    if (sql.startsWith("select id from app.users where cpf")) {
+    if (sql.startsWith("select id, worker_id from app.users where cpf")) {
       const found = users.find((user) => user.cpf === values[0]);
-      return { rows: found ? [{ id: found.id }] : [] };
+      return { rows: found ? [{ id: found.id, worker_id: found.worker_id }] : [] };
+    }
+    if (sql.startsWith("update app.users set worker_id")) {
+      const user = users.find((item) => item.id === values[0] && item.worker_id == null);
+      if (!user) return { rows: [] };
+      user.worker_id = String(values[1]);
+      return { rows: [{ id: user.id }] };
     }
     if (sql.startsWith("insert into app.users")) {
       const id = `user-${++seq}`;
@@ -87,6 +93,25 @@ describe("provisionamento do acesso", () => {
     };
     await expect(provisionWorkerAccess(db, worker, "author", createAuthUser)).rejects.toMatchObject({ code: "CPF_IN_USE" });
     expect(called).toBe(false);
+  });
+
+  it("vincula a ficha à conta que já usa o CPF, sem criar outro acesso", async () => {
+    const db = memoryDb([{
+      id: "user-admin", auth_user_id: "auth-admin", email: "admin@lardabencao.org", full_name: "Marcel",
+      role_key: "administrador", status: "active", cpf: "52998224725", worker_id: null, must_reset_password: true,
+      created_by: "author", departments: []
+    }]);
+    let called = false;
+    const createAuthUser = async () => {
+      called = true;
+      return { data: { user: { id: "auth-new" } }, error: null };
+    };
+    const result = await provisionWorkerAccess(db, worker, "author", createAuthUser);
+    expect(result).toEqual({ userId: "user-admin", linkedExisting: true });
+    expect(called).toBe(false);
+    expect(db.users[0]).toMatchObject({
+      role_key: "administrador", email: "admin@lardabencao.org", worker_id: "w-1", departments: []
+    });
   });
 
   it("cria o acesso com o CPF, papel trabalhador e os departamentos da ficha", async () => {

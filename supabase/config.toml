@@ -179,7 +179,7 @@ enable_anonymous_sign_ins = false
 enable_manual_linking = false
 # A senha inicial do trabalhador é o CPF (11 dígitos). O app exige 14 caracteres,
 # diferentes do CPF, na troca obrigatória do primeiro acesso.
-minimum_password_length = 11
+minimum_password_length = 6
 password_requirements = ""
 
 # Configure passkey sign-ins.

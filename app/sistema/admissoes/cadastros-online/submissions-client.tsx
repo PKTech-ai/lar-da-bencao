@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { readFicha, WorkerFichaForm, type FichaValues } from "@/components/worker-ficha-form";
 import { api, postJson } from "@/lib/client-api";
-import { formatMoney } from "@/lib/resources/types";
-import { WEEKDAYS, workerStatusLabel, type WorkerStatus } from "@/lib/worker-constants";
+import { workerStatusLabel, type WorkerStatus } from "@/lib/worker-constants";
 import {
-  submissionDiff, type ExistingFicha, type MatchSuggestion, type SubmissionPayload, type WorkerSummary
+  fichaFromSubmission, submissionDiff, type ExistingFicha, type MatchSuggestion, type SubmissionPayload, type WorkerSummary
 } from "@/lib/worker-submissions";
 
 type Option = { key: string; label: string };
@@ -13,7 +13,20 @@ type Submission = { id: string; created_at: string; payload: SubmissionPayload |
 type WorkerDetail = ExistingFicha & { id: string; status: WorkerStatus; version: number };
 type Outcome = { result: "created" | "updated" | "discarded"; resubmitted?: boolean };
 
-const brDate = (value: string) => value.split("-").reverse().join("/");
+function toForm(payload: SubmissionPayload, existing?: ExistingFicha): FichaValues {
+  const ficha = fichaFromSubmission(payload, existing);
+  return {
+    ...ficha,
+    email: ficha.email || null,
+    phone: ficha.phone || null,
+    birth_date: ficha.birth_date || null,
+    naturality: ficha.naturality || null,
+    marital_status: ficha.marital_status || null,
+    profession: ficha.profession || null,
+    address: ficha.address || null,
+    filled_date: ficha.filled_date || null
+  };
+}
 
 export function SubmissionsClient({ departments }: { departments: Option[] }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -56,20 +69,19 @@ export function SubmissionsClient({ departments }: { departments: Option[] }) {
       {message ? <div className="success" role="status">{message}</div> : null}
       {loaded && !submissions.length ? <section className="card"><p>Nenhum envio aguardando conferência.</p></section> : null}
       {submissions.map((submission) => (
-        <SubmissionCard key={submission.id} submission={submission} workers={workers} label={label} busy={busy}
+        <SubmissionCard key={submission.id} submission={submission} workers={workers} departments={departments} label={label} busy={busy}
           onReview={(payload) => void review(submission.id, payload)} onError={setError} />
       ))}
     </>
   );
 }
 
-function SubmissionCard({ submission, workers, label, busy, onReview, onError }: {
-  submission: Submission; workers: WorkerSummary[]; label: (key: string) => string; busy: boolean;
+function SubmissionCard({ submission, workers, departments, label, busy, onReview, onError }: {
+  submission: Submission; workers: WorkerSummary[]; departments: Option[]; label: (key: string) => string; busy: boolean;
   onReview: (payload: object) => void; onError: (message: string) => void;
 }) {
   const { payload, suggestions } = submission;
   const [target, setTarget] = useState<WorkerDetail | null>(null);
-  const [origin, setOrigin] = useState(payload?.departments[0] ?? "");
   const received = new Date(submission.created_at).toLocaleString("pt-BR");
   const suggested = suggestions
     .map((item) => ({ ...item, worker: workers.find((w) => w.id === item.worker_id) }))
@@ -102,29 +114,28 @@ function SubmissionCard({ submission, workers, label, busy, onReview, onError }:
     );
   }
 
-  const diff = target ? submissionDiff(target, payload, label) : [];
-  const rows: [string, string][] = [
-    ["Telefone", payload.phone], ["E-mail", payload.email || "—"], ["Nascimento", brDate(payload.birth_date)],
-    ["Naturalidade", payload.naturality || "—"], ["Estado civil", payload.marital_status || "—"],
-    ["Profissão", payload.profession || "—"], ["Endereço", payload.address || "—"],
-    ["Departamentos", payload.departments.map(label).join(", ")], ["Funções na Doutrina", payload.functions.join(", ") || "—"],
-    ["Dias disponíveis", payload.available_days.map((day) => WEEKDAYS[day]).join(", ") || "—"],
-    ["Valor da contribuição mensal", payload.contribution_cents ? formatMoney(payload.contribution_cents) : "—"],
-    ["Data da contribuição", payload.contribution_due_day ? `Dia ${String(payload.contribution_due_day).padStart(2, "0")}` : "—"],
-    ["Serviço voluntário", payload.volunteer_service || "—"],
-    ["Termo de voluntariado", "Aceito"], ["Autorização de imagem", payload.image_authorization ? "Sim" : "Não"]
+  const receivedPayload = payload;
+  const diff = target ? submissionDiff(target, receivedPayload, label) : [];
+  const initial = toForm(receivedPayload, target ?? undefined);
+  const originOptions = [
+    ...departments.filter((department) => receivedPayload.departments.includes(department.key)),
+    ...departments.filter((department) => !receivedPayload.departments.includes(department.key))
   ];
+
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const ficha = readFicha(form);
+    const origin = String(new FormData(form).get("origin_department") ?? "");
+    if (target) onReview({ action: "apply", worker_id: target.id, version: target.version, ficha });
+    else onReview({ action: "create", origin_department: origin || receivedPayload.departments[0], ficha });
+  }
 
   return (
     <section className="card">
       <div className="toolbar">
         <h2>{payload.full_name}</h2>
         <span className="muted small">Recebido em {received}</span>
-      </div>
-      <div className="table-wrap">
-        <table>
-          <tbody>{rows.map(([name, value]) => <tr key={name}><th scope="row">{name}</th><td>{value}</td></tr>)}</tbody>
-        </table>
       </div>
       <div className="form-stack" style={{ marginTop: 16 }}>
         <label>Já tem ficha? Vincular a
@@ -151,29 +162,18 @@ function SubmissionCard({ submission, workers, label, busy, onReview, onError }:
             {diff.length ? (
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Campo</th><th>Hoje na ficha</th><th>Depois de atualizar</th></tr></thead>
+                  <thead><tr><th>Campo</th><th>Hoje na ficha</th><th>O que chegou no formulário</th></tr></thead>
                   <tbody>{diff.map((row) => <tr key={row.field}><th scope="row">{row.label}</th><td>{row.before}</td><td>{row.after}</td></tr>)}</tbody>
                 </table>
               </div>
-            ) : <p className="muted small">O envio não muda nenhum campo desta ficha.</p>}
+            ) : <p className="muted small">O envio não muda nenhum campo desta ficha. Você ainda pode corrigir os campos abaixo.</p>}
           </>
         ) : null}
+        <WorkerFichaForm key={target?.id ?? "nova"} departments={departments} initial={initial}
+          originOptions={target ? undefined : originOptions} busy={busy}
+          notice="Corrija qualquer campo. Só o Administrador do Sistema grava esta ficha."
+          submitLabel={target ? "Atualizar esta ficha" : "Criar nova ficha"} onSubmit={save} />
         <div className="row-actions">
-          {target ? (
-            <button className="button primary" disabled={busy} onClick={() => onReview({ action: "apply", worker_id: target.id, version: target.version })}>Atualizar esta ficha</button>
-          ) : null}
-          {!target ? (
-            <>
-              {payload.departments.length > 1 ? (
-                <label>Departamento solicitante
-                  <select value={origin} onChange={(event) => setOrigin(event.target.value)}>
-                    {payload.departments.map((key) => <option key={key} value={key}>{label(key)}</option>)}
-                  </select>
-                </label>
-              ) : null}
-              <button className="button primary" disabled={busy} onClick={() => onReview({ action: "create", origin_department: origin })}>Criar nova ficha</button>
-            </>
-          ) : null}
           <button className="button danger" disabled={busy} onClick={discard}>Descartar</button>
         </div>
       </div>

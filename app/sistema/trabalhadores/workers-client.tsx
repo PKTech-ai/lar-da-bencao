@@ -19,8 +19,8 @@ function contributionLabel(cents: string | number | null | undefined, day: numbe
 }
 type WorkerDetail = FichaValues & { id: string; status: WorkerStatus; version: number };
 
-export function WorkersClient({ departments, originOptions, updateScope }: {
-  departments: Option[]; originOptions: Option[]; updateScope: string[] | null; canDecide: boolean;
+export function WorkersClient({ departments, originOptions, updateScope, canEditFicha }: {
+  departments: Option[]; originOptions: Option[]; updateScope: string[] | null; canDecide: boolean; canEditFicha: boolean;
 }) {
   const [workers, setWorkers] = useState<WorkerRow[]>([]);
   const [status, setStatus] = useState("");
@@ -87,7 +87,18 @@ export function WorkersClient({ departments, originOptions, updateScope }: {
     void run(async () => {
       const body = await send(`/api/workers/${editing.id}`, "PATCH", { ...readFicha(form), version: editing.version });
       setEditing(null);
+      if (body.approved && body.linkedExisting) return "Ficha salva e aprovada. Ela foi vinculada ao acesso que este CPF já possui. O login e o perfil permanecem os mesmos.";
+      if (body.approved) return "Ficha salva e aprovada. O trabalhador fica ativo.";
       return body.resubmitted ? "Ficha atualizada e encaminhada para nova análise da Diretoria." : "Ficha atualizada.";
+    });
+  }
+
+  function remove(worker: WorkerRow) {
+    if (!window.confirm(`Excluir a ficha de ${worker.full_name}? O acesso ao sistema, se já existir, continua e só perde o vínculo com esta ficha.`)) return;
+    void run(async () => {
+      await send(`/api/workers/${worker.id}`, "DELETE", {});
+      if (editing?.id === worker.id) setEditing(null);
+      return "Ficha excluída.";
     });
   }
 
@@ -107,10 +118,10 @@ export function WorkersClient({ departments, originOptions, updateScope }: {
 
   const term = search.trim().toLocaleLowerCase("pt-BR");
   const visible = workers.filter((w) => !term || [w.full_name, ...w.departments.map(label), ...w.functions].join(" ").toLocaleLowerCase("pt-BR").includes(term));
-  const editNotice = editing?.status === "active" || editing?.status === "inactive"
-    ? "Ficha aprovada: você pode corrigir os dados. Se alterar departamentos ou funções, a ficha volta para PENDENTE — AGUARDANDO DIRETORIA."
-    : editing?.status === "rejected"
-      ? "Ficha reprovada: ao salvar, ela será reenviada para nova análise da Diretoria."
+  const editNotice = editing?.status === "pending" || editing?.status === "rejected"
+    ? "Esta ficha ainda não está aprovada. Ao salvar, ela é aprovada e o trabalhador fica ativo."
+    : editing?.status === "active" || editing?.status === "inactive"
+      ? "Ficha aprovada: você pode corrigir os dados. Se alterar departamentos ou funções, a ficha volta para PENDENTE — AGUARDANDO DIRETORIA."
       : undefined;
 
   return (
@@ -164,7 +175,8 @@ export function WorkersClient({ departments, originOptions, updateScope }: {
                   <td><span className={`status ${workerStatusTone[w.status]}`}>{workerStatusLabel[w.status]}</span></td>
                   <td>
                     <div className="row-actions">
-                      {canEdit(w) ? <button className="button" disabled={busy} onClick={() => void openEdit(w.id)}>Editar ficha</button> : null}
+                      {canEditFicha ? <button className="button" disabled={busy} onClick={() => void openEdit(w.id)}>Editar ficha</button> : null}
+                      {canEditFicha ? <button className="button danger" disabled={busy} onClick={() => remove(w)}>Excluir ficha</button> : null}
                       {canEdit(w) && w.status === "active" ? <button className="button danger" disabled={busy} onClick={() => setActive(w, false)}>Afastar</button> : null}
                       {canEdit(w) && w.status === "inactive" ? <button className="button" disabled={busy} onClick={() => setActive(w, true)}>Reativar</button> : null}
                       {w.status === "active" || w.status === "inactive" ? <Link className="button" href={`/sistema/trabalhadores/${w.id}/ficha`}>⎙ Ficha</Link> : null}
