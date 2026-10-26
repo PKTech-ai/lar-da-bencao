@@ -434,7 +434,7 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 }
 
 @media print {
-  .sidebar, .no-print { display: none !important; }
+  .sidebar, .no-print, .system-bar, .ops-save, .lar-demo-note { display: none !important; }
   .app-shell { display: block; }
   .app-main { padding: 0; }
   .card { box-shadow: none; border: 0; }
@@ -682,3 +682,16 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 @media (max-width: 720px) { .pin-button { width: 40px; height: 40px; opacity: .7; } }
 @media print { .pin-button { display: none !important; } .scale-sheet .slot-fixed { background: none; font-weight: inherit; } }
 @media (max-width: 720px) { .scale-sheet select { min-width: 150px; } }
+
+/* Lista de trabalhadores para impressão */
+.worker-print h1 { margin: 6px 0 2px; font-size: 20px; text-align: center; }
+.worker-print > .small { text-align: center; margin: 0 0 12px; }
+.worker-print td:nth-child(1), .worker-print th:nth-child(1) { width: 36px; text-align: right; }
+.worker-print td:nth-child(n+3):nth-child(-n+6) { white-space: nowrap; }
+@media print {
+  .worker-print { padding: 0; }
+  .worker-print table { font-size: 11px; }
+  .worker-print td, .worker-print th { padding: 4px 6px; }
+  .worker-print .table-wrap { overflow: visible; }
+}
+.worker-print .sheet-title { text-align: center; font-weight: 800; color: var(--blue-900); }

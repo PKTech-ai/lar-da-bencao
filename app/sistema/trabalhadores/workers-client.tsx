@@ -145,7 +145,13 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
       <section className="card">
         <div className="toolbar">
           <h2>Fichas</h2>
-          {originOptions.length && !creating ? <button className="button primary" onClick={() => { setEditing(null); setCreating(true); }}>Nova ficha</button> : null}
+          <div className="row-actions">
+            {/* Imprime com os filtros da tela: nome, emissão da ficha, aniversário, ano, idade e contribuição. */}
+            <Link className="button" href={`/sistema/trabalhadores/lista?${new URLSearchParams(Object.entries({ status, department, q: search.trim() }).filter(([, v]) => v))}`}>
+              ⎙ Lista de trabalhadores
+            </Link>
+            {originOptions.length && !creating ? <button className="button primary" onClick={() => { setEditing(null); setCreating(true); }}>Nova ficha</button> : null}
+          </div>
         </div>
         <div className="filters">
           <label>Buscar<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome, departamento ou função" /></label>
