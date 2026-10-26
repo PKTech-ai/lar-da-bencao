@@ -44,9 +44,10 @@ export const loadNavigation = cache(async (actor: Actor) => {
         : await hasPermission(actor, mod.permissionResource, "read");
     if (allowed) modules.push({ href: mod.href, label: mod.label });
   }
+  const serviceOrders = Boolean(flags.get("module_patrimonio")) && await hasAnyDepartmentPermission(actor, "read");
   return {
     modules,
     roleLabel: role.rows[0]?.label ?? actor.role,
-    capabilities: { audit, attachments, users, moduleAdmin, modules }
+    capabilities: { audit, attachments, users, moduleAdmin, serviceOrders, modules }
   };
 });

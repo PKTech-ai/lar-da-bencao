@@ -28,6 +28,10 @@ export async function GET() {
       hasPermission(actor, "department", "update", "patrimonio"),
       "select count(*)::text as count from app.cleaning_roster where payment_status = 'pending'",
       "Conferir taxas ainda sem recebimento");
+    await add("os", "Ordens de serviço em aberto", "/sistema/patrimonio/os", "module_patrimonio",
+      hasPermission(actor, "department", "update", "patrimonio"),
+      "select count(*)::text as count from app.service_orders where status in ('open','in_progress')",
+      "Atender os pedidos dos departamentos");
     await add("sugestoes", "Sugestões sem resposta", "/sistema/sugestoes", "business_modules",
       hasPermission(actor, "presidencia", "update"),
       "select count(*)::text as count from app.suggestions where status in ('Recebida','Em análise')",

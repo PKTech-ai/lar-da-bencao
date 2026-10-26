@@ -34,5 +34,6 @@ export const doutrinaSubnav = [
   { href: "/sistema/doutrina/estudos", label: "Biblioteca de Estudos" },
   { href: "/sistema/doutrina/escalas", label: "Escala Mensal" },
   { href: "/sistema/doutrina/frequencia", label: "Frequência" },
-  { href: "/sistema/doutrina/culto-lar", label: "Culto no Lar" }
+  { href: "/sistema/doutrina/culto-lar", label: "Culto no Lar" },
+  { href: "/sistema/doutrina/ordens-servico", label: "Ordens de Serviço" }
 ] as const;

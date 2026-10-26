@@ -4,6 +4,7 @@ import { SuggestionsBox } from "@/components/suggestions-box";
 import { DepartmentDashboard } from "@/components/modules/department-dashboard";
 import { ModulePanel } from "@/components/modules/panels";
 import { ResourceManager } from "@/components/resources/resource-manager";
+import { isFlagEnabled } from "@/lib/feature-flags";
 import { findModulePage, SECTOR_ROLE_RESOURCE, type SectionAccess } from "@/lib/module-pages";
 import { requireModulePage } from "@/lib/page-auth";
 import { hasPermission } from "@/lib/permissions";
@@ -24,6 +25,7 @@ export default async function ModuleSectionPage({ params }: Params) {
   for (const section of page.sections) {
     if (sectorResource && section.access?.resource !== sectorResource) continue;
     if (section.panel === "admissoes-atalho" && !(await canSeeAdmissions(actor))) continue;
+    if (section.flag && !(await isFlagEnabled(section.flag))) continue;
     if (await can(section.access)) visible.push(section);
   }
   const current = visible.find((s) => s.slug === (secao?.[0] ?? ""));

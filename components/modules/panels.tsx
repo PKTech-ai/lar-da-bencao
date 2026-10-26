@@ -15,6 +15,7 @@ import { WhatsappQueue } from "@/components/modules/whatsapp";
 import { DisposalsPanel } from "@/components/modules/patrimonio-baixas";
 import { CleaningPanel } from "@/components/modules/patrimonio-limpeza";
 import { PatrimonyReport } from "@/components/modules/patrimonio-relatorio";
+import { ServiceOrdersPanel } from "@/components/modules/ordens-servico";
 
 /** Aba que leva para uma tela já existente, sem duplicar cadastro. */
 function Shortcut({ href, label, text }: { href: string; label: string; text: string }) {
@@ -29,7 +30,10 @@ function Shortcut({ href, label, text }: { href: string; label: string; text: st
 
 /** Painéis próprios referenciados por nome em lib/module-pages.ts. */
 export function ModulePanel({ name }: { name: string }) {
+  // "os-<departamento>": ordens de serviço que o departamento abriu ao Patrimônio.
+  if (name.startsWith("os-")) return <ServiceOrdersPanel department={name.slice(3)} />;
   switch (name) {
+    case "patrimonio-os": return <ServiceOrdersPanel area="patrimonio" />;
     case "patrimonio-baixas": return <DisposalsPanel area="patrimonio" />;
     case "presidencia-baixas": return <DisposalsPanel area="diretoria" />;
     case "patrimonio-limpeza": return <CleaningPanel />;

@@ -5,7 +5,8 @@ import type { EducationDepartment } from "@/lib/education";
 
 const tabs = [
   ["", "Painel"], ["evangelizandos", "Evangelizandos"], ["aniversariantes", "Aniversariantes"], ["estudos", "Biblioteca de Estudos"],
-  ["frequencia", "Frequência"], ["cronograma", "Cronograma"], ["planejamento", "Planejamento Anual"], ["relatorio", "Relatório Anual"]
+  ["frequencia", "Frequência"], ["cronograma", "Cronograma"], ["planejamento", "Planejamento Anual"], ["relatorio", "Relatório Anual"],
+  ["ordens-servico", "Ordens de Serviço"]
 ] as const;
 
 export function EducationNav({ department, current }: { department: EducationDepartment; current: string }) {

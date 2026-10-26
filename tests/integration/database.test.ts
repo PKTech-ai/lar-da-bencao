@@ -326,6 +326,50 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect((await decide.POST(json("POST", { action: "decide", version: 2, decision: "rejected", decision_date: "2026-09-13", notes: "x" }), memoParams)).status).toBe(409);
   });
 
+  it("ordens de serviço: departamento abre, Patrimônio atende e cada um vê só o que pode", async () => {
+    const orders = await import("@/app/api/patrimonio/os/route");
+    const act = await import("@/app/api/patrimonio/os/[id]/route");
+    const patrimony = await createActor("coordenador", ["patrimonio"]);
+    const events = await createActor("coordenador", ["eventos"]);
+    const os = { department_key: "doutrina", kind: "Conserto", priority: "Urgente", title: "Trocar a lâmpada da sala 2", description: "Sala sem luz.", location: "Sala 2" };
+
+    // Trabalhador só consulta; coordenador abre pelo próprio departamento.
+    current.actor = worker;
+    expect((await orders.POST(json("POST", os))).status).toBe(403);
+    current.actor = coordinator;
+    expect((await orders.POST(json("POST", { ...os, department_key: "eventos" }))).status).toBe(403);
+    const created = await orders.POST(json("POST", os));
+    expect(created.status).toBe(201);
+    const { id, number } = await created.json();
+    expect(number).toMatch(/^OS-\d{4}-\d{4}$/);
+    const params = { params: Promise.resolve({ id }) };
+    // Quem abriu não muda a situação.
+    expect((await act.POST(json("POST", { action: "status", version: 1, status: "in_progress" }), params)).status).toBe(403);
+
+    // Outro departamento não enxerga; o Patrimônio enxerga tudo.
+    current.actor = events;
+    expect((await (await orders.GET(json("GET"))).json()).orders.some((o: { id: string }) => o.id === id)).toBe(false);
+    expect((await act.POST(json("POST", { action: "note", version: 1, note: "Oi" }), params)).status).toBe(404);
+    current.actor = patrimony;
+    expect((await (await orders.GET(json("GET"))).json()).orders.some((o: { id: string }) => o.id === id)).toBe(true);
+    expect((await act.POST(json("POST", { action: "status", version: 1, status: "in_progress", note: "Vamos amanhã." }), params)).status).toBe(200);
+    expect((await act.POST(json("POST", { action: "status", version: 1, status: "done", note: "Feito." }), params)).status).toBe(409);
+
+    // Já começou: o departamento não cancela, mas escreve posição.
+    current.actor = coordinator;
+    expect((await act.POST(json("POST", { action: "cancel", version: 2, note: "Desistimos." }), params)).status).toBe(409);
+    expect((await act.POST(json("POST", { action: "note", version: 2, note: "A chave fica na secretaria." }), params)).status).toBe(200);
+
+    current.actor = patrimony;
+    expect((await act.POST(json("POST", { action: "status", version: 3, status: "done", note: "Lâmpada trocada." }), params)).status).toBe(200);
+    const mine = (await (await orders.GET(json("GET", undefined, "https://app.test/x?department=doutrina"))).json()).orders.find((o: { id: string }) => o.id === id);
+    expect(mine.status).toBe("done");
+    expect(mine.updates.map((u: { kind: string }) => u.kind)).toEqual(["created", "status", "note", "status"]);
+    expect((await act.POST(json("POST", { action: "note", version: 4, note: "Mais uma." }), params)).status).toBe(409);
+    expect((await query("select 1 from app.audit_events where entity_id=$1 and entity_type='patrimonio-os'", [id])).rowCount).toBe(4);
+    await expect(query("delete from app.service_order_updates where order_id=$1", [id])).rejects.toThrow(/permission denied/);
+  });
+
   it("escala de limpeza: domingo, repetição no ano e taxa de serviço", async () => {
     const roster = await import("@/app/api/patrimonio/limpeza/route");
     const item = await import("@/app/api/patrimonio/limpeza/[id]/route");

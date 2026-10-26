@@ -17,13 +17,13 @@ begin
   end if;
 
   -- Cadastros sensíveis: exclusão só pela função de reversão da importação (SECURITY DEFINER).
-  foreach t in array array['app.workers','app.speakers','app.studies','app.scale_months','app.users','app.legacy_id_map','app.worker_approval_decisions','app.evangelizando_renewals'] loop
+  foreach t in array array['app.workers','app.speakers','app.studies','app.scale_months','app.users','app.legacy_id_map','app.worker_approval_decisions','app.evangelizando_renewals','app.service_orders','app.service_order_updates'] loop
     if has_table_privilege('lar_app', t, 'DELETE') then
       raise exception 'lar_app não deve ter DELETE em %', t;
     end if;
   end loop;
   -- Históricos: somente inclusão.
-  foreach t in array array['app.worker_approval_decisions','app.evangelizando_renewals','app.legacy_id_map'] loop
+  foreach t in array array['app.worker_approval_decisions','app.evangelizando_renewals','app.legacy_id_map','app.service_order_updates'] loop
     if has_table_privilege('lar_app', t, 'UPDATE') then
       raise exception 'lar_app não deve ter UPDATE em %', t;
     end if;
