@@ -25,7 +25,7 @@ export const serviceOrderCreateSchema = z.object({
   priority: z.enum(OS_PRIORITIES).optional().default("Normal"),
   title: z.string().trim().min(1, "Informe o que precisa ser feito.").max(150),
   description: z.string().trim().min(1, "Descreva o serviço.").max(2000),
-  location: z.string().trim().max(200).optional().default(""),
+  location: z.string("Informe onde é o serviço.").trim().min(1, "Informe onde é o serviço.").max(200),
   asset_id: z.string().uuid().optional().or(z.literal("")).default("")
 });
 
@@ -65,6 +65,23 @@ export async function serviceOrderAccess(actor: Actor) {
   return { read, create, executor, seesAll: patrimonyRead };
 }
 
+/**
+ * Fotos da OS (anexos `service_order`): vê quem vê a OS; envia o Patrimônio ou o departamento que abriu,
+ * enquanto a OS está aberta. Devolve o departamento da OS para gravar no anexo.
+ */
+export async function authorizeServiceOrderFiles(actor: Actor, orderId: string, mode: "read" | "write") {
+  if (!z.string().uuid().safeParse(orderId).success) throw new AppError("OS não encontrada.", 404, "NOT_FOUND");
+  const access = await serviceOrderAccess(actor);
+  const found = await query<{ department_key: string; status: OsStatus }>("select department_key, status from app.service_orders where id = $1", [orderId]);
+  const order = found.rows[0];
+  if (!order || (!access.seesAll && !access.read.includes(order.department_key))) throw new AppError("OS não encontrada.", 404, "NOT_FOUND");
+  if (mode === "write") {
+    if (!access.executor && !access.create.includes(order.department_key)) throw new AuthorizationError();
+    if (CLOSED.includes(order.status)) throw new AppError("Esta OS já foi encerrada.", 409, "ALREADY_CLOSED");
+  }
+  return order.department_key;
+}
+
 export async function listServiceOrders(actor: Actor, filters: { department?: string; status?: string; q?: string }) {
   const access = await serviceOrderAccess(actor);
   if (!access.seesAll && !access.read.length) throw new AuthorizationError();
@@ -84,7 +101,10 @@ export async function listServiceOrders(actor: Actor, filters: { department?: st
             o.asset_id, a.tombamento as asset_tombamento, a.description as asset_description,
             coalesce((select jsonb_agg(jsonb_build_object('id', u.id, 'kind', u.kind, 'status', u.status, 'note', u.note,
                                                           'created_at', u.created_at, 'created_by_name', uu.full_name) order by u.created_at)
-                        from app.service_order_updates u join app.users uu on uu.id = u.created_by where u.order_id = o.id), '[]'::jsonb) as updates
+                        from app.service_order_updates u join app.users uu on uu.id = u.created_by where u.order_id = o.id), '[]'::jsonb) as updates,
+            coalesce((select jsonb_agg(jsonb_build_object('id', f.id, 'filename', f.filename, 'status', f.status, 'uploaded_at', f.uploaded_at) order by f.uploaded_at)
+                        from app.attachments f where f.owner_type = 'service_order' and f.owner_id = o.id::text
+                         and f.status in ('active', 'pending_scan')), '[]'::jsonb) as photos
        from app.service_orders o
        join app.departments d on d.key = o.department_key
        join app.users ru on ru.id = o.requested_by

@@ -45,6 +45,8 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  // No celular o menu fica fechado atrás do botão "Menu" para a tela começar no conteúdo.
+  const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const needle = query.trim().toLocaleLowerCase("pt-BR");
   const show = (label: string) => label.toLocaleLowerCase("pt-BR").includes(needle);
@@ -93,17 +95,21 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
   }
 
   return (
-    <aside className={collapsed ? "sidebar is-collapsed" : "sidebar"}>
+    <aside className={`${collapsed ? "sidebar is-collapsed" : "sidebar"}${menuOpen ? " menu-open" : ""}`}>
       <button className="sidebar-collapse" type="button" aria-pressed={collapsed} aria-label={collapsed ? "Expandir menu" : "Recolher menu"} onClick={toggleCollapsed}>
         <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h16"/></svg></span>
         <span className="nav-label">{collapsed ? "Expandir" : "Recolher"}</span>
       </button>
       <Brand subtitle="Sistema Integrado — Demonstração Funcional com Dados Fictícios" />
+      <button className="sidebar-mobile-toggle" type="button" aria-expanded={menuOpen} aria-controls="menu-principal" onClick={() => setMenuOpen((open) => !open)}>
+        <span aria-hidden="true">{menuOpen ? "✕" : "☰"}</span> {menuOpen ? "Fechar" : "Menu"}
+      </button>
       <label className="module-search">
         Encontrar módulo
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome do departamento" aria-label="Encontrar módulo" />
       </label>
-      <nav className="nav-list" aria-label="Módulos principais">
+      <nav id="menu-principal" className="nav-list" aria-label="Módulos principais"
+        onClick={(event) => { if ((event.target as HTMLElement).closest("a")) setMenuOpen(false); }}>
         {show("Visão Geral") ? <NavItem href="/sistema" label="Visão Geral" current={current("/sistema")} /> : null}
         {show("Demonstração") ? <NavItem href="/visual" label="Demonstração" current={false} /> : null}
         {documentos && show(documentos.label) ? <NavItem href={documentos.href} label={documentos.label} current={current(documentos.href)} /> : null}

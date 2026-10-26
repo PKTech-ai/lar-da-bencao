@@ -38,10 +38,11 @@ describe("situação da ordem de serviço", () => {
 
 describe("abertura da ordem de serviço", () => {
   it("exige departamento, tipo, o que fazer e descrição; urgência padrão Normal", () => {
-    const ok = serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Conserto", title: "Trocar lâmpada", description: "Sala 2 sem luz." });
-    expect(ok).toMatchObject({ priority: "Normal", location: "", asset_id: "" });
-    expect(() => serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Pintura", title: "x", description: "y" })).toThrow();
-    expect(() => serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Conserto", title: "", description: "y" })).toThrow();
-    expect(() => serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Conserto", title: "x", description: "y", asset_id: "abc" })).toThrow();
+    const ok = serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Conserto", title: "Trocar lâmpada", description: "Sala 2 sem luz.", location: "Sala 2" });
+    expect(ok).toMatchObject({ priority: "Normal", location: "Sala 2", asset_id: "" });
+    expect(() => serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Conserto", title: "x", description: "y" })).toThrow(/onde é o serviço/);
+    expect(() => serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Pintura", title: "x", description: "y", location: "Sala" })).toThrow();
+    expect(() => serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Conserto", title: "", description: "y", location: "Sala" })).toThrow();
+    expect(() => serviceOrderCreateSchema.parse({ department_key: "doutrina", kind: "Conserto", title: "x", description: "y", location: "Sala", asset_id: "abc" })).toThrow();
   });
 });

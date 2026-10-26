@@ -16,14 +16,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const id = z.string().uuid().parse((await context.params).id);
     const input = schema.parse(await request.json());
     await transaction(async (client) => {
-      const found = await client.query<{ owner_type: string; status: string; filename: string; has_binary: boolean }>(
-        `select owner_type, status, filename, exists (select 1 from app.attachment_chunks c where c.attachment_id = a.id) as has_binary
+      const found = await client.query<{ owner_type: string; owner_id: string; status: string; filename: string; has_binary: boolean }>(
+        `select owner_type, owner_id, status, filename, exists (select 1 from app.attachment_chunks c where c.attachment_id = a.id) as has_binary
            from app.attachments a where id=$1 for update`,
         [id]
       );
       const file = found.rows[0];
       if (!file) throw new AppError("Anexo não encontrado.", 404, "NOT_FOUND");
-      await authorizeAttachment(actor, file.owner_type, "update");
+      await authorizeAttachment(actor, file.owner_type, "update", file.owner_id);
       if (input.action === "remove") {
         if (file.status !== "active") throw new AppError("Somente anexos ativos podem ser retirados.", 409, "INVALID_ATTACHMENT_STATUS");
         if (input.reason.length < 3) throw new AppError("Informe o motivo da retirada.");

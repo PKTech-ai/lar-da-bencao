@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   try {
     const actor = await requireActor();
     const params = listSchema.parse(Object.fromEntries(new URL(request.url).searchParams));
-    await authorizeAttachment(actor, params.ownerType, "read");
+    await authorizeAttachment(actor, params.ownerType, "read", params.ownerId);
     const result = await dbPool().query(
       `select a.id, a.kind, a.filename, a.mime_type, a.size_bytes, a.sha256, a.status, a.scan_result, a.uploaded_at, a.activated_at, a.removed_at,
               u.full_name as uploaded_by_name

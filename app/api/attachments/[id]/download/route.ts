@@ -7,16 +7,16 @@ import { AppError, errorResponse } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
-type FileRow = { id: string; owner_type: string; filename: string; mime_type: string; size_bytes: string; status: string; chunk_count: number };
+type FileRow = { id: string; owner_type: string; owner_id: string; filename: string; mime_type: string; size_bytes: string; status: string; chunk_count: number };
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const actor = await requireActor();
     const id = z.string().uuid().parse((await context.params).id);
-    const found = await dbPool().query<FileRow>("select id,owner_type,filename,mime_type,size_bytes::text,status,chunk_count from app.attachments where id=$1", [id]);
+    const found = await dbPool().query<FileRow>("select id,owner_type,owner_id,filename,mime_type,size_bytes::text,status,chunk_count from app.attachments where id=$1", [id]);
     const file = found.rows[0];
     if (!file || file.status !== "active") throw new AppError("Anexo não encontrado.", 404, "ATTACHMENT_NOT_FOUND");
-    await authorizeAttachment(actor, file.owner_type, "download");
+    await authorizeAttachment(actor, file.owner_type, "download", file.owner_id);
     await appendAudit(actor, { category: "Acesso", action: "Download de anexo", module: "Anexos", section: file.owner_type, entityType: "attachment", entityId: id, result: "success", details: file.filename });
     let index = 0;
     const stream = new ReadableStream<Uint8Array>({

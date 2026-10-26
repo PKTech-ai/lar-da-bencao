@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     assertSameOrigin(request);
     actor = await requireActor();
     const input = schema.parse(await request.json());
-    const permission = await authorizeAttachment(actor, input.ownerType, "create");
+    const permission = await authorizeAttachment(actor, input.ownerType, "create", input.ownerId);
     const limit = input.ownerType === "bank_statement" ? BANK_FILE_LIMIT : COMMON_FILE_LIMIT;
     if (input.sizeBytes > limit) throw new AppError(`O arquivo ultrapassa o limite de ${limit / 1024 / 1024} MB.`, 413, "FILE_TOO_LARGE");
     const chunkCount = Math.ceil(input.sizeBytes / CHUNK_SIZE);

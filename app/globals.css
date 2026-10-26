@@ -409,6 +409,20 @@ table.visual-table .small { font-size: 13px; color: #617683; }
   input, select, textarea { font-size: 16px; }
 }
 
+/* Celular: só a marca e o botão Menu ficam visíveis até abrir o menu. */
+.sidebar-mobile-toggle { display: none; }
+@media (max-width: 720px) {
+  .sidebar, .sidebar.is-collapsed { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 16px; }
+  .sidebar > .sidebar-collapse { display: none; }
+  .sidebar .brand-lockup { flex: 1; margin-bottom: 0; }
+  .sidebar .brand-lockup small { display: none; }
+  .sidebar .brand-logo { width: 40px; height: 50px; flex-basis: 40px; }
+  .sidebar .brand-lockup strong { font-size: 18px; }
+  .sidebar-mobile-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface, #fff); color: var(--blue-900); font: inherit; font-weight: 700; cursor: pointer; }
+  .sidebar > .module-search, .sidebar > .nav-list, .sidebar > .sidebar-session { flex: 1 1 100%; }
+  .sidebar:not(.menu-open) > .module-search, .sidebar:not(.menu-open) > .nav-list, .sidebar:not(.menu-open) > .sidebar-session { display: none; }
+}
+
 @media (max-width: 540px) {
   .card.lar-welcome { display: block; }
   .lar-welcome-emblem { display: none; }
@@ -617,3 +631,38 @@ table.visual-table .small { font-size: 13px; color: #617683; }
   .org-a-relation { padding: 5px 0; }
 }
 @media (max-width: 520px) { .org-a-grid, .syn-grid { grid-template-columns: 1fr; } }
+
+/* Ordens de Serviço — câmera, fotos e lista em cartões no celular */
+.os-fieldset { border: 1px solid var(--line, #dae5e9); border-radius: 12px; padding: 12px 14px; margin: 0; }
+.os-fieldset legend { font-weight: 700; padding: 0 6px; }
+.os-photo-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.os-photo-buttons .button { cursor: pointer; min-height: 48px; }
+.os-photo-buttons .button.disabled { opacity: .5; pointer-events: none; }
+.os-photo-grid { list-style: none; padding: 0; margin: 10px 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.os-photo-grid li { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--surface-sunken, #f1f7fa); }
+.os-photo-grid img, .os-photo-grid a { display: block; width: 100%; height: 100%; object-fit: cover; }
+.os-photo-remove { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; border-radius: 999px; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
+.os-photo-pending { display: grid; place-items: center; height: 100%; font-size: 12px; color: var(--muted, #617683); text-align: center; padding: 6px; }
+.os-more-photos { display: grid; gap: 8px; margin-bottom: 8px; }
+.os-timeline { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.os-timeline li { border-left: 3px solid var(--sage-700, #356f52); padding: 4px 0 4px 12px; }
+.os-timeline p { white-space: pre-wrap; margin: 4px 0 0; }
+.os-cards { display: none; list-style: none; padding: 0; margin: 12px 0 0; gap: 10px; }
+.os-card { display: grid; gap: 4px; width: 100%; text-align: left; padding: 14px; border-radius: 12px; border: 1px solid var(--line, #dae5e9); background: var(--surface, #fff); color: inherit; font: inherit; cursor: pointer; }
+.os-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.os-card-title { font-weight: 700; font-size: 16px; }
+.os-card .status.blocked { justify-self: start; }
+@media (max-width: 720px) {
+  .os-table { display: none; }
+  .os-cards { display: grid; }
+  .os-panel .toolbar { flex-direction: column; align-items: stretch; }
+  .os-open-button { width: 100%; min-height: 52px; font-size: 17px; }
+  .os-photo-buttons .button { flex: 1 1 100%; justify-content: center; }
+  .os-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .os-actions .button, .os-more-photos > .button { width: 100%; min-height: 48px; }
+  .os-panel .details-grid { grid-template-columns: 1fr; }
+  .os-panel .grid.cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .os-panel .card.kpi { padding: 12px 14px; }
+}
+.os-panel section[aria-label^="OS "] form { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line, #dae5e9); }
+@media print { .os-cards { display: none !important; } }

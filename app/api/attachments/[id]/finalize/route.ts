@@ -10,7 +10,7 @@ import { assertSameOrigin } from "@/lib/csrf";
 
 export const runtime = "nodejs";
 
-type Attachment = { id: string; owner_type: string; filename: string; mime_type: string; size_bytes: string; sha256: string; chunk_count: number; status: string; token_valid: boolean };
+type Attachment = { id: string; owner_type: string; owner_id: string; filename: string; mime_type: string; size_bytes: string; sha256: string; chunk_count: number; status: string; token_valid: boolean };
 type Chunk = { part_no: number; data: Buffer; size_bytes: number };
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -25,13 +25,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const verified = await transaction(async (client) => {
       const found = await client.query<Attachment>(
-        `select id,owner_type,filename,mime_type,size_bytes::text,sha256,chunk_count,status,
+        `select id,owner_type,owner_id,filename,mime_type,size_bytes::text,sha256,chunk_count,status,
                 upload_token_hash = $2 as token_valid
            from app.attachments where id=$1 for update`, [id, uploadTokenHash(token)]
       );
       const file = found.rows[0];
       if (!file || !file.token_valid) throw new AppError("Upload não encontrado.", 404, "UPLOAD_NOT_FOUND");
-      await authorizeAttachment(actor!, file.owner_type, "update");
+      await authorizeAttachment(actor!, file.owner_type, "update", file.owner_id);
       if (file.status === "active") return { file, chunks: [] as Chunk[], already: true };
       if (!['uploading','pending_scan'].includes(file.status)) throw new AppError("Este anexo não pode ser finalizado.", 409, "INVALID_ATTACHMENT_STATUS");
       const chunks = await client.query<Chunk>("select part_no,data,size_bytes from app.attachment_chunks where attachment_id=$1 order by part_no", [id]);

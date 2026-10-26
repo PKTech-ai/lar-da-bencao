@@ -368,6 +368,24 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect((await act.POST(json("POST", { action: "note", version: 4, note: "Mais uma." }), params)).status).toBe(409);
     expect((await query("select 1 from app.audit_events where entity_id=$1 and entity_type='patrimonio-os'", [id])).rowCount).toBe(4);
     await expect(query("delete from app.service_order_updates where order_id=$1", [id])).rejects.toThrow(/permission denied/);
+
+    // Fotos: quem abriu envia enquanto a OS está aberta; outro departamento nem enxerga; OS encerrada não recebe mais.
+    const init = await import("@/app/api/attachments/init/route");
+    const files = await import("@/app/api/attachments/route");
+    const photo = (ownerId: string) => ({ ownerType: "service_order", ownerId, filename: "foto-1.jpg", mimeType: "image/jpeg", sizeBytes: 1000, sha256: "a".repeat(64), kind: "photo" });
+    current.actor = coordinator;
+    const second = await (await orders.POST(json("POST", { ...os, title: "Consertar a torneira" }))).json();
+    const started = await init.POST(json("POST", photo(second.id)));
+    expect(started.status).toBe(201);
+    const stored = await query<{ department_key: string }>("select department_key from app.attachments where id=$1", [(await started.json()).id]);
+    expect(stored.rows[0].department_key).toBe("doutrina");
+    expect((await init.POST(json("POST", photo(id)))).status).toBe(409);
+    expect((await files.GET(json("GET", undefined, `https://app.test/x?ownerType=service_order&ownerId=${second.id}`))).status).toBe(200);
+    current.actor = events;
+    expect((await init.POST(json("POST", photo(second.id)))).status).toBe(404);
+    expect((await files.GET(json("GET", undefined, `https://app.test/x?ownerType=service_order&ownerId=${second.id}`))).status).toBe(404);
+    current.actor = patrimony;
+    expect((await init.POST(json("POST", { ...photo(second.id), sha256: "b".repeat(64) }))).status).toBe(201);
   });
 
   it("escala de limpeza: domingo, repetição no ano e taxa de serviço", async () => {

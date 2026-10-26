@@ -8,7 +8,7 @@ import { assertSameOrigin } from "@/lib/csrf";
 export const runtime = "nodejs";
 
 const paramsSchema = z.object({ id: z.string().uuid(), part: z.coerce.number().int().min(0).max(6) });
-type Attachment = { id: string; owner_type: string; mime_type: string; status: string; chunk_count: number; size_bytes: string; token_valid: boolean };
+type Attachment = { id: string; owner_type: string; owner_id: string; mime_type: string; status: string; chunk_count: number; size_bytes: string; token_valid: boolean };
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string; part: string }> }) {
   try {
@@ -24,13 +24,13 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     const result = await transaction(async (client) => {
       const found = await client.query<Attachment>(
-        `select id,owner_type,mime_type,status,chunk_count,size_bytes::text,
+        `select id,owner_type,owner_id,mime_type,status,chunk_count,size_bytes::text,
                 upload_token_hash = $2 as token_valid
            from app.attachments where id=$1 for update`, [params.id, uploadTokenHash(token)]
       );
       const file = found.rows[0];
       if (!file || !file.token_valid) throw new AppError("Upload não encontrado.", 404, "UPLOAD_NOT_FOUND");
-      await authorizeAttachment(actor, file.owner_type, "update");
+      await authorizeAttachment(actor, file.owner_type, "update", file.owner_id);
       if (file.status !== "uploading") throw new AppError("Este upload já foi finalizado.", 409, "UPLOAD_ALREADY_FINALIZED");
       if (params.part >= file.chunk_count) throw new AppError("Número de parte inválido.");
       if (params.part === 0) validateSignature(file.mime_type, bytes);

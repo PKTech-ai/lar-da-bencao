@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Actor } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
+import { authorizeServiceOrderFiles } from "@/lib/ordens-servico";
 import { assertPermission } from "@/lib/permissions";
 
 export const CHUNK_SIZE = 3 * 1024 * 1024;
@@ -68,6 +69,8 @@ export function attachmentPermission(ownerType: string) {
     study_material_juventude: { resource: "department", department: "juventude" },
     evangelizando_photo_infancia: { resource: "department", department: "infancia" },
     evangelizando_photo_juventude: { resource: "department", department: "juventude" },
+    // Fotos da OS: o departamento depende da OS (ver authorizeAttachment).
+    service_order: { resource: "department" },
     system_test: { resource: "attachments" }
   };
   const mapping = mappings[ownerType];
@@ -75,8 +78,12 @@ export function attachmentPermission(ownerType: string) {
   return mapping;
 }
 
-export async function authorizeAttachment(actor: Actor, ownerType: string, action: "read" | "create" | "update" | "delete" | "download") {
+export async function authorizeAttachment(actor: Actor, ownerType: string, action: "read" | "create" | "update" | "delete" | "download", ownerId?: string) {
   const permission = attachmentPermission(ownerType);
+  if (ownerType === "service_order") {
+    const department = await authorizeServiceOrderFiles(actor, ownerId ?? "", action === "read" || action === "download" ? "read" : "write");
+    return { ...permission, department };
+  }
   // Vínculos de negócio usam a permissão do próprio recurso: baixar = ler.
   const effective = permission.resource !== "attachments" && action === "download" ? "read" : action;
   await assertPermission(actor, permission.resource, effective, permission.department);
