@@ -695,3 +695,9 @@ table.visual-table .small { font-size: 13px; color: #617683; }
   .worker-print .table-wrap { overflow: visible; }
 }
 .worker-print .sheet-title { text-align: center; font-weight: 800; color: var(--blue-900); }
+
+/* Painel do Patrimônio — OS em aberto */
+.os-dashboard { margin-bottom: 16px; }
+.os-dashboard-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.os-dashboard-list a { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; color: inherit; text-decoration: none; background: var(--surface, #fff); min-height: 48px; }
+.os-dashboard-list a:hover, .os-dashboard-list a:focus-visible { border-color: var(--blue-800); }

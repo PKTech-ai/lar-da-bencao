@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, postJson } from "@/lib/client-api";
 import { uploadAttachment } from "@/lib/upload-client";
 
@@ -118,6 +119,13 @@ export function ServiceOrdersPanel({ area, department }: { area?: "patrimonio"; 
   const [status, setStatus] = useState("active");
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // `?os=<id>` (link do Painel do Patrimônio) já abre aquela OS, também na navegação sem recarregar a página.
+  const linked = useSearchParams().get("os");
+  const [seenLinked, setSeenLinked] = useState<string | null>(null);
+  if (linked && linked !== seenLinked) {
+    setSeenLinked(linked);
+    setOpenId(linked);
+  }
   const [newPhotos, setNewPhotos] = useState<File[]>([]);
   const [morePhotos, setMorePhotos] = useState<File[]>([]);
   const [message, setMessage] = useState("");
@@ -136,8 +144,6 @@ export function ServiceOrdersPanel({ area, department }: { area?: "patrimonio"; 
   }, [q, department]);
 
   useEffect(() => { const t = setTimeout(() => void load().catch((e) => setError(e.message)), 200); return () => clearTimeout(t); }, [load]);
-  // No celular o formulário e a OS aberta ficam acima da lista: leva a tela até eles.
-  useEffect(() => { if (creating || openId) focus.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [creating, openId]);
 
   async function run(label: string, work: () => Promise<string>) {
     setBusy(label); setError(""); setMessage("");
@@ -160,6 +166,9 @@ export function ServiceOrdersPanel({ area, department }: { area?: "patrimonio"; 
   const openDepartments = department ? departments.filter((d) => d.key === department) : departments;
   const canOpen = caps.open && openDepartments.length > 0;
   const current = orders.find((o) => o.id === openId) ?? null;
+  // Leva a tela até o formulário ou a OS aberta (no celular eles ficam acima da lista), inclusive vindo do Painel.
+  const showing = creating ? "new" : current?.id ?? "";
+  useEffect(() => { if (showing) focus.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [showing]);
   const shown = orders.filter((o) => status === "active" ? ACTIVE.includes(o.status) : !status || o.status === status);
   const count = (s: Status) => orders.filter((o) => o.status === s).length;
   const canWrite = (o: Order) => ACTIVE.includes(o.status) && (caps.execute || caps.requesterOf.includes(o.department_key));

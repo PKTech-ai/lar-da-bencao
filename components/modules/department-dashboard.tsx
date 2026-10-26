@@ -1,4 +1,5 @@
 import { DepartmentAbout } from "@/components/department-about";
+import { PatrimonyOpenOrders } from "@/components/modules/patrimonio-os-resumo";
 import { query } from "@/lib/db";
 import { buildDepartmentDashboard, workerDepartmentKey } from "@/lib/department-dashboard";
 import { departmentInfoFor } from "@/lib/department-info";
@@ -27,6 +28,7 @@ export async function DepartmentDashboard({ page }: { page: ModulePage }) {
       <div className="grid cards" style={{ marginBottom: 16 }}>
         {data.kpis.map((k) => <article key={k.label} className="card kpi"><span className="small muted">{k.label}</span><b>{k.value}</b></article>)}
       </div>
+      {page.slug === "patrimonio" ? <PatrimonyOpenOrders /> : null}
       <section className="card">
         <h2>Alertas</h2>
         {data.alerts.length ? <ul>{data.alerts.map((a) => <li key={a}>{a}</li>)}</ul> : <p className="muted">Nenhum alerta.</p>}
