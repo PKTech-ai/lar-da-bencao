@@ -106,13 +106,14 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "secretaria",
     title: "Secretaria",
-    intro: "Reuniões e atas com áudio guardado no banco, acompanhamento das admissões e aniversariantes.",
+    intro: "Reuniões e atas com áudio guardado no banco, cadastro de trabalhadores, acompanhamento das admissões e aniversariantes.",
     flag: "module_secretaria",
     access: { resource: "secretaria" },
     sections: [
       { slug: "reunioes", label: "Reuniões e Atas", resource: "secretaria-reunioes" },
       { slug: "", label: "Painel", panel: "painel" },
       { slug: "admissoes", label: "Acompanhar admissões", panel: "admissoes-atalho" },
+      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-cadastro", flag: "module_workers" },
       { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
       { slug: "gravador", label: "Gravador", panel: "secretaria-gravador" },
       { slug: "os", label: "Ordens de Serviço", panel: "os-secretaria", flag: "module_patrimonio" }

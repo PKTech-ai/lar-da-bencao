@@ -12,7 +12,8 @@ import { createClient } from "@/lib/supabase/client";
 export type NavCapability = ToolCapabilities;
 
 const DIRETORIA = ["/sistema/presidencia", "/sistema/secretaria", "/sistema/tesouraria"];
-const PLACED = new Set(["/sistema/documentos", "/sistema/conselhofiscal", ...DIRETORIA]);
+// Trabalhadores fica dentro da Secretaria (aba própria); a tela /sistema/trabalhadores continua para os atalhos.
+const PLACED = new Set(["/sistema/documentos", "/sistema/conselhofiscal", "/sistema/trabalhadores", ...DIRETORIA]);
 const MENU_LABEL: Record<string, string> = {
   "/sistema/doutrina": "Dpto de Doutrina",
   "/sistema/infancia": "Dpto da Infância",

@@ -7,9 +7,11 @@ import { ResourceManager } from "@/components/resources/resource-manager";
 import { isFlagEnabled } from "@/lib/feature-flags";
 import { findModulePage, SECTOR_ROLE_RESOURCE, type SectionAccess } from "@/lib/module-pages";
 import { requireModulePage } from "@/lib/page-auth";
-import { hasPermission } from "@/lib/permissions";
+import { hasAnyDepartmentPermission, hasPermission } from "@/lib/permissions";
 import { canSeeAdmissions } from "@/lib/workers";
+import { workerPageContext } from "@/lib/worker-page";
 import { RESOURCES } from "@/lib/resources/registry";
+import { WorkersClient } from "@/app/sistema/trabalhadores/workers-client";
 
 type Params = { params: Promise<{ modulo: string; secao?: string[] }> };
 
@@ -26,6 +28,8 @@ export default async function ModuleSectionPage({ params }: Params) {
     if (sectorResource && section.access?.resource !== sectorResource) continue;
     if (section.panel === "admissoes-atalho" && !(await canSeeAdmissions(actor))) continue;
     if (section.flag && !(await isFlagEnabled(section.flag))) continue;
+    // Cadastro de trabalhadores: mesma regra da tela /sistema/trabalhadores (algum departamento do usuário).
+    if (section.panel === "trabalhadores-cadastro" && !(await hasAnyDepartmentPermission(actor, "read"))) continue;
     if (await can(section.access)) visible.push(section);
   }
   const current = visible.find((s) => s.slug === (secao?.[0] ?? ""));
@@ -42,6 +46,7 @@ export default async function ModuleSectionPage({ params }: Params) {
         current={`/sistema/${page.slug}${current.slug ? `/${current.slug}` : ""}`} />
       <SuggestionsBox />
       {def ? <ResourceManager resourceKey={def.key} />
+        : current.panel === "trabalhadores-cadastro" ? <WorkersClient {...await workerPageContext(actor)} />
         : current.panel === "painel" ? <DepartmentDashboard page={page} />
         : current.panel ? <ModulePanel name={current.panel} /> : null}
     </>

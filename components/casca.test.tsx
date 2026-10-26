@@ -33,8 +33,9 @@ describe("menu lateral como no visual", () => {
       expect(group).not.toContain(label);
     }
     const after = html.slice(html.indexOf("Dpto de Doutrina"));
-    expect(after.indexOf("Trabalhadores")).toBeGreaterThan(-1);
-    expect(after.indexOf("Dedo-duro / Histórico")).toBeGreaterThan(after.indexOf("Trabalhadores"));
+    // Trabalhadores mudou para uma aba da Secretaria: não aparece mais solto no menu.
+    expect(html).not.toContain('data-nav-label="Trabalhadores"');
+    expect(after.indexOf("Dedo-duro / Histórico")).toBeGreaterThan(after.indexOf("Admissões"));
     expect(after.indexOf("Sair deste aparelho")).toBeGreaterThan(after.indexOf("Importação v215"));
   });
   it("o grupo Diretoria nasce aberto, como no visual", async () => {
