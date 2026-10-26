@@ -2,6 +2,7 @@ import { z } from "zod";
 import { cpfDigits, cpfSchemaMessage, formatCpf, isValidCpf } from "@/lib/cpf";
 import { formatMoney, parseMoney } from "@/lib/resources/types";
 import { DOCTRINE_FUNCTIONS, WEEKDAYS } from "@/lib/worker-constants";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Regras do cadastro online de trabalhadores (formulário público → fila de revisão).
@@ -71,7 +72,7 @@ function requiredContribution(data: { contribution_cents: number; contribution_d
  * Envio antigo sem esses campos não apaga o que já está na ficha.
  */
 const submissionFields = z.object({
-  full_name: z.string().trim().min(2).max(160),
+  full_name: z.string().trim().min(2).max(160).transform(formatPersonName),
   cpf: z.string().trim().refine(isValidCpf, cpfSchemaMessage).transform(cpfDigits),
   phone: z.string().trim().max(40).refine((value) => phoneDigits(value).length >= 10, "Informe o telefone com DDD."),
   email: z.string().trim().max(320).email().optional().or(z.literal("")).default(""),
@@ -176,7 +177,7 @@ const dateOnly = (value: string | Date | null | undefined) => {
 export function fichaFromSubmission(payload: SubmissionPayload, existing?: ExistingFicha) {
   const keep = (submitted: string, current: string | null | undefined) => submitted || current || "";
   return {
-    full_name: payload.full_name,
+    full_name: formatPersonName(payload.full_name),
     cpf: payload.cpf,
     phone: payload.phone,
     email: keep(payload.email, existing?.email),

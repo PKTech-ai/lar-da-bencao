@@ -5,6 +5,7 @@ import { AppError, AuthorizationError } from "@/lib/errors";
 import { query } from "@/lib/db";
 import { departmentsWithPermission, hasPermission } from "@/lib/permissions";
 import { DOCTRINE_FUNCTIONS, type WorkerStatus } from "@/lib/worker-constants";
+import { formatPersonName } from "@/lib/person-name";
 
 export { DOCTRINE_FUNCTIONS, workerStatusLabel, type WorkerStatus } from "@/lib/worker-constants";
 
@@ -12,7 +13,7 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const optionalText = (max: number) => z.string().trim().max(max).optional().default("");
 
 export const fichaSchema = z.object({
-  full_name: z.string().trim().min(2).max(160),
+  full_name: z.string().trim().min(2).max(160).transform(formatPersonName),
   cpf: z.string().trim().refine(isValidCpf, cpfSchemaMessage).transform(cpfDigits),
   email: z.string().trim().email().optional().or(z.literal("")),
   phone: optionalText(40),
