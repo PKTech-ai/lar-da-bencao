@@ -104,12 +104,65 @@ export function canAddExtra(slot: Pick<Slot, "dow" | "si" | "ri">) {
 
 const eligible = (w: ScaleWorker, type: string, dow: number) => w.functions.includes(type) && w.days.includes(dow);
 
-export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers: readonly ScaleSpeaker[], studies: readonly ScaleStudy[]) {
+/** Posição fixa: a mesma função de uma atividade em todas as semanas (`dia-da-semana|seção|linha|posição`). */
+export type FixedPattern = Pick<Slot, "dow" | "si" | "ri" | "pos">;
+
+export function fixedKey(p: FixedPattern) {
+  return `${p.dow}|${p.si}|${p.ri}|${p.pos}`;
+}
+
+export function parseFixedKey(key: string): FixedPattern | null {
+  const parts = key.split("|");
+  if (parts.length !== 4) return null;
+  const slot = parseSlotKey(`${parts[0]}|${parts[1]}|${parts[2]}|1|${parts[3]}`);
+  return slot ? { dow: slot.dow, si: slot.si, ri: slot.ri, pos: slot.pos } : null;
+}
+
+/**
+ * Regras para marcar um fixo (puras): só trabalhador, posição prevista no modelo, com a função e o dia na ficha,
+ * uma função fixa por dia e sem quebrar a folga quarta/sexta do psicofônico.
+ */
+export function validateFixed(pattern: FixedPattern, worker: ScaleWorker | undefined, current: ReadonlyMap<string, string>): string | null {
+  const row = TEMPLATES[pattern.dow]?.[pattern.si]?.r[pattern.ri];
+  if (!row || pattern.pos >= row[2]) return "Posição inválida para trabalhador fixo.";
+  const type = row[1] === "SPEAKER" ? "Palestrante" : row[1];
+  if (type === "STUDY") return "Tema e roteiro não podem ser fixos.";
+  if (!worker) return "Trabalhador sem aprovação da Diretoria ou fora da Doutrina.";
+  if (!worker.functions.includes(type)) return `${worker.name} não tem a função ${type} na ficha.`;
+  if (row[1] !== "SPEAKER" && !worker.days.includes(pattern.dow)) return `${worker.name} não marcou ${DAY_NAME[pattern.dow].toLowerCase()} como dia disponível.`;
+  for (const [key, id] of current) {
+    if (id !== worker.id || key === fixedKey(pattern)) continue;
+    const other = parseFixedKey(key);
+    if (!other) continue;
+    if (other.dow === pattern.dow) return `${worker.name} já está fixo em ${TEMPLATES[other.dow][other.si].n} neste dia.`;
+    const pair = (pattern.dow === 3 && other.dow === 5) || (pattern.dow === 5 && other.dow === 3);
+    if (pair && type === "Psicofônico" && TEMPLATES[other.dow][other.si].r[other.ri][1] === "Psicofônico") {
+      return "Folga obrigatória: o psicofônico não pode ser fixo na quarta e na sexta.";
+    }
+  }
+  return null;
+}
+
+/**
+ * Gera a escala do mês. `fixed` (`dia-da-semana|seção|linha|posição` → trabalhador) entra primeiro em todas as
+ * ocorrências e já conta na divisão do mês; o restante segue a regra de sempre. Sem fixos, o resultado é o mesmo de antes.
+ */
+export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers: readonly ScaleSpeaker[], studies: readonly ScaleStudy[],
+  fixed: ReadonlyMap<string, string> = new Map()) {
   const assignments = new Map<string, string>();
   const count = new Map<string, number>();
   const wednesdayPsych = new Map<string, Set<string>>();
   const bump = (id: string) => count.set(id, (count.get(id) ?? 0) + 1);
   const ordered = (list: ScaleWorker[]) => list.sort((a, b) => (count.get(a.id) ?? 0) - (count.get(b.id) ?? 0) || a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
+  const blockWednesday = (week: string, id: string) => {
+    if (!wednesdayPsych.has(week)) wednesdayPsych.set(week, new Set());
+    wednesdayPsych.get(week)!.add(id);
+  };
+  // Quem é fixo já "gastou" essas escalas: não é puxado para outras vagas antes dos demais.
+  for (const [key, id] of fixed) {
+    const pattern = parseFixedKey(key);
+    if (pattern) monthDays(ym, pattern.dow).forEach(() => bump(id));
+  }
 
   for (const dow of [0, 1, 3, 4, 5, 6]) {
     for (const day of monthDays(ym, dow)) {
@@ -118,7 +171,19 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
       TEMPLATES[dow].forEach((section, si) => {
         section.r.forEach(([, type, min], ri) => {
           for (let pos = 0; pos < min; pos += 1) {
+            const id = fixed.get(fixedKey({ dow, si, ri, pos }));
+            if (!id || used.has(id)) continue;
+            assignments.set(slotKey({ dow, si, ri, day, pos }), `w:${id}`);
+            used.add(id);
+            if (type === "Psicofônico" && dow === 3) blockWednesday(week, id);
+          }
+        });
+      });
+      TEMPLATES[dow].forEach((section, si) => {
+        section.r.forEach(([, type, min], ri) => {
+          for (let pos = 0; pos < min; pos += 1) {
             const key = slotKey({ dow, si, ri, day, pos });
+            if (assignments.has(key)) continue;
             if (type === "STUDY") {
               const pool = studies.filter((s) => s.type === section.s);
               assignments.set(key, pool.length ? `t:${pool[(day + si + ri) % pool.length].id}` : "");
@@ -150,10 +215,7 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
             assignments.set(key, `w:${chosen.id}`);
             used.add(chosen.id);
             bump(chosen.id);
-            if (type === "Psicofônico" && dow === 3) {
-              if (!wednesdayPsych.has(week)) wednesdayPsych.set(week, new Set());
-              wednesdayPsych.get(week)!.add(chosen.id);
-            }
+            if (type === "Psicofônico" && dow === 3) blockWednesday(week, chosen.id);
           }
         });
       });

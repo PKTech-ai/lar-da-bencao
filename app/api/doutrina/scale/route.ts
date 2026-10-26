@@ -5,10 +5,11 @@ import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import {
-  assertMonthVersion, canEditDoutrina, insertSlots, loadScale, loadScaleOptions, requireDoutrina, reviewScale
+  assertMonthVersion, canEditDoutrina, insertSlots, loadFixed, loadScale, loadScaleOptions, requireDoutrina, reviewScale
 } from "@/lib/doutrina-data";
 import {
-  buildScale, canAddExtra, isValidMonth, parseSlotKey, roleOf, scaleStatusLabel, slotKey, validateSlotValue, type ScaleStatus
+  buildScale, canAddExtra, isValidMonth, parseFixedKey, parseSlotKey, roleOf, scaleStatusLabel, slotKey, validateFixed, validateSlotValue,
+  type ScaleStatus
 } from "@/lib/doutrina-scale";
 
 const monthSchema = z.string().refine(isValidMonth, "Mês inválido.");
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
     const actor = await requireActor();
     await requireDoutrina(actor, "read");
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
-    const [scale, options, canEdit] = await Promise.all([loadScale(ym), loadScaleOptions(), canEditDoutrina(actor)]);
+    const [scale, options, canEdit, fixed] = await Promise.all([loadScale(ym), loadScaleOptions(), canEditDoutrina(actor), loadFixed()]);
     const review = scale.month?.reviewed ? reviewScale(scale.assignments, options) : null;
     return Response.json({
       month: scale.month ? { ...scale.month, statusLabel: scaleStatusLabel[scale.month.status] } : null,
@@ -48,7 +49,8 @@ export async function GET(request: Request) {
       extras: [...scale.extras],
       review,
       options,
-      canEdit
+      canEdit,
+      fixed
     }, { headers: noStore });
   } catch (error) {
     return errorResponse(error);
@@ -81,7 +83,17 @@ export async function POST(request: Request) {
           throw new AppError("Já existe escala neste mês. Use “Gerar novamente” para substituí-la.", 409, "SCALE_EXISTS");
         }
         const options = await loadScaleOptions(client);
-        const generated = buildScale(input.month, options.workers, options.speakers, options.studies);
+        // Fixo que deixou de valer (afastado, sem a função ou sem o dia) não entra: a vaga volta para a regra normal.
+        const fixedRows = await loadFixed(client);
+        const fixed = new Map<string, string>();
+        const skipped: string[] = [];
+        for (const row of fixedRows) {
+          const pattern = parseFixedKey(row.key);
+          const worker = options.workers.find((w) => w.id === row.worker_id);
+          if (pattern && !validateFixed(pattern, worker, fixed)) fixed.set(row.key, row.worker_id);
+          else skipped.push(`${row.worker_name} (${row.section_name} → ${row.role_label})`);
+        }
+        const generated = buildScale(input.month, options.workers, options.speakers, options.studies, fixed);
         const saved = await client.query<{ id: string }>(
           `insert into app.scale_months (department_key, year, month, status, reviewed, generated_at, created_by, updated_by)
            values ('doutrina', $1, $2, 'generated', false, now(), $3, $3)
@@ -99,9 +111,9 @@ export async function POST(request: Request) {
           category: removed.rowCount ? "Edição" : "Inclusão",
           action: removed.rowCount ? "Exclusão e nova geração de escala" : "Geração de escala",
           ...audit("Escala mensal"), entityId: monthId,
-          details: `${input.month}: ${removed.rowCount ?? 0} removida(s) · ${generated.size} gerada(s) · ${missing} vaga(s) pendente(s)`
+          details: `${input.month}: ${removed.rowCount ?? 0} removida(s) · ${generated.size} gerada(s) · ${missing} vaga(s) pendente(s) · ${fixed.size} fixo(s)${skipped.length ? ` · fixos ignorados: ${skipped.join("; ")}` : ""}`
         }, client);
-        return { removed: removed.rowCount ?? 0, added: generated.size, missing };
+        return { removed: removed.rowCount ?? 0, added: generated.size, missing, fixed: fixed.size, skipped };
       }
 
       if (!current) throw new AppError("Não há escala ativa neste mês. Gere a escala primeiro.", 404, "SCALE_NOT_FOUND");

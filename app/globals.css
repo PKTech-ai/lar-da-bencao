@@ -315,7 +315,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .history-list { display: grid; gap: 10px; }
 .history-list article { border-left: 3px solid var(--line); padding-left: 12px; }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.scale-sheet { display: grid; gap: 14px; }
+.scale-sheet { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .scale-sheet .sheet-title { text-align: center; font-weight: 800; color: var(--blue-900); }
 .scale-sheet .sheet-sub { text-align: center; font-size: 13px; color: var(--muted); }
 .scale-sheet h3 { margin: 0; padding: 7px 10px; background: var(--blue-100); border-radius: 8px; font-size: 13px; letter-spacing: .02em; }
@@ -371,7 +371,7 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 @media (max-width: 980px) {
   .grid.cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filters { grid-template-columns: 1fr 1fr; }
-  .app-main { grid-template-columns: 1fr; }
+  .app-main { grid-template-columns: minmax(0, 1fr); }
   .system-bar, .page-heading { grid-column: 1; grid-row: auto; max-width: none; }
   .system-bar { order: 1; }
   .page-heading { order: 2; margin-top: 16px; padding-right: 0; }
@@ -666,3 +666,19 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 }
 .os-panel section[aria-label^="OS "] form { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line, #dae5e9); }
 @media print { .os-cards { display: none !important; } }
+
+/* Escala da Doutrina — trabalhadores fixos */
+.fixed-panel > summary { cursor: pointer; list-style: none; min-height: 32px; }
+.fixed-panel > summary::-webkit-details-marker { display: none; }
+.fixed-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.fixed-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.scale-sheet .slot-with-pin { display: flex; align-items: center; gap: 2px; }
+.scale-sheet .slot-with-pin select { flex: 1; min-width: 0; }
+.pin-button { flex: 0 0 auto; width: 30px; height: 30px; display: inline-grid; place-items: center; border: 1px solid transparent; border-radius: 8px; background: transparent; cursor: pointer; font-size: 15px; opacity: .45; padding: 0; }
+.pin-button:hover, .pin-button:focus-visible { opacity: 1; border-color: var(--line); }
+.pin-button.is-pinned { opacity: 1; }
+.scale-sheet .slot-fixed { background: #fff3cd; border-color: #d9a400; font-weight: 700; }
+:root[data-theme="dark"] .scale-sheet .slot-fixed { background: #3d3418; }
+@media (max-width: 720px) { .pin-button { width: 40px; height: 40px; opacity: .7; } }
+@media print { .pin-button { display: none !important; } .scale-sheet .slot-fixed { background: none; font-weight: inherit; } }
+@media (max-width: 720px) { .scale-sheet select { min-width: 150px; } }

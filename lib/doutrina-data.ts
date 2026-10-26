@@ -37,7 +37,23 @@ export async function loadScaleOptions(db: Db = pool) {
   return { workers: workers.rows, speakers: speakers.rows, studies: studies.rows };
 }
 
-export type ScaleMonthRow = { id: string; status: ScaleStatus; reviewed: boolean; version: number; generated_at: string | null; deleted_at: string | null; published_at: string | null };
+export type FixedRow = { id: string; key: string; worker_id: string; worker_name: string; section_name: string; role_label: string; created_at: string; created_by_name: string };
+
+/** Trabalhadores fixos da escala da Doutrina (`key` = `dia-da-semana|seção|linha|posição`). */
+export async function loadFixed(db: Db = pool) {
+  const result = await db.query<FixedRow>(
+    `select f.id, f.dow || '|' || f.section_index || '|' || f.role_index || '|' || f.position as key, f.worker_id,
+            w.full_name as worker_name, f.section_name, f.role_label, f.created_at, u.full_name as created_by_name
+       from app.scale_fixed_assignments f
+       join app.workers w on w.id = f.worker_id
+       join app.users u on u.id = f.created_by
+      where f.department_key = 'doutrina'
+      order by f.dow, f.section_index, f.role_index, f.position`
+  );
+  return result.rows;
+}
+
+export type ScaleMonthRow ={ id: string; status: ScaleStatus; reviewed: boolean; version: number; generated_at: string | null; deleted_at: string | null; published_at: string | null };
 
 export async function loadScale(ym: string, db: Db = pool, lock = false) {
   const [year, month] = ym.split("-").map(Number);

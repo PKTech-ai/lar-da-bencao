@@ -15,6 +15,7 @@ type Payload = {
   review: { conflicts: Conflict[]; invalid: { key: string; message: string }[] } | null;
   options: { workers: ScaleWorker[]; speakers: ScaleSpeaker[]; studies: ScaleStudy[] };
   canEdit: boolean;
+  fixed: { id: string; key: string; worker_id: string; worker_name: string; section_name: string; role_label: string }[];
 };
 
 const currentMonth = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()).slice(0, 7);
@@ -43,10 +44,10 @@ export function ScalesClient() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
 
-  async function call(method: string, payload: object, success?: (body: Record<string, unknown>) => string) {
+  async function call(method: string, payload: object, success?: (body: Record<string, unknown>) => string, url = "/api/doutrina/scale") {
     setBusy(true); setError(""); setMessage("");
     try {
-      const response = await fetch("/api/doutrina/scale", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ month: ym, ...payload }) });
+      const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ month: ym, ...payload }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
       if (success) setMessage(success(body));
@@ -63,10 +64,14 @@ export function ScalesClient() {
   const version = active?.version;
 
   function operate(action: "generate" | "regenerate" | "delete" | "check" | "approve" | "publish") {
-    if (action === "regenerate" && !window.confirm("Gerar a escala novamente? Todas as posições do mês serão substituídas, inclusive as alterações manuais.")) return;
+    if (action === "regenerate" && !window.confirm("Gerar a escala novamente? Todas as posições do mês serão substituídas, inclusive as alterações manuais. Os trabalhadores fixos 📌 são mantidos.")) return;
     if (action === "delete" && !window.confirm("Excluir a escala do mês? Frequências continuam registradas.")) return;
     void call("POST", { action, version }, (body) => {
-      if (action === "generate" || action === "regenerate") return `Escala gerada: ${body.added} posição(ões), ${body.missing} vaga(s) pendente(s). Confira funções e trabalhadores.`;
+      if (action === "generate" || action === "regenerate") {
+        const skipped = (body.skipped as string[] | undefined) ?? [];
+        return `Escala gerada: ${body.added} posição(ões), ${body.missing} vaga(s) pendente(s), ${body.fixed ?? 0} fixo(s) mantido(s).`
+          + (skipped.length ? ` Fixos que não valem mais (afastados ou sem a função/dia na ficha): ${skipped.join("; ")}.` : " Confira funções e trabalhadores.");
+      }
       if (action === "delete") return `Escala excluída (${body.removed} posição(ões)).`;
       if (action === "publish") return "Escala publicada.";
       if (body.status === "pending_issues") return action === "approve" ? "Existem duplicidades ou conflitos. Corrija antes de aprovar." : "Conferência concluída com pendências.";
@@ -83,6 +88,26 @@ export function ScalesClient() {
     ...(data?.review?.invalid ?? []).map((i) => i.key)
   ]), [data]);
   const workerName = useMemo(() => new Map((data?.options.workers ?? []).map((w) => [w.id, w.name])), [data]);
+  const fixedByKey = useMemo(() => new Map((data?.fixed ?? []).map((f) => [f.key, f])), [data]);
+  // Fixos marcados depois da última geração ainda não aparecem em todas as semanas do mês.
+  const fixedPending = useMemo(() => (data?.fixed ?? []).filter((f) => {
+    const [fdow, fsi, fri, fpos] = f.key.split("|").map(Number);
+    return monthDays(ym, fdow).some((day) => {
+      const value = byKey.get(slotKey({ dow: fdow, si: fsi, ri: fri, day, pos: fpos }));
+      return value !== undefined && value !== `w:${f.worker_id}`;
+    });
+  }).length, [data, byKey, ym]);
+
+  function togglePin(patternKey: string, current: string) {
+    const pinned = fixedByKey.get(patternKey);
+    if (pinned) {
+      void call("DELETE", { key: patternKey }, () => `${pinned.worker_name} deixou de ser fixo. Na próxima geração a vaga volta para a regra normal.`, "/api/doutrina/scale/fixed");
+      return;
+    }
+    const name = workerName.get(current.slice(2)) ?? "Trabalhador";
+    void call("POST", { key: patternKey, worker_id: current.slice(2) },
+      () => `${name} agora é fixo 📌 nesta função, toda semana. Use “Gerar novamente” para aplicar em todas as semanas do mês.`, "/api/doutrina/scale/fixed");
+  }
 
   function options(key: string, current: string) {
     if (!data) return [];
@@ -156,6 +181,25 @@ export function ScalesClient() {
       {error ? <div className="error" role="alert">{error}</div> : null}
       {message ? <div className="success" role="status">{message}</div> : null}
 
+      {data && (data.fixed.length || data.canEdit) ? (
+        <details className="card no-print fixed-panel" open={data.fixed.length > 0}>
+          <summary><strong>📌 Trabalhadores fixos ({data.fixed.length})</strong>
+            {fixedPending ? <span className="small"> · {fixedPending} ainda fora desta escala: use “Gerar novamente”</span> : null}</summary>
+          <p className="small muted">O fixo fica na mesma função em todas as semanas, em toda escala gerada, até ser desmarcado.
+            Para marcar, toque no 📍 ao lado do nome na folha do dia.</p>
+          {data.fixed.length ? (
+            <ul className="fixed-list">
+              {data.fixed.map((f) => (
+                <li key={f.id}>
+                  <span><strong>{f.worker_name}</strong><br /><span className="small muted">{DAY_NAME[Number(f.key.split("|")[0])]} · {f.section_name} → {f.role_label}</span></span>
+                  {data.canEdit ? <button className="button" disabled={busy} onClick={() => togglePin(f.key, "")}>Desmarcar</button> : null}
+                </li>
+              ))}
+            </ul>
+          ) : <p className="small">Nenhum trabalhador fixo.</p>}
+        </details>
+      ) : null}
+
       {data?.review && (data.review.conflicts.length || data.review.invalid.length) ? (
         <section className="card no-print">
           <h2>Resultado da conferência</h2>
@@ -195,7 +239,18 @@ export function ScalesClient() {
                             <td key={day}>
                               {keys.map((key) => {
                                 const current = byKey.get(key) ?? "";
-                                const cls = [edited.has(key) ? "slot-edited" : "", duplicateKeys.has(key) ? "slot-duplicate" : "", conflictKeys.has(key) ? "slot-conflict" : ""].join(" ");
+                                const patternKey = `${dow}|${si}|${ri}|${key.split("|")[4]}`;
+                                const pinned = fixedByKey.get(patternKey);
+                                const pinOk = pinned && current === `w:${pinned.worker_id}`;
+                                const cls = [edited.has(key) ? "slot-edited" : "", duplicateKeys.has(key) ? "slot-duplicate" : "", conflictKeys.has(key) ? "slot-conflict" : "", pinOk ? "slot-fixed" : ""].join(" ");
+                                const canPin = Boolean(data?.canEdit) && !busy && !extras.has(key) && roleOf({ dow, si, ri }).type !== "STUDY" && Boolean(pinned || current.startsWith("w:"));
+                                const pin = canPin ? (
+                                  <button type="button" className={`pin-button${pinned ? " is-pinned" : ""}`} onClick={() => togglePin(patternKey, current)}
+                                    title={pinned ? `${pinned.worker_name} é fixo — tocar para desmarcar` : `Fixar ${workerName.get(current.slice(2)) ?? ""} nesta função toda semana`}
+                                    aria-label={pinned ? `Desmarcar ${pinned.worker_name} como fixo` : `Marcar ${workerName.get(current.slice(2)) ?? ""} como fixo`}>
+                                    {pinned ? "📌" : "📍"}
+                                  </button>
+                                ) : pinned ? <span className="pin-button is-pinned" title={`${pinned.worker_name} é fixo`}>📌</span> : null;
                                 const select = (
                                   <select key={key} aria-label={describeSlot(key, ym)} className={cls} value={current} disabled={readOnly}
                                     onChange={(e) => void call("PATCH", { key, value: e.target.value, version })}>
@@ -207,7 +262,7 @@ export function ScalesClient() {
                                   <div className="slot-extra" key={key}>{select}
                                     {!readOnly ? <button className="link-button" title="Remover posição adicional" onClick={() => void call("PUT", { op: "remove", key, version })}>×</button> : null}
                                   </div>
-                                ) : select;
+                                ) : <div className="slot-with-pin" key={key}>{select}{pin}</div>;
                               })}
                               {!readOnly && canAddExtra({ dow, si, ri }) && keys.length ? (
                                 <button className="link-button" onClick={() => void call("PUT", { op: "add", key: slotKey({ dow, si, ri, day, pos: 0 }).slice(0, -2), version })}>+ adicional</button>

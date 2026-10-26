@@ -163,6 +163,25 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect((await post({ action: "publish", version: month.rows[0].version })).status).toBe(200);
     current.actor = worker;
     expect((await post({ action: "regenerate" })).status).toBe(403);
+
+    // Trabalhador fixo: fica em todas as segundas ao gerar de novo; trabalhador comum não marca; desmarcar libera.
+    const fixed = await import("@/app/api/doutrina/scale/fixed/route");
+    const pick = await query<{ id: string }>("select w.id from app.workers w where w.full_name = 'Escala 07'");
+    const workerId = pick.rows[0].id;
+    expect((await fixed.POST(json("POST", { key: "1|0|0|0", worker_id: workerId }))).status).toBe(403);
+    current.actor = coordinator;
+    await owner((client) => client.query("delete from app.scale_fixed_assignments where dow = 1 and section_index = 0 and role_index = 0 and position = 0"));
+    expect((await fixed.POST(json("POST", { key: "1|0|0|0", worker_id: workerId }))).status).toBe(201);
+    expect((await fixed.POST(json("POST", { key: "1|0|1|0", worker_id: workerId }))).status).toBe(409);
+    const v = await query<{ version: number }>("select version from app.scale_months where year=$1 and month=3", [year]);
+    expect((await post({ action: "regenerate", version: v.rows[0].version })).status).toBe(200);
+    const mondays = await query<{ worker_id: string }>(
+      `select a.worker_id from app.scale_assignments a join app.scale_months m on m.id = a.scale_month_id
+        where m.year = $1 and m.month = 3 and a.slot_key like '1|0|0|%|0'`, [year]);
+    expect(mondays.rows.length).toBeGreaterThan(3);
+    expect(mondays.rows.every((r) => r.worker_id === workerId)).toBe(true);
+    expect((await fixed.DELETE(json("DELETE", { key: "1|0|0|0" }))).status).toBe(200);
+    expect((await fixed.DELETE(json("DELETE", { key: "1|0|0|0" }))).status).toBe(404);
   });
 
   it("Infância: matrícula, turma, chamada e cronograma", async () => {

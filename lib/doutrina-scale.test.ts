@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { attendanceStats, isValidAttendanceCell } from "@/lib/doutrina-attendance";
 import {
-  FREE_THEME, buildScale, canAddExtra, findConflicts, monthDays, parseSlotKey, roleOf, slotKey, validateSlotValue,
-  type ScaleWorker
+  FREE_THEME, buildScale, canAddExtra, findConflicts, fixedKey, monthDays, parseFixedKey, parseSlotKey, roleOf, slotKey, validateFixed,
+  validateSlotValue, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
 const ALL = ["Passista", "Psicofônico", "Dialogador", "Dirigente de Reunião", "Dirigente de Estudo", "Expositor de Estudo", "Palestrante", "Dirigente de Palestra", "Entrevistador", "Recepcionista"];
@@ -146,7 +146,8 @@ const route = vi.hoisted(() => ({
   inserted: [] as [string, string][],
   statusUpdates: [] as string[],
   audits: [] as string[],
-  canEdit: true
+  canEdit: true,
+  fixed: [] as { id: string; key: string; worker_id: string; worker_name: string; section_name: string; role_label: string; created_at: string; created_by_name: string }[]
 }));
 
 vi.mock("@/lib/csrf", () => ({ assertSameOrigin: () => undefined }));
@@ -182,6 +183,7 @@ vi.mock("@/lib/doutrina-data", async (importOriginal) => {
     requireDoutrina: async (_: unknown, action: string) => { if (action === "update" && !route.canEdit) throw new AuthorizationError(); },
     canEditDoutrina: async () => route.canEdit,
     loadScaleOptions: async () => ({ workers: team(40), speakers, studies }),
+    loadFixed: async () => route.fixed,
     loadScale: async () => ({ month: route.month, assignments: route.assignments, edited: new Set(), extras: new Set() }),
     insertSlots: async (_: unknown, __: string, ___: string, slots: [string, string][]) => {
       for (const [key, value] of slots) route.assignments.set(key, value);
@@ -194,6 +196,47 @@ const scaleRoute = await import("@/app/api/doutrina/scale/route");
 const post = (body: object) => scaleRoute.POST(new Request("https://app.test/x", { method: "POST", body: JSON.stringify({ month: "2026-09", ...body }) }));
 const patch = (body: object) => scaleRoute.PATCH(new Request("https://app.test/x", { method: "PATCH", body: JSON.stringify({ month: "2026-09", ...body }) }));
 
+describe("trabalhadores fixos", () => {
+  const workers = team(40);
+  const ana = workers[29];
+
+  it("fixo fica na mesma posição em todas as semanas e já conta na divisão do mês", () => {
+    const mep = fixedKey({ dow: 4, si: 0, ri: 0, pos: 0 });
+    const scale = buildScale("2026-10", workers, speakers, studies, new Map([[mep, ana.id]]));
+    for (const day of monthDays("2026-10", 4)) expect(scale.get(slotKey({ dow: 4, si: 0, ri: 0, day, pos: 0 }))).toBe(`w:${ana.id}`);
+    // Sem fixo, Ana teria mais escalas em outros dias do que tem agora.
+    const count = (m: Map<string, string>) => [...m.values()].filter((v) => v === `w:${ana.id}`).length;
+    expect(count(scale)).toBeLessThanOrEqual(count(buildScale("2026-10", workers, speakers, studies)) + monthDays("2026-10", 4).length);
+    expect(findConflicts(scale)).toEqual([]);
+  });
+
+  it("sem fixos o resultado é o mesmo de antes", () => {
+    expect([...buildScale("2026-10", workers, speakers, studies, new Map())]).toEqual([...buildScale("2026-10", workers, speakers, studies)]);
+  });
+
+  it("psicofônico fixo na quarta folga na sexta da mesma semana", () => {
+    const wed = fixedKey({ dow: 3, si: 7, ri: 2, pos: 0 });
+    const scale = buildScale("2026-10", workers, speakers, studies, new Map([[wed, ana.id]]));
+    // 02/10 fica de fora: a quarta daquela semana (30/09) é do mês anterior.
+    const friday = [...scale].filter(([k, v]) => v === `w:${ana.id}` && parseSlotKey(k)!.dow === 5 && parseSlotKey(k)!.day > 2 && roleOf(parseSlotKey(k)!).type === "Psicofônico");
+    expect(friday).toEqual([]);
+  });
+
+  it("valida a marcação do fixo", () => {
+    const only = { ...ana, functions: ["Passista"], days: [1] };
+    expect(parseFixedKey("1|0|1|0")).toEqual({ dow: 1, si: 0, ri: 1, pos: 0 });
+    expect(parseFixedKey("1|0|1")).toBeNull();
+    expect(validateFixed({ dow: 1, si: 0, ri: 1, pos: 0 }, only, new Map())).toBeNull();
+    expect(validateFixed({ dow: 1, si: 0, ri: 2, pos: 0 }, only, new Map())).toMatch(/não tem a função Psicofônico/);
+    expect(validateFixed({ dow: 3, si: 6, ri: 2, pos: 0 }, only, new Map())).toMatch(/dia disponível/);
+    expect(validateFixed({ dow: 4, si: 0, ri: 2, pos: 0 }, ana, new Map())).toMatch(/não podem ser fixos/);
+    expect(validateFixed({ dow: 1, si: 0, ri: 1, pos: 5 }, only, new Map())).toMatch(/Posição inválida/);
+    expect(validateFixed({ dow: 1, si: 0, ri: 1, pos: 0 }, undefined, new Map())).toMatch(/fora da Doutrina/);
+    expect(validateFixed({ dow: 1, si: 0, ri: 2, pos: 0 }, ana, new Map([["1|0|0|0", ana.id]]))).toMatch(/já está fixo/);
+    expect(validateFixed({ dow: 5, si: 3, ri: 2, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toMatch(/Folga obrigatória/);
+  });
+});
+
 describe("API da escala", () => {
   beforeEach(() => {
     route.month = null;
@@ -202,6 +245,7 @@ describe("API da escala", () => {
     route.statusUpdates = [];
     route.audits = [];
     route.canEdit = true;
+    route.fixed = [];
   });
 
   it("gera, recusa gerar duas vezes sem confirmação e regenera", async () => {
@@ -211,6 +255,21 @@ describe("API da escala", () => {
     expect((await post({ action: "generate" })).status).toBe(409);
     expect((await post({ action: "regenerate", version: route.month!.version })).status).toBe(200);
     expect(route.audits).toEqual(["Geração de escala", "Falha em operação de escala", "Exclusão e nova geração de escala"]);
+  });
+
+  it("gerar de novo mantém os fixos e ignora quem não vale mais", async () => {
+    const [a, b] = team(40);
+    route.fixed = [
+      { id: "f1", key: "4|0|0|0", worker_id: a.id, worker_name: a.name, section_name: "ESTUDO DO MEP", role_label: "DIRIG.", created_at: "", created_by_name: "" },
+      { id: "f2", key: "1|0|0|0", worker_id: uuid(999), worker_name: "Afastado", section_name: "MEDIÚNICA", role_label: "DIRIG.", created_at: "", created_by_name: "" },
+      { id: "f3", key: "4|0|1|0", worker_id: b.id, worker_name: b.name, section_name: "ESTUDO DO MEP", role_label: "EXP.", created_at: "", created_by_name: "" }
+    ];
+    const res = await post({ action: "generate" });
+    expect(await res.json()).toMatchObject({ fixed: 2, skipped: ["Afastado (MEDIÚNICA → DIRIG.)"] });
+    for (const day of monthDays("2026-09", 4)) {
+      expect(route.assignments.get(`4|0|0|${day}|0`)).toBe(`w:${a.id}`);
+      expect(route.assignments.get(`4|0|1|${day}|0`)).toBe(`w:${b.id}`);
+    }
   });
 
   it("perfil só de leitura não gera", async () => {
