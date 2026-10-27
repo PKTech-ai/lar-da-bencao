@@ -119,9 +119,12 @@ export function ScalesClient() {
     }
     const name = workerName.get(current.slice(2)) ?? "Trabalhador";
     void call("POST", { key: patternKey, worker_id: current.slice(2) }, (body) => {
-      const skipped = (body.busyDays as number[] | undefined) ?? [];
+      const days = (list: unknown) => ((list as number[] | undefined) ?? []).map((d) => String(d).padStart(2, "0")).join(", ");
+      const skipped = days(body.busyDays);
+      const moved = days(body.movedDays);
       return `${name} agora é fixo 📌 nesta função e já foi colocado em todas as semanas do mês.`
-        + (skipped.length ? ` Fora do(s) dia(s) ${skipped.map((d) => String(d).padStart(2, "0")).join(", ")}: já escalado em outra atividade ou em folga.` : "");
+        + (moved ? ` No(s) dia(s) ${moved} saiu da outra atividade em que estava: escolha quem fica no lugar.` : "")
+        + (skipped ? ` Fora do(s) dia(s) ${skipped}: folga do psicofônico ou indisponível na ficha.` : "");
     }, "/api/doutrina/scale/fixed");
   }
 

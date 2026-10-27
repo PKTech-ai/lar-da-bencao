@@ -171,14 +171,28 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect((await fixed.POST(json("POST", { key: "1|0|0|0", worker_id: workerId }))).status).toBe(403);
     current.actor = coordinator;
     await owner((client) => client.query("delete from app.scale_fixed_assignments where dow = 1 and section_index = 0 and role_index = 0 and position = 0"));
+    // Na 2ª segunda ele está em outra atividade (passista): o fixo tem prioridade, sai de lá e entra na linha fixada.
+    const secondMonday = (await import("@/lib/doutrina-scale")).monthDays(ym, 1)[1];
+    const setSlot = (key: string, value: string) => owner((client) => client.query(
+      `update app.scale_assignments a set slot_value = $3, worker_id = nullif(substr($3, 3), '')::uuid
+         from app.scale_months m where m.id = a.scale_month_id and m.year = $1 and m.month = 3 and a.slot_key = $2`, [year, key, value]));
+    await setSlot(`1|0|0|${secondMonday}|0`, "");
+    await setSlot(`1|0|1|${secondMonday}|0`, `w:${workerId}`);
     const marked = await fixed.POST(json("POST", { key: "1|0|0|0", worker_id: workerId, month: ym }));
     expect(marked.status).toBe(201);
     // Fixar já preenche a linha inteira do mês aberto, sem gerar de novo.
     const applied = await query<{ worker_id: string }>(
       `select a.worker_id from app.scale_assignments a join app.scale_months m on m.id = a.scale_month_id
         where m.year = $1 and m.month = 3 and a.slot_key like '1|0|0|%|0'`, [year]);
-    const { busyDays } = await marked.json();
-    expect(applied.rows.filter((r) => r.worker_id === workerId).length).toBe(applied.rows.length - busyDays.length);
+    const { busyDays, movedDays } = await marked.json();
+    expect(busyDays).toEqual([]);
+    expect(movedDays).toContain(secondMonday);
+    expect(applied.rows.length).toBeGreaterThan(3);
+    expect(applied.rows.every((r) => r.worker_id === workerId)).toBe(true);
+    const freed = await query<{ slot_value: string }>(
+      `select a.slot_value from app.scale_assignments a join app.scale_months m on m.id = a.scale_month_id
+        where m.year = $1 and m.month = 3 and a.slot_key = $2`, [year, `1|0|1|${secondMonday}|0`]);
+    expect(freed.rows[0].slot_value).toBe("");
     expect((await fixed.POST(json("POST", { key: "1|0|1|0", worker_id: workerId }))).status).toBe(409);
     const v = await query<{ version: number }>("select version from app.scale_months where year=$1 and month=3", [year]);
     expect((await post({ action: "regenerate", version: v.rows[0].version })).status).toBe(200);

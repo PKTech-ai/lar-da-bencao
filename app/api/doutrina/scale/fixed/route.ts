@@ -41,29 +41,47 @@ export async function POST(request: Request) {
         [pattern.dow, pattern.si, pattern.ri, pattern.pos, section.n, label, worker!.id, actor.id]
       );
       // Já coloca o fixo em todas as semanas da escala aberta (na linha toda), sem esperar "Gerar novamente".
-      // Onde ele já está em outra atividade no dia, ou a folga do psicofônico impede, a semana fica como está.
+      // O fixo tem prioridade, como na geração: se no dia ele estava em outra atividade, sai de lá e a posição fica livre.
+      // Só a folga do psicofônico (ou falta de função/dia na ficha) deixa a semana como está.
       const applied: number[] = [];
       const busyDays: number[] = [];
+      const movedDays: number[] = [];
       const scale = input.month ? await loadScale(input.month, client, true) : null;
       if (input.month && scale?.month && scale.month.status !== "deleted") {
         const value = `w:${worker!.id}`;
         const current = new Map(scale.assignments);
         const regular: [string, string][] = [];
         const extra: [string, string][] = [];
+        const freed: [string, string][] = [];
+        const removedExtras: string[] = [];
         for (const day of monthDays(input.month, pattern.dow)) {
           const prefix = `${pattern.dow}|${pattern.si}|${pattern.ri}|${day}|`;
           if (![...current.keys()].some((k) => k.startsWith(prefix))) continue;
           const target = slotKey({ ...pattern, day });
           if (current.get(target) === value) continue;
-          const elsewhere = [...current].some(([k, v]) => v === value && k !== target && k.startsWith(`${pattern.dow}|`) && k.split("|")[3] === String(day));
-          if (elsewhere || validateSlotValue(parseSlotKey(target)!, value, { ...options, assignments: current })) {
+          if (validateSlotValue(parseSlotKey(target)!, value, { ...options, assignments: current })) {
             busyDays.push(day);
             continue;
           }
+          const elsewhere = [...current.keys()].filter((k) => current.get(k) === value && k !== target && k.startsWith(`${pattern.dow}|`) && k.split("|")[3] === String(day));
+          for (const k of elsewhere) {
+            if (scale.extras.has(k)) {
+              removedExtras.push(k);
+              current.delete(k);
+            } else {
+              freed.push([k, ""]);
+              current.set(k, "");
+            }
+          }
+          if (elsewhere.length) movedDays.push(day);
           (current.has(target) ? regular : extra).push([target, value]);
           current.set(target, value);
           applied.push(day);
         }
+        if (removedExtras.length) {
+          await client.query("delete from app.scale_assignments where scale_month_id=$1 and slot_key = any($2::text[])", [scale.month.id, removedExtras]);
+        }
+        await insertSlots(client, scale.month.id, input.month, freed, { edited: true });
         await insertSlots(client, scale.month.id, input.month, regular, { edited: true });
         await insertSlots(client, scale.month.id, input.month, extra, { edited: true, extra: true });
         if (applied.length) {
@@ -75,10 +93,10 @@ export async function POST(request: Request) {
       }
       await appendAudit(actor, {
         category: before ? "Edição" : "Inclusão", action: "Trabalhador marcado como fixo na escala", ...audit, entityId: inserted.rows[0].id,
-        details: `${worker!.name} · ${section.n} → ${label}${applied.length ? ` · aplicado em ${input.month}: dias ${applied.join(", ")}` : ""}`,
+        details: `${worker!.name} · ${section.n} → ${label}${applied.length ? ` · aplicado em ${input.month}: dias ${applied.join(", ")}` : ""}${movedDays.length ? ` · retirado de outra atividade nos dias ${movedDays.join(", ")}` : ""}`,
         before: before ? { worker: before.worker_name } : null, after: { worker: worker!.name }
       }, client);
-      return { id: inserted.rows[0].id, applied: applied.length, busyDays };
+      return { id: inserted.rows[0].id, applied: applied.length, busyDays, movedDays };
     });
     return Response.json(result, { status: 201 });
   } catch (error) {
