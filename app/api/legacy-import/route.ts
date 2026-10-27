@@ -4,6 +4,7 @@ import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { query, transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
+import { runtimeEnvironment } from "@/lib/environment";
 import { requireFlag } from "@/lib/feature-flags";
 import { applyPlan } from "@/lib/legacy/importer";
 import { isDemoPlan, planSchema } from "@/lib/legacy/v215";
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
       return Response.json({ status: "rolled_back", counts });
     }
 
-    if (process.env.VERCEL_ENV === "production" && isDemoPlan(input.plan)) {
+    if (runtimeEnvironment().production && isDemoPlan(input.plan)) {
       throw new AppError("O pacote contém os dados fictícios de demonstração da v215 e não pode ser importado em produção.", 422, "DEMO_PACKAGE");
     }
     const manifest = { ...input.manifest, origin: input.origin };

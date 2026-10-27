@@ -71,8 +71,8 @@ Depois da migração e das variáveis, crie o primeiro administrador uma única 
 ## Produção única na Vercel
 
 - Production Branch: `main`.
-- Variáveis somente no escopo Production.
-- Nenhum Preview Deployment ou banco remoto de homologação.
+- Variáveis nos escopos Production e Preview.
+- Só os rascunhos `rascunho-*` geram Preview Deployment, e ele usa o banco de produção (dados reais); não há banco de homologação.
 - `APP_URL` deve ser o domínio canônico.
 - O banco deve estar na região mais próxima disponível das Functions.
 - Configure o cron diário de integridade com `CRON_SECRET`.

@@ -55,8 +55,8 @@ de backup, que é decisão da Diretoria, não do código.
 ## 2. Projeto Vercel
 
 1. Importar o repo; Framework = Next.js
-2. Production Branch = `main` (em `vercel.json`, só os rascunhos `rascunho-*` geram prévia; a prévia não acessa banco nem segredos)
-3. Variáveis **somente Production** (ver `.env.example`):
+2. Production Branch = `main` (em `vercel.json`, só os rascunhos `rascunho-*` geram prévia; a prévia usa o mesmo banco e as mesmas variáveis da produção)
+3. Variáveis em **Production e Preview** (ver `.env.example`):
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`

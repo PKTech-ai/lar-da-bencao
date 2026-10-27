@@ -11,8 +11,8 @@ const serverSchema = z.object({
   ANTIMALWARE_API_TOKEN: z.string().min(20),
   APP_URL: z.string().url()
 }).superRefine((env, ctx) => {
-  // Em produção o scanner precisa ser um serviço real sob HTTPS (nunca o scanner local de desenvolvimento).
-  if (process.env.VERCEL_ENV !== "production") return;
+  // Com dados reais (produção e rascunho) o scanner precisa ser um serviço real sob HTTPS (nunca o scanner local de desenvolvimento).
+  if (process.env.VERCEL_ENV !== "production" && process.env.VERCEL_ENV !== "preview") return;
   const scanner = new URL(env.ANTIMALWARE_API_URL);
   if (scanner.protocol !== "https:" || ["localhost", "127.0.0.1", "::1"].includes(scanner.hostname)) {
     ctx.addIssue({ code: "custom", path: ["ANTIMALWARE_API_URL"], message: "Em produção, use um scanner HTTPS externo." });
@@ -28,8 +28,7 @@ let cached: ServerEnv | undefined;
 
 export function serverEnv(): ServerEnv {
   if (cached) return cached;
-  // BL-059: em vercel.json só os rascunhos (rascunho-*) viram prévia, e nenhuma prévia acessa segredos nem banco.
-  if (process.env.VERCEL_ENV === "preview") throw new Error("Pré-visualizações não podem acessar o banco ou segredos de produção.");
+  // BL-059: em vercel.json só os rascunhos (rascunho-*) viram prévia; a prévia usa o banco de produção (decisão de 27/10).
   cached = serverSchema.parse(process.env);
   return cached;
 }

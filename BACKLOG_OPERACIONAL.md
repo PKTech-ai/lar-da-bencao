@@ -830,7 +830,8 @@ Inventário operacional da migração **v215 (mock HTML em `dist/index.html`) �
   - `serverEnv()` recusa rodar em Preview (sem segredos nem banco); previews continuam desligados no `vercel.json`
   - selo de ambiente real (`lib/environment.ts`): “Produção · Vercel” só em produção; fora dela, aviso “somente dados sintéticos” em todas as telas
   - importação recusa a semente fictícia do mock em produção (BL-010); o app não tem função de “restaurar dados fictícios”
-- **Pendência (ops):** conferir na Vercel que todas as variáveis estão só no escopo Production
+- **Mudança (2026-10-27, decisão do Marcel):** os rascunhos `rascunho-*` viram prévia e usam o banco de produção, para conferir as mudanças com dados reais antes de publicar; variáveis em Production e Preview; na prévia valem as mesmas travas da produção (`runtimeEnvironment().production`)
+- **Pendência (ops):** conferir na Vercel que todas as variáveis estão em Production e Preview
 - **Critério de aceite:** ✅ nenhum dado fictício misturado à produção; ✅ previews desabilitados; ⏳ conferência das variáveis.
 
 ### BL-060 — Observabilidade, alertas, health, WAF, domínio

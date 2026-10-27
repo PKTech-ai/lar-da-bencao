@@ -212,6 +212,14 @@ describe("API de importação", () => {
     expect(route.committed).toEqual([]);
   });
 
+  it("bloqueia pacote de demonstração no rascunho, que usa o banco de produção", async () => {
+    process.env.VERCEL_ENV = "preview";
+    const demoPlan = { ...plan, workers: ["André Almeida", "Beatriz Barbosa", "Carlos Cardoso", "Daniela Dias", "Eduardo Esteves"].map((full_name, i) => ({ ...plan.workers[0], legacy_id: String(i), full_name })) };
+    const response = await api.POST(body("commit", { plan: demoPlan }));
+    expect(response.status).toBe(422);
+    expect(route.committed).toEqual([]);
+  });
+
   it("reverte uma importação", async () => {
     const response = await api.POST(new Request("https://app.test/x", { method: "POST", body: JSON.stringify({ action: "rollback", import_id: "00000000-0000-4000-8000-000000000009" }) }));
     expect(await response.json()).toEqual({ status: "rolled_back", counts: { worker: 3 } });
