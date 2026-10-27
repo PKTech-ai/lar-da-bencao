@@ -24,15 +24,17 @@ export async function DepartmentDashboard({ page }: { page: ModulePage }) {
   const info = departmentInfoFor(page.slug);
   return (
     <>
-      {info ? <DepartmentAbout info={info} coordinators={coordinators.rows.map((r) => r.full_name)} /> : null}
       <div className="grid cards" style={{ marginBottom: 16 }}>
         {data.kpis.map((k) => <article key={k.label} className="card kpi"><span className="small muted">{k.label}</span><b>{k.value}</b></article>)}
       </div>
       {page.slug === "patrimonio" ? <PatrimonyOpenOrders /> : null}
-      <section className="card">
-        <h2>Alertas</h2>
-        {data.alerts.length ? <ul>{data.alerts.map((a) => <li key={a}>{a}</li>)}</ul> : <p className="muted">Nenhum alerta.</p>}
-      </section>
+      {data.alerts.length ? (
+        <section className="card">
+          <h2>Alertas</h2>
+          <ul>{data.alerts.map((a) => <li key={a}>{a}</li>)}</ul>
+        </section>
+      ) : null}
+      {info ? <DepartmentAbout info={info} coordinators={coordinators.rows.map((r) => r.full_name)} /> : null}
     </>
   );
 }

@@ -191,6 +191,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
     if (!restore && reason.trim().length < 3) return;
     void run(async () => {
       await api(`/api/r/${def.key}/${row.id}`, { method: "DELETE", body: JSON.stringify({ version: row.version, reason, restore }) });
+      if (editing?.row?.id === row.id) setEditing(null);
       return restore ? "Registro restaurado." : "Registro arquivado. Ele continua disponível no histórico.";
     });
   }
@@ -237,7 +238,11 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
         <section className="card" aria-label={row ? `${def.singular}` : `Novo ${def.singular}`}>
           <div className="toolbar">
             <h2>{row ? `${canWrite ? "Editar" : "Consultar"} — ${String(row[def.fields[0].name] ?? def.singular)}` : `Novo: ${def.singular}`}</h2>
-            <button type="button" className="button" onClick={() => { if (!dirty || window.confirm("Há alterações não salvas. Fechar mesmo assim?")) { setEditing(null); setDirty(false); } }}>Fechar</button>
+            <div className="row-actions">
+              {row && !canWrite && caps.update && !row.archived_at ? <button type="button" className="button primary" onClick={() => void openRecord(row, true)}>Editar</button> : null}
+              {row && !canWrite && def.archiveLabel && caps.delete ? <button type="button" className={`button${row.archived_at ? "" : " danger"}`} onClick={() => archive(row, Boolean(row.archived_at))}>{row.archived_at ? "Restaurar" : def.archiveLabel}</button> : null}
+              <button type="button" className="button" onClick={() => { if (!dirty || window.confirm("Há alterações não salvas. Fechar mesmo assim?")) { setEditing(null); setDirty(false); } }}>Fechar</button>
+            </div>
           </div>
           {row?.archived_at ? <div className="notice">Arquivado em {brDate(row.archived_at as string)} — {row.archive_reason}</div> : null}
           <form className="form-stack" onSubmit={save} onChange={() => setDirty(true)} key={`${row?.id ?? "new"}-${row?.version ?? 0}`}>
@@ -349,9 +354,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
                   {extraColumns.map((c) => <td key={c.label}>{c.render(r)}</td>)}
                   <td className="no-print">
                     <div className="row-actions">
-                      <button type="button" className="button" onClick={() => void openRecord(r, false)}>Consultar</button>
-                      {caps.update && !r.archived_at ? <button type="button" className="button" onClick={() => void openRecord(r, true)}>Editar</button> : null}
-                      {def.archiveLabel && caps.delete ? <button type="button" className={`button${r.archived_at ? "" : " danger"}`} onClick={() => archive(r, Boolean(r.archived_at))}>{r.archived_at ? "Restaurar" : def.archiveLabel}</button> : null}
+                      <button type="button" className="button" style={{ whiteSpace: "nowrap" }} onClick={() => void openRecord(r, false)}>Abrir</button>
                       {rowActions ? rowActions(r, load) : null}
                     </div>
                   </td>

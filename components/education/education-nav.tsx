@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ModuleTabs } from "@/components/module-tabs";
 import type { EducationDepartment } from "@/lib/education";
 
@@ -12,8 +11,8 @@ export function EducationNav({ department, current }: { department: EducationDep
   return (
     <>
       <ModuleTabs label="Seções do departamento" current={`/sistema/${department}${current ? `/${current}` : ""}`}
-        tabs={tabs.map(([path, label]) => ({ href: `/sistema/${department}${path ? `/${path}` : ""}`, label }))} />
-      <p className="no-print"><Link className="button" href="/sistema/trabalhadores">Evangelizadores (fichas)</Link></p>
+        tabs={[...tabs.map(([path, label]) => ({ href: `/sistema/${department}${path ? `/${path}` : ""}`, label })),
+          { href: "/sistema/trabalhadores", label: "Evangelizadores (fichas)" }]} />
     </>
   );
 }

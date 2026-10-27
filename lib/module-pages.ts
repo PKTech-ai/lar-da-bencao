@@ -29,7 +29,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "patrimonio",
     title: "Patrimônio",
-    intro: "Bens da Casa com fotos e notas fiscais, autorização de baixa pela Diretoria e escala de limpeza de domingo.",
+    intro: "Bens da Casa, baixas, limpeza de domingo e ordens de serviço.",
     flag: "module_patrimonio",
     access: { resource: "department", department: "patrimonio" },
     sections: [
@@ -46,7 +46,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "eventos",
     title: "Eventos",
-    intro: "Agenda dos eventos da Casa, itens previstos e disponíveis, escala de trabalho e avaliação.",
+    intro: "Agenda, itens, escala de trabalho e avaliação dos eventos.",
     flag: "module_eventos",
     access: { resource: "department", department: "eventos" },
     sections: [
@@ -63,7 +63,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "assistencia",
     title: "Assistência e Promoção Social",
-    intro: "Famílias acompanhadas, rancho, kits de higiene, atividades, voluntários, mantenedores e os setores Brechó e Clube de Mães.",
+    intro: "Famílias, rancho, kits, voluntários, Brechó e Clube de Mães.",
     flag: "module_assistencia",
     access: { resource: "department", department: "assistencia_social" },
     sections: [
@@ -89,7 +89,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "divulgacao",
     title: "Divulgação",
-    intro: "Livraria: obras para empréstimo e revenda, estoque, empréstimos com devolução e vendas com comprovante.",
+    intro: "Livraria: obras, estoque, empréstimos e vendas.",
     flag: "module_divulgacao",
     access: { resource: "department", department: "divulgacao" },
     sections: [
@@ -122,7 +122,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "tesouraria",
     title: "Tesouraria",
-    intro: "Caixa mensal com plano de contas, contribuições, mantenedores, extrato bancário conciliado e envio ao Conselho Fiscal.",
+    intro: "Caixa mensal, contribuições, mantenedores e extrato bancário.",
     flag: "module_tesouraria",
     access: { resource: "tesouraria" },
     sections: [
@@ -143,7 +143,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "conselhofiscal",
     title: "Conselho Fiscal",
-    intro: "Análise dos meses enviados pela Tesouraria, com parecer registrado e histórico.",
+    intro: "Análise e parecer dos meses enviados pela Tesouraria.",
     flag: "module_conselho_fiscal",
     access: { resource: "conselho_fiscal" },
     sections: [
@@ -155,7 +155,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "juridico",
     title: "Jurídico",
-    intro: "Eleições da Casa: etapas, datas e documentos (inclusive modelos .docx).",
+    intro: "Eleições da Casa: etapas, datas e documentos.",
     flag: "module_juridico",
     access: { resource: "department", department: "juridico" },
     sections: [
