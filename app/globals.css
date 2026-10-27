@@ -451,6 +451,8 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 /* Abas dos módulos — .sub do visual v215 */
 .module-tabs-wrap { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 16px; padding-bottom: 16px; border-bottom: 1px solid #e1eaee; position: relative; }
 .module-tabs { display: flex; flex-wrap: wrap; gap: 7px; flex: 1 1 auto; min-width: 0; }
+.module-tabs-wrap:has(.module-tabs-more) .module-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.module-tabs-wrap:has(.module-tabs-more) .module-tabs a { flex: 0 0 auto; white-space: nowrap; }
 .module-tabs-more { position: relative; flex: 0 0 auto; }
 .module-tabs-more > summary { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 14px; border-radius: 10px; border: 1px solid #d4e3e9; font-size: 14px; font-weight: 700; color: #526f7e; cursor: pointer; list-style: none; white-space: nowrap; }
 .module-tabs-more > summary::-webkit-details-marker { display: none; }
