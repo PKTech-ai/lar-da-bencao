@@ -82,7 +82,20 @@ export function ScalesClient() {
   const byKey = useMemo(() => new Map(Object.entries(data?.assignments ?? {})), [data]);
   const edited = useMemo(() => new Set(data?.edited ?? []), [data]);
   const extras = useMemo(() => new Set(data?.extras ?? []), [data]);
-  const duplicateKeys = useMemo(() => new Set((data?.review?.conflicts ?? []).filter((c) => c.type === "same_day").flatMap((c) => c.keys)), [data]);
+  // Duplicidade na hora (mesmo trabalhador duas vezes no mesmo dia), sem esperar a conferência.
+  const duplicateKeys = useMemo(() => {
+    const byDay = new Map<string, string[]>();
+    for (const [key, value] of byKey) {
+      const slot = value.startsWith("w:") ? parseSlotKey(key) : null;
+      if (!slot) continue;
+      const id = `${slot.dow}|${slot.day}|${value}`;
+      byDay.set(id, [...(byDay.get(id) ?? []), key]);
+    }
+    return new Set([
+      ...[...byDay.values()].filter((keys) => keys.length > 1).flat(),
+      ...(data?.review?.conflicts ?? []).filter((c) => c.type === "same_day").flatMap((c) => c.keys)
+    ]);
+  }, [byKey, data]);
   const conflictKeys = useMemo(() => new Set([
     ...(data?.review?.conflicts ?? []).filter((c) => c.type !== "same_day").flatMap((c) => c.keys),
     ...(data?.review?.invalid ?? []).map((i) => i.key)
@@ -243,7 +256,7 @@ export function ScalesClient() {
                                 const pinned = fixedByKey.get(patternKey);
                                 const pinOk = pinned && current === `w:${pinned.worker_id}`;
                                 const cls = [edited.has(key) ? "slot-edited" : "", duplicateKeys.has(key) ? "slot-duplicate" : "", conflictKeys.has(key) ? "slot-conflict" : "", pinOk ? "slot-fixed" : ""].join(" ");
-                                const canPin = Boolean(data?.canEdit) && !busy && !extras.has(key) && roleOf({ dow, si, ri }).type !== "STUDY" && Boolean(pinned || current.startsWith("w:"));
+                                const canPin = Boolean(data?.canEdit) && !busy && roleOf({ dow, si, ri }).type !== "STUDY" && Boolean(pinned || current.startsWith("w:"));
                                 const pin = canPin ? (
                                   <button type="button" className={`pin-button${pinned ? " is-pinned" : ""}`} onClick={() => togglePin(patternKey, current)}
                                     title={pinned ? `${pinned.worker_name} é fixo — tocar para desmarcar` : `Fixar ${workerName.get(current.slice(2)) ?? ""} nesta função toda semana`}
@@ -253,16 +266,25 @@ export function ScalesClient() {
                                 ) : pinned ? <span className="pin-button is-pinned" title={`${pinned.worker_name} é fixo`}>📌</span> : null;
                                 const select = (
                                   <select key={key} aria-label={describeSlot(key, ym)} className={cls} value={current} disabled={readOnly}
-                                    onChange={(e) => void call("PATCH", { key, value: e.target.value, version })}>
+                                    title={duplicateKeys.has(key) ? "Duplicidade: escalado mais de uma vez neste dia" : undefined}
+                                    onChange={(e) => void call("PATCH", { key, value: e.target.value, version, series: extras.has(key) },
+                                      (body) => {
+                                        const skipped = (body.busyDays as number[] | undefined) ?? [];
+                                        const note = skipped.length ? ` Fora do(s) dia(s) ${skipped.map((d) => String(d).padStart(2, "0")).join(", ")}: já escalado em outra atividade.` : "";
+                                        return Number(body.followed) ? `Adicional repetido em ${body.followed} semana(s) seguinte(s).${note}` : `Escala atualizada.${note}`;
+                                      })}>
                                     <option value="">— selecionar —</option>
                                     {options(key, current).map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}
                                   </select>
                                 );
-                                return extras.has(key) ? (
-                                  <div className="slot-extra" key={key}>{select}
-                                    {!readOnly ? <button className="link-button" title="Remover posição adicional" onClick={() => void call("PUT", { op: "remove", key, version })}>×</button> : null}
-                                  </div>
-                                ) : <div className="slot-with-pin" key={key}>{select}{pin}</div>;
+                                const remove = readOnly ? null : extras.has(key) ? (
+                                  <button type="button" className="slot-remove" title="Remover esta posição adicional" aria-label={`Remover posição adicional — ${describeSlot(key, ym)}`}
+                                    onClick={() => void call("PUT", { op: "remove", key, version }, () => "Posição adicional removida.")}>×</button>
+                                ) : current ? (
+                                  <button type="button" className="slot-remove" title="Tirar desta posição" aria-label={`Tirar da escala — ${describeSlot(key, ym)}`}
+                                    onClick={() => void call("PATCH", { key, value: "", version }, () => "Posição liberada.")}>×</button>
+                                ) : null;
+                                return <div className="slot-with-pin" key={key}>{select}{pin}{remove}</div>;
                               })}
                               {!readOnly && canAddExtra({ dow, si, ri }) && keys.length ? (
                                 <button className="link-button" onClick={() => void call("PUT", { op: "add", key: slotKey({ dow, si, ri, day, pos: 0 }).slice(0, -2), version })}>+ adicional</button>

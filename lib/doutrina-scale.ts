@@ -102,6 +102,11 @@ export function canAddExtra(slot: Pick<Slot, "dow" | "si" | "ri">) {
   return type === "Recepcionista" || type === "Psicofônico";
 }
 
+/** Posição além do mínimo do modelo: só existe como adicional. */
+export function isExtraPosition(slot: Pick<Slot, "dow" | "si" | "ri" | "pos">) {
+  return slot.pos >= roleOf(slot).min;
+}
+
 const eligible = (w: ScaleWorker, type: string, dow: number) => w.functions.includes(type) && w.days.includes(dow);
 
 /** Posição fixa: a mesma função de uma atividade em todas as semanas (`dia-da-semana|seção|linha|posição`). */
@@ -124,7 +129,8 @@ export function parseFixedKey(key: string): FixedPattern | null {
  */
 export function validateFixed(pattern: FixedPattern, worker: ScaleWorker | undefined, current: ReadonlyMap<string, string>): string | null {
   const row = TEMPLATES[pattern.dow]?.[pattern.si]?.r[pattern.ri];
-  if (!row || pattern.pos >= row[2]) return "Posição inválida para trabalhador fixo.";
+  // Além do mínimo do modelo, só onde a função aceita adicional (recepção, passistas do Grupo do Passe, psicofônicos).
+  if (!row || pattern.pos > 40 || (pattern.pos >= row[2] && !canAddExtra(pattern))) return "Posição inválida para trabalhador fixo.";
   const type = row[1] === "SPEAKER" ? "Palestrante" : row[1];
   if (type === "STUDY") return "Tema e roteiro não podem ser fixos.";
   if (!worker) return "Trabalhador sem aprovação da Diretoria ou fora da Doutrina.";
@@ -159,26 +165,23 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
     wednesdayPsych.get(week)!.add(id);
   };
   // Quem é fixo já "gastou" essas escalas: não é puxado para outras vagas antes dos demais.
-  for (const [key, id] of fixed) {
-    const pattern = parseFixedKey(key);
-    if (pattern) monthDays(ym, pattern.dow).forEach(() => bump(id));
-  }
+  const fixedPatterns = [...fixed]
+    .map(([key, id]) => ({ pattern: parseFixedKey(key), id }))
+    .filter((f): f is { pattern: FixedPattern; id: string } => f.pattern !== null)
+    .sort((a, b) => a.pattern.si - b.pattern.si || a.pattern.ri - b.pattern.ri || a.pattern.pos - b.pattern.pos);
+  for (const { pattern, id } of fixedPatterns) monthDays(ym, pattern.dow).forEach(() => bump(id));
 
   for (const dow of [0, 1, 3, 4, 5, 6]) {
     for (const day of monthDays(ym, dow)) {
       const used = new Set<string>();
       const week = weekKey(ym, day);
-      TEMPLATES[dow].forEach((section, si) => {
-        section.r.forEach(([, type, min], ri) => {
-          for (let pos = 0; pos < min; pos += 1) {
-            const id = fixed.get(fixedKey({ dow, si, ri, pos }));
-            if (!id || used.has(id)) continue;
-            assignments.set(slotKey({ dow, si, ri, day, pos }), `w:${id}`);
-            used.add(id);
-            if (type === "Psicofônico" && dow === 3) blockWednesday(week, id);
-          }
-        });
-      });
+      // Fixos primeiro, inclusive os de posição adicional.
+      for (const { pattern, id } of fixedPatterns) {
+        if (pattern.dow !== dow || used.has(id)) continue;
+        assignments.set(slotKey({ ...pattern, day }), `w:${id}`);
+        used.add(id);
+        if (roleOf(pattern).type === "Psicofônico" && dow === 3) blockWednesday(week, id);
+      }
       TEMPLATES[dow].forEach((section, si) => {
         section.r.forEach(([, type, min], ri) => {
           for (let pos = 0; pos < min; pos += 1) {

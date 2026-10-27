@@ -8,8 +8,8 @@ import {
   assertMonthVersion, canEditDoutrina, insertSlots, loadFixed, loadScale, loadScaleOptions, requireDoutrina, reviewScale
 } from "@/lib/doutrina-data";
 import {
-  buildScale, canAddExtra, isValidMonth, parseFixedKey, parseSlotKey, roleOf, scaleStatusLabel, slotKey, validateFixed, validateSlotValue,
-  type ScaleStatus
+  buildScale, canAddExtra, isExtraPosition, isValidMonth, monthDays, parseFixedKey, parseSlotKey, roleOf, scaleStatusLabel, slotKey,
+  validateFixed, validateSlotValue, type ScaleStatus
 } from "@/lib/doutrina-scale";
 
 const monthSchema = z.string().refine(isValidMonth, "Mês inválido.");
@@ -22,7 +22,9 @@ const slotSchema = z.object({
   month: monthSchema,
   key: z.string().max(40),
   value: z.string().max(60),
-  version: z.number().int().positive()
+  version: z.number().int().positive(),
+  /** Posição adicional: o trabalhador escolhido segue para as semanas seguintes do mês. */
+  series: z.boolean().optional()
 });
 const extraSchema = z.object({
   month: monthSchema,
@@ -105,7 +107,10 @@ export async function POST(request: Request) {
         );
         const monthId = saved.rows[0].id;
         const removed = await client.query("delete from app.scale_assignments where scale_month_id=$1", [monthId]);
-        await insertSlots(client, monthId, input.month, [...generated]);
+        // Posições além do mínimo só nascem de fixos em adicional: ficam marcadas como adicionais.
+        const slots = [...generated];
+        await insertSlots(client, monthId, input.month, slots.filter(([key]) => !isExtraPosition(parseSlotKey(key)!)));
+        await insertSlots(client, monthId, input.month, slots.filter(([key]) => isExtraPosition(parseSlotKey(key)!)), { extra: true });
         const missing = [...generated.values()].filter((value) => !value).length;
         await appendAudit(author, {
           category: removed.rowCount ? "Edição" : "Inclusão",
@@ -185,6 +190,27 @@ export async function PATCH(request: Request) {
       if (problem) throw new AppError(problem, 409, "SLOT_INVALID");
       const before = scale.assignments.get(input.key);
       await insertSlots(client, scale.month.id, input.month, [[input.key, input.value]], { edited: true });
+      const followed: number[] = [];
+      const busyDays: number[] = [];
+      if (input.series && isExtraPosition(slot) && input.value.startsWith("w:")) {
+        const current = new Map(scale.assignments).set(input.key, input.value);
+        for (const day of monthDays(input.month, slot.dow).filter((d) => d > slot.day)) {
+          const prefix = `${slot.dow}|${slot.si}|${slot.ri}|${day}|`;
+          const keys = [...current.keys()].filter((k) => k.startsWith(prefix));
+          if (!keys.length || keys.some((k) => current.get(k) === input.value)) continue;
+          // Já escalado em outra atividade nesse dia: não cria duplicidade sozinho.
+          if ([...current].some(([k, v]) => v === input.value && k.startsWith(`${slot.dow}|`) && k.split("|")[3] === String(day))) {
+            busyDays.push(day);
+            continue;
+          }
+          let target = slotKey({ ...slot, day });
+          if (current.get(target)) target = slotKey({ ...slot, day, pos: Math.max(roleOf(slot).min, ...keys.map((k) => Number(k.split("|")[4]) + 1)) });
+          if (validateSlotValue(parseSlotKey(target)!, input.value, { ...options, assignments: current })) continue;
+          await insertSlots(client, scale.month.id, input.month, [[target, input.value]], { edited: true, extra: true });
+          current.set(target, input.value);
+          followed.push(day);
+        }
+      }
       const updated = await client.query<{ version: number }>(
         `update app.scale_months set status='in_review', reviewed=false, published_at=null, updated_by=$2, updated_at=now(), version=version+1
           where id=$1 returning version`,
@@ -192,10 +218,10 @@ export async function PATCH(request: Request) {
       );
       await appendAudit(actor, {
         category: "Edição", action: "Alteração manual de escala", ...audit("Escala mensal"), entityId: scale.month.id,
-        details: `${input.month} · ${roleOf(slot).section.n} → ${roleOf(slot).label} · dia ${slot.day}`,
+        details: `${input.month} · ${roleOf(slot).section.n} → ${roleOf(slot).label} · dia ${slot.day}${followed.length ? ` · repetido nos dias ${followed.join(", ")}` : ""}`,
         before: { value: before }, after: { value: input.value }
       }, client);
-      return { version: updated.rows[0].version };
+      return { version: updated.rows[0].version, followed: followed.length, busyDays };
     });
     return Response.json(result);
   } catch (error) {

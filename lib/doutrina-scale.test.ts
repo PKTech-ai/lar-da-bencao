@@ -235,6 +235,13 @@ describe("trabalhadores fixos", () => {
     expect(validateFixed({ dow: 1, si: 0, ri: 2, pos: 0 }, ana, new Map([["1|0|0|0", ana.id]]))).toMatch(/já está fixo/);
     expect(validateFixed({ dow: 5, si: 3, ri: 2, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toMatch(/Folga obrigatória/);
   });
+
+  it("fixo em posição adicional (recepção) entra em todas as semanas; onde não aceita adicional, recusa", () => {
+    expect(validateFixed({ dow: 3, si: 0, ri: 0, pos: 2 }, ana, new Map())).toBeNull();
+    expect(validateFixed({ dow: 3, si: 1, ri: 0, pos: 2 }, ana, new Map())).toMatch(/Posição inválida/);
+    const scale = buildScale("2026-10", workers, speakers, studies, new Map([[fixedKey({ dow: 3, si: 0, ri: 0, pos: 2 }), ana.id]]));
+    for (const day of monthDays("2026-10", 3)) expect(scale.get(slotKey({ dow: 3, si: 0, ri: 0, day, pos: 2 }))).toBe(`w:${ana.id}`);
+  });
 });
 
 describe("API da escala", () => {
@@ -306,6 +313,26 @@ describe("API da escala", () => {
     const good = await patch({ key: "3|2|2|2|0", value: `t:${uuid(800)}`, version });
     expect(good.status).toBe(200);
     expect(route.month!.status).toBe("in_review");
+  });
+
+  it("adicional: o trabalhador escolhido segue para as semanas seguintes do mês", async () => {
+    await post({ action: "generate" });
+    const [first, ...rest] = monthDays("2026-09", 3);
+    route.assignments.set(`3|0|0|${first}|2`, "");
+    const chosen = `w:${uuid(40)}`;
+    const res = await patch({ key: `3|0|0|${first}|2`, value: chosen, version: route.month!.version, series: true });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // Segue para cada semana seguinte, menos onde já está escalado em outra atividade no dia.
+    for (const day of rest) {
+      const keys = [...route.assignments].filter(([k, v]) => k.startsWith(`3|0|0|${day}|`) && v === chosen);
+      expect(keys.length).toBe(body.busyDays.includes(day) ? 0 : 1);
+    }
+    expect(body.followed + body.busyDays.length).toBe(rest.length);
+    expect(body.followed).toBeGreaterThan(0);
+    // Posição normal (não adicional) não se repete.
+    const normal = await patch({ key: `3|1|0|${first}|0`, value: `w:${uuid(39)}`, version: route.month!.version, series: true });
+    expect((await normal.json()).followed).toBe(0);
   });
 
   it("exclusão lógica mantém o mês e remove as posições", async () => {

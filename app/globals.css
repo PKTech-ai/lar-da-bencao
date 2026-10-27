@@ -324,7 +324,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .scale-sheet td:first-child, .scale-sheet th:first-child { position: sticky; left: 0; background: var(--surface-sunken); font-weight: 700; z-index: 1; }
 .scale-sheet select { min-height: 36px; padding: 5px 8px; font-size: 12px; margin-bottom: 4px; }
 .scale-sheet .slot-edited { border-color: var(--blue-800); }
-.scale-sheet .slot-duplicate { background: var(--bg-warning); border-color: var(--border-duplicate); }
+.scale-sheet .slot-duplicate { background: var(--bg-error); border-color: var(--danger); color: var(--danger); font-weight: 700; }
 .scale-sheet .slot-conflict { background: var(--bg-error); border-color: var(--danger); }
 .slot-extra { display: flex; gap: 4px; align-items: flex-start; }
 .link-button { background: none; border: 0; color: var(--blue-800); font-weight: 700; cursor: pointer; padding: 2px 0; font-size: 12px; }
@@ -743,3 +743,6 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 :root[data-theme="dark"] .home-memory-strip > div { background: var(--surface); border-color: var(--line); }
 :root[data-theme="dark"] .home-memory-strip > div.featured { background: var(--button-hover); }
 @media (max-width: 720px) { .home-memory-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.scale-sheet .slot-remove { flex: 0 0 auto; min-width: 24px; min-height: 24px; padding: 0 4px; border: 0; background: transparent; color: var(--danger); font-size: 18px; line-height: 1; cursor: pointer; border-radius: 6px; }
+.scale-sheet .slot-remove:hover { background: var(--bg-error); }
+@media print { .scale-sheet .slot-remove { display: none; } }
