@@ -10,11 +10,10 @@ export default async function DashboardPage() {
     <>
       <header className="page-heading">
         <div>
-          <h1>Visão Geral do Sistema</h1>
-          <p>Acesse cada departamento pelo seu próprio módulo.</p>
+          <h1>Visão Geral</h1>
         </div>
       </header>
-      <HomeClient moduleCount={nav.modules.length} modules={nav.modules} showAccess={nav.capabilities.users} />
+      <HomeClient modules={nav.modules} showAccess={nav.capabilities.users} />
     </>
   );
 }

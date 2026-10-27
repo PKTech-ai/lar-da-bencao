@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavIcon } from "@/components/nav-icon";
 import { SuggestionsBox } from "@/components/suggestions-box";
 import { api } from "@/lib/client-api";
-import { addDays, buildHomeStats, filterAgenda, todayInSaoPaulo, type AgendaItem } from "@/lib/home-dashboard";
+import { addDays, filterAgenda, todayInSaoPaulo, type AgendaItem } from "@/lib/home-dashboard";
 import { SYSTEM_VERSION, SYSTEM_VERSION_NOTE, SYSTEM_VERSION_UPDATED } from "@/lib/system-version";
 import { brDate, formatMoney } from "@/lib/resources/types";
 
@@ -76,41 +76,7 @@ function monthShort(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase();
 }
 
-function OpIcon({ name }: { name: "calendar" | "check" | "people" | "org" }) {
-  return (
-    <svg className="op-icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {/* Traços copiados dos ícones do painel do visual v215 (lar-operational-behavior-v210). */}
-      {name === "calendar" ? (
-        <>
-          <rect x="3" y="5" width="18" height="16" rx="2" />
-          <path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2m-8 3h2" />
-        </>
-      ) : null}
-      {name === "check" ? (
-        <>
-          <path d="m6 12 4 4 8-9" />
-          <rect x="3" y="3" width="18" height="18" rx="4" />
-        </>
-      ) : null}
-      {name === "people" ? (
-        <>
-          <circle cx="9" cy="7" r="3" />
-          <path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v3" />
-        </>
-      ) : null}
-      {name === "org" ? (
-        <>
-          <rect x="9" y="2" width="6" height="5" rx="1" />
-          <rect x="2" y="17" width="6" height="5" rx="1" />
-          <rect x="16" y="17" width="6" height="5" rx="1" />
-          <path d="M12 7v5M5 17v-5h14v5" />
-        </>
-      ) : null}
-    </svg>
-  );
-}
-
-export function HomeClient({ moduleCount, modules, showAccess }: { moduleCount: number; modules: VisibleModule[]; showAccess: boolean }) {
+export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; showAccess: boolean }) {
   const [home, setHome] = useState<Home | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
@@ -135,54 +101,66 @@ export function HomeClient({ moduleCount, modules, showAccess }: { moduleCount: 
   const allowed = new Set(modules.map((mod) => mod.href));
   const cards = MODULE_CARDS.filter((card) => card.when === "always" || (card.when === "access" ? showAccess : allowed.has(card.href)));
   const shortcuts = SHORTCUTS.filter((item) => allowed.has(item.needs)).slice(0, 6);
-  const stats = buildHomeStats({ today, moduleCount, agenda, pending: badgePending });
   const memory = home?.memory;
   const visibleAgenda = filterAgenda(agenda, today, period);
   const agendaTotal = agenda.filter((item) => item.date >= today && item.date <= addDays(today, period)).length;
 
-  function reload() {
-    window.location.reload();
-  }
+  const attention = [
+    ...badgePending.map((item) => ({ key: item.key, href: item.href, count: item.count, title: item.label, hint: item.hint })),
+    ...routines.map((item) => ({ key: item.key, href: item.href, count: item.count, title: routineTitle(item).replace(/^\d+ /, ""), hint: undefined })),
+    ...(undatedEvents ? [{ key: "eventos-sem-data", href: "/sistema/eventos/agenda", count: undatedEvents, title: "evento(s) com data a definir", hint: undefined }] : [])
+  ];
+  const worker = home?.myArea?.worker;
 
   return (
     <div className="grid">
       {error ? <div className="error" role="alert">{error}</div> : null}
-      <section className="card lar-welcome">
-        <div>
-          <p className="op-eyebrow">Seja bem-vindo</p>
-          <h2>Ao Lar da Bênção</h2>
-          <p>{home?.institution.motto || "Uma Casa de estudo, acolhimento e caridade."}</p>
-          <div className="lar-welcome-actions">
-            <Link className="button primary" href="/sistema/conta">Acessar minha área</Link>
-            <button className="button" type="button" onClick={reload}>Atualizar painel</button>
-          </div>
-          <small className="lar-welcome-date">{todayLabel}</small>
-        </div>
-        <div className="lar-welcome-emblem"><img src="/marca-lar-da-bencao.png" alt="" /></div>
-      </section>
+      <p className="home-greeting">{todayLabel} · {home?.institution.motto || "Uma Casa de estudo, acolhimento e caridade."}</p>
 
-      <div className="op-stats">
-        {stats.map((card) => (
-          <article key={card.key} className={card.pending ? "op-stat op-pending" : "op-stat"}>
-            <OpIcon name={card.icon} />
-            <span>{card.label}</span>
-            <b>{card.value}</b>
-            <small>{card.hint}</small>
-          </article>
-        ))}
-      </div>
+      {worker && home?.myArea ? (
+        <section className="op-section">
+          <div className="op-section-head"><h3>Minha área</h3><Link href="/sistema/conta">Abrir</Link></div>
+          <p className="small muted">{worker.full_name} · {worker.departments.join(" / ") || "sem departamento"}{worker.functions.length ? ` · ${worker.functions.join(", ")}` : ""}</p>
+          <ul className="home-mine">
+            {home.myArea.cleaning.slice(0, 2).map((item) => (
+              <li key={item.clean_date}>Limpeza {brDate(item.clean_date)} · {CLEANING[item.status] ?? item.status}{item.fee_cents ? ` · ${formatMoney(item.fee_cents)} ${item.payment_status === "paid" ? "recebida" : "pendente"}` : ""}</li>
+            ))}
+            {home.myArea.shifts.slice(0, 2).map((item, index) => (
+              <li key={`${item.name}-${index}`}>Evento {item.event_date ? brDate(item.event_date) : "data a definir"} · {item.name}</li>
+            ))}
+            {home.myArea.contributions.slice(0, 1).map((item, index) => (
+              <li key={`${item.reference_month}-${index}`}>Última contribuição {item.reference_month.split("-").reverse().join("/")} · {formatMoney(item.amount_cents)}</li>
+            ))}
+            {!home.myArea.cleaning.length && !home.myArea.shifts.length && !home.myArea.contributions.length ? <li className="muted">Nada marcado para você nos próximos dias.</li> : null}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="op-columns">
         <section className="op-section">
+          <div className="op-section-head"><h3>Precisa de atenção</h3></div>
+          {attention.length ? (
+            <ul className="op-list">
+              {attention.map((item) => (
+                <li key={item.key}>
+                  <Link href={item.href} className="op-pending-link">
+                    <span className="op-count">{item.count}</span>
+                    <span className="op-line-copy"><strong>{item.title}</strong>{item.hint ? <small>{item.hint}</small> : null}</span>
+                    <span className="op-arrow" aria-hidden="true">›</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : <div className="op-empty"><strong>Tudo em dia</strong><p>Nenhuma ficha, pedido ou conferência aguardando nos seus módulos.</p></div>}
+        </section>
+        <section className="op-section">
           <div className="op-section-head">
             <h3>Agenda</h3>
-            <label>Período
-              <select aria-label="Período da agenda" value={period} onChange={(event) => setPeriod(Number(event.target.value) as 0 | 7 | 30)}>
-                <option value={0}>Hoje</option>
-                <option value={7}>Próximos 7 dias</option>
-                <option value={30}>Próximos 30 dias</option>
-              </select>
-            </label>
+            <select aria-label="Período da agenda" value={period} onChange={(event) => setPeriod(Number(event.target.value) as 0 | 7 | 30)}>
+              <option value={0}>Hoje</option>
+              <option value={7}>Próximos 7 dias</option>
+              <option value={30}>Próximos 30 dias</option>
+            </select>
           </div>
           {visibleAgenda.length ? (
             <ul className="op-list">
@@ -196,120 +174,32 @@ export function HomeClient({ moduleCount, modules, showAccess }: { moduleCount: 
                 </li>
               ))}
             </ul>
-          ) : (
-            <div className="op-empty">
-              <strong>Nenhuma atividade neste período</strong>
-              <p>Confira as agendas dos seus departamentos ou escolha outro período.</p>
-            </div>
-          )}
-          <p className="op-footnote">
-            {agendaTotal > 6
-              ? `Exibindo as próximas 6 de ${agendaTotal} atividades. Abra o departamento para consultar a agenda completa.`
-              : "Agenda formada pelos eventos, atividades sociais, treinamentos e limpeza cadastrados nos módulos liberados."}
-          </p>
-        </section>
-        <section className="op-section">
-          <div className="op-section-head">
-            <h3>Pendências</h3>
-            <span>Acompanhamento</span>
-          </div>
-          {badgePending.length ? (
-            <ul className="op-list">
-              {badgePending.map((item) => (
-                <li key={item.key}>
-                  <Link href={item.href} className="op-pending-link">
-                    <span className="op-count">{item.count}</span>
-                    <span className="op-line-copy"><strong>{item.label}</strong><small>{item.hint}</small></span>
-                    <span className="op-arrow" aria-hidden="true">›</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="op-empty">
-              <strong>Nenhuma pendência neste resumo</strong>
-              <p>Não há fichas, pedidos ou sugestões aguardando análise nas categorias exibidas.</p>
-            </div>
-          )}
-          {undatedEvents ? (
-            <Link href="/sistema/eventos/agenda" className="op-pending-link">
-              <OpIcon name="calendar" />
-              <span className="op-line-copy"><strong>{undatedEvents} evento(s) com data a definir</strong><small>Consultar a agenda de eventos</small></span>
-              <span className="op-arrow" aria-hidden="true">›</span>
-            </Link>
-          ) : null}
+          ) : <div className="op-empty"><strong>Nenhuma atividade neste período</strong></div>}
+          {agendaTotal > 6 ? <p className="op-footnote">Exibindo 6 de {agendaTotal}. A agenda completa fica em cada departamento.</p> : null}
         </section>
       </div>
 
-      {shortcuts.length ? (
-        <>
-          <h3 className="op-shortcut-heading">Acessos rápidos</h3>
+      <section className="home-go">
+        <h3>Ir para</h3>
+        {shortcuts.length ? (
           <div className="op-shortcuts">
-            {shortcuts.map((item) => (
-              <Link key={item.href} className="button" href={item.href}>{item.title}</Link>
-            ))}
+            {shortcuts.map((item) => <Link key={item.href} className="button" href={item.href}>{item.title}</Link>)}
           </div>
-        </>
-      ) : null}
-
-      <section className="op-section op-routines">
-        <h3>Conferências da rotina</h3>
-        {routines.length ? (
-          <ul className="ops-list">
-            {routines.map((item) => (
-              <li key={item.key}><Link className="button" href={item.href}>{routineTitle(item)}</Link></li>
-            ))}
-          </ul>
-        ) : <p className="muted">Nenhuma pendência adicional encontrada nas categorias acompanhadas dos módulos liberados.</p>}
+        ) : null}
+        <div className="home-mods">
+          {cards.map((card) => (
+            <Link key={card.href} className="home-mod" href={card.href} title={card.text}>
+              <span className="mod-ico"><NavIcon href={card.href} /></span>
+              <span>{card.title}</span>
+            </Link>
+          ))}
+        </div>
       </section>
-
-      <h2 className="op-modules-heading">Módulos disponíveis</h2>
-      <div className="mods">
-        {cards.map((card) => (
-          <Link key={card.href} className="card mod" href={card.href}>
-            <span className="mod-ico"><NavIcon href={card.href} /></span>
-            <strong>{card.title}</strong>
-            <p>{card.text}</p>
-          </Link>
-        ))}
-      </div>
-
-      {memory ? (
-        <section className="home-institution-card">
-          <div className="home-institution-head">
-            <div>
-              <strong>Memória Institucional — {home?.institution.name || "Lar da Bênção"}</strong>
-              <div className="small muted">Referência permanente da data de fundação e idade da Casa.</div>
-            </div>
-            <span className="home-history-badge">Desde {memory.foundedOn.slice(0, 4)}</span>
-          </div>
-          <div className="home-institution-grid">
-            <div className="home-history-item">
-              <span className="home-history-label">Data de fundação</span>
-              <strong>{longDate(memory.foundedOn)}</strong>
-              <small>{brDate(memory.foundedOn)}</small>
-            </div>
-            <div className="home-history-item featured">
-              <span className="home-history-label">Idade atual da Casa</span>
-              <strong>{memory.age} anos</strong>
-              <small>Idade em {brDate(today)} · cálculo automático</small>
-            </div>
-            <div className="home-history-item">
-              <span className="home-history-label">Próximo aniversário</span>
-              <strong>{longDate(memory.nextAnniversary)}</strong>
-              <small>Completará {memory.age + 1} anos</small>
-            </div>
-          </div>
-          <div className="home-institution-foot">
-            <span>{home?.institution.name || "Centro Espírita Filantrópico Lar da Bênção"}</span>
-            <span>{memory.age} anos de história, luz, amor e caridade cristã.</span>
-          </div>
-        </section>
-      ) : null}
 
       <SuggestionsBox />
 
       <footer className="lar-system-footer">
+        {memory ? <p className="home-memory">{home?.institution.name || "Lar da Bênção"} · fundado em {longDate(memory.foundedOn)} · <strong>{memory.age} anos</strong> · completa {memory.age + 1} em {brDate(memory.nextAnniversary)}</p> : null}
         <p>Desenvolvido por <strong>PK Instituto</strong>, inspirada pela Espiritualidade Amiga.</p>
         <div className="lar-version-row">
           <span><strong>Versão {SYSTEM_VERSION}</strong> · Atualização: {SYSTEM_VERSION_UPDATED}</span>
@@ -332,41 +222,6 @@ export function HomeClient({ moduleCount, modules, showAccess }: { moduleCount: 
         </article>
       </dialog>
 
-      {home?.myArea?.worker ? (
-        <section className="card">
-          <h2>Minha área</h2>
-          <p className="small">
-            {home.myArea.worker.full_name} · {home.myArea.worker.departments.join(" / ") || "sem departamento"}
-            {home.myArea.worker.functions.length ? ` · ${home.myArea.worker.functions.join(", ")}` : ""}
-          </p>
-          <div className="grid cards">
-            <article className="card">
-              <h3>Escala de limpeza</h3>
-              {home.myArea.cleaning.map((item) => (
-                <p key={item.clean_date} className="small">
-                  {brDate(item.clean_date)} · {CLEANING[item.status] ?? item.status}
-                  {item.fee_cents ? ` · ${formatMoney(item.fee_cents)} ${item.payment_status === "paid" ? "recebida" : "pendente"}` : ""}
-                </p>
-              ))}
-              {!home.myArea.cleaning.length ? <p className="small muted">Nenhuma escala próxima.</p> : null}
-            </article>
-            <article className="card">
-              <h3>Eventos</h3>
-              {home.myArea.shifts.map((item, index) => (
-                <p key={`${item.name}-${index}`} className="small">{item.event_date ? brDate(item.event_date) : "data a definir"} · {item.name} · {item.place}</p>
-              ))}
-              {!home.myArea.shifts.length ? <p className="small muted">Você não está escalado para eventos.</p> : null}
-            </article>
-            <article className="card">
-              <h3>Minhas contribuições</h3>
-              {home.myArea.contributions.map((item, index) => (
-                <p key={`${item.reference_month}-${index}`} className="small">{item.reference_month.split("-").reverse().join("/")} · {formatMoney(item.amount_cents)} · {item.kind}</p>
-              ))}
-              {!home.myArea.contributions.length ? <p className="small muted">Nenhuma contribuição registrada.</p> : null}
-            </article>
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }
