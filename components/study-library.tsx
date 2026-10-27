@@ -7,7 +7,10 @@ type Folder = { id: string; parent_id: string | null; title: string; system: boo
 type Study = {
   id: string; folder_id: string | null; study_type: string | null; code: string | null; title: string; reference: string | null;
   description: string; active: boolean; version: number; attachment_id: string | null; attachment_name: string | null; attachment_status: string | null;
+  links: { roteiro?: string; perguntas?: string; texto?: string } | null;
 };
+
+const LINK_LABELS = [["roteiro", "Roteiro"], ["perguntas", "Perguntas"], ["texto", "Texto"]] as const;
 type Department = "doutrina" | "infancia" | "juventude";
 
 const TYPES = [["ESE", "ESE"], ["ESDE", "ESDE"], ["MEP", "MEP"], ["OBRA", "Estudo de Obra"], ["PALESTRA", "Palestra"], ["TREINAMENTO", "Treinamento"], ["OUTRO", "Outro"]];
@@ -219,7 +222,7 @@ export function StudyLibrary({ department }: { department: Department }) {
             </div>
             <div className="table-wrap" style={{ marginTop: 10 }}>
               <table>
-                <thead><tr><th>Pasta</th><th>Tipo</th><th>Código</th><th>Tema</th><th>Referência</th><th>Arquivo</th><th>Ações</th></tr></thead>
+                <thead><tr><th>Pasta</th><th>Tipo</th><th>Código</th><th>Tema</th><th>Referência</th><th>Material</th><th>Ações</th></tr></thead>
                 <tbody>
                   {visible.map((s) => (
                     <tr key={s.id} style={s.active ? undefined : { opacity: 0.6 }}>
@@ -228,9 +231,18 @@ export function StudyLibrary({ department }: { department: Department }) {
                       <td>{s.code ?? "—"}</td>
                       <td><strong>{s.title}</strong>{s.active ? null : <><br /><span className="small">Retirado</span></>}</td>
                       <td>{s.reference ?? "—"}</td>
-                      <td>{s.attachment_id && s.attachment_status === "active"
-                        ? <a className="button" href={`/api/attachments/${s.attachment_id}/download`}>Baixar</a>
-                        : s.attachment_id ? <span className="small">{s.attachment_status}</span> : "—"}</td>
+                      <td>
+                        {s.attachment_id && s.attachment_status === "active"
+                          ? <a className="button" href={`/api/attachments/${s.attachment_id}/download`}>Baixar</a>
+                          : s.attachment_id ? <span className="small">{s.attachment_status}</span> : s.links ? null : "—"}
+                        {s.links ? (
+                          <div className="row-actions" title="Abre no OneDrive">
+                            {LINK_LABELS.filter(([kind]) => s.links?.[kind]).map(([kind, label]) => (
+                              <a key={kind} className="link-button" href={s.links![kind]} target="_blank" rel="noopener noreferrer">{label}</a>
+                            ))}
+                          </div>
+                        ) : null}
+                      </td>
                       <td>
                         {canEdit ? (
                           <div className="row-actions">

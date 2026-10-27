@@ -3,6 +3,7 @@ import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { query, transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
+import { oneDriveLinks } from "@/lib/onedrive";
 import { canEditLibrary, libraryDepartment, requireLibrary, studyInput } from "@/lib/study-library";
 
 const createSchema = studyInput.extend({ department_key: libraryDepartment });
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
       query("select id, parent_id, title, system from app.study_folders where department_key=$1 order by lower(title)", [department]),
       query(
         `select s.id, s.folder_id, s.study_type, s.code, s.title, s.reference, s.description, s.active, s.version, s.updated_at,
-                a.id as attachment_id, a.filename as attachment_name, a.status as attachment_status
+                s.onedrive, a.id as attachment_id, a.filename as attachment_name, a.status as attachment_status
            from app.studies s left join app.attachments a on a.id = s.attachment_id
           where s.department_key=$1
           order by s.active desc, s.study_type nulls last, s.code nulls last, s.title`,
@@ -24,7 +25,11 @@ export async function GET(request: Request) {
       )
     ]);
     return Response.json(
-      { folders: folders.rows, studies: studies.rows, canEdit: await canEditLibrary(actor, department) },
+      {
+        folders: folders.rows,
+        studies: studies.rows.map(({ onedrive, ...study }) => ({ ...study, links: oneDriveLinks(onedrive) })),
+        canEdit: await canEditLibrary(actor, department)
+      },
       { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch (error) {
