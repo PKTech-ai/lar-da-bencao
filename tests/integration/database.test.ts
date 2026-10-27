@@ -612,6 +612,20 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     const audit = await query("select 1 from app.audit_events where entity_type = 'whatsapp' and entity_id = $1 and action like '%enviada%'", [id]);
     expect(audit.rowCount).toBe(1);
   });
+  it("livraria: disponível e painel descontam empréstimos menos devoluções", async () => {
+    const { availableCopies, bookshopSummary } = await import("@/lib/bookshop");
+    const book = await owner(async (client) => {
+      const b = await client.query<{ id: string }>("insert into app.books (code, title, purpose, active) values ($1, 'Obra de teste', 'Empréstimos', 'Ativo') returning id", [`T-${randomUUID().slice(0, 6)}`]);
+      await client.query("insert into app.book_stock_moves (book_id, direction, quantity, move_date) values ($1, 'Entrada', 5, current_date)", [b.rows[0].id]);
+      const loan = await client.query<{ id: string }>("insert into app.book_loans (book_id, borrower, quantity, loan_date, due_date) values ($1, 'Leitor', 3, current_date, current_date + 7) returning id", [b.rows[0].id]);
+      await client.query("insert into app.book_loan_returns (loan_id, quantity, return_date) values ($1, 1, current_date)", [loan.rows[0].id]);
+      return b.rows[0].id;
+    });
+    expect(await transaction((client) => availableCopies(client, book))).toBe(3);
+    const summary = await bookshopSummary();
+    expect(JSON.stringify(summary)).toContain("Obra de teste");
+  });
+
   it("as tabelas dos cadastros batem com as definições do motor", async () => {
     const { RESOURCE_LIST } = await import("@/lib/resources/registry");
     const columns = await query<{ table_name: string; column_name: string }>(

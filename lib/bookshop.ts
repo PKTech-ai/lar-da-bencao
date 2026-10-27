@@ -14,7 +14,7 @@ export const BOOKSHOP_FLAG = "module_divulgacao";
 export async function availableCopies(client: Pick<PoolClient, "query">, bookId: string, ignoreLoan?: string) {
   const result = await client.query<{ available: string }>(
     `select coalesce((select sum(case when direction = 'Entrada' then quantity else -quantity end) from app.book_stock_moves where book_id = $1 and archived_at is null), 0)
-          - coalesce((select sum(l.quantity) - coalesce((select sum(r.quantity) from app.book_loan_returns r where r.loan_id = l.id), 0)
+          - coalesce((select sum(l.quantity - coalesce((select sum(r.quantity) from app.book_loan_returns r where r.loan_id = l.id), 0))
                         from app.book_loans l where l.book_id = $1 and l.archived_at is null and ($2::uuid is null or l.id <> $2)), 0)
           - coalesce((select sum(quantity) from app.book_sales where book_id = $1 and archived_at is null), 0) as available`,
     [bookId, ignoreLoan ?? null]
@@ -72,7 +72,7 @@ export async function bookshopSummary() {
     query(
       `select b.id, b.code, b.title, b.purpose, b.active, b.price_cents,
               coalesce((select sum(case when m.direction = 'Entrada' then m.quantity else -m.quantity end) from app.book_stock_moves m where m.book_id = b.id and m.archived_at is null), 0)::int as in_stock,
-              coalesce((select sum(l.quantity) - coalesce((select sum(r.quantity) from app.book_loan_returns r where r.loan_id = l.id), 0) from app.book_loans l where l.book_id = b.id and l.archived_at is null), 0)::int as on_loan,
+              coalesce((select sum(l.quantity - coalesce((select sum(r.quantity) from app.book_loan_returns r where r.loan_id = l.id), 0)) from app.book_loans l where l.book_id = b.id and l.archived_at is null), 0)::int as on_loan,
               coalesce((select sum(s.quantity) from app.book_sales s where s.book_id = b.id and s.archived_at is null), 0)::int as sold
          from app.books b where b.archived_at is null order by b.title`
     ),
