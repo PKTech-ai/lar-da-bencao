@@ -28,7 +28,7 @@ let cached: ServerEnv | undefined;
 
 export function serverEnv(): ServerEnv {
   if (cached) return cached;
-  // BL-059: previews estão desligados em vercel.json; se algum for publicado, não acessa segredos nem banco.
+  // BL-059: em vercel.json só os rascunhos (rascunho-*) viram prévia, e nenhuma prévia acessa segredos nem banco.
   if (process.env.VERCEL_ENV === "preview") throw new Error("Pré-visualizações não podem acessar o banco ou segredos de produção.");
   cached = serverSchema.parse(process.env);
   return cached;
