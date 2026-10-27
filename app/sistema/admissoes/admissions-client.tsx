@@ -66,7 +66,7 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
     }
   }
 
-  function remove(row: Row) {
+  function remove(row: Pick<Row, "id" | "full_name">) {
     if (!window.confirm(`Excluir a ficha de ${row.full_name}? O acesso ao sistema, se já existir, continua e só perde o vínculo com esta ficha.`)) return;
     setBusy(true); setError(""); setMessage("");
     void (async () => {
@@ -230,7 +230,8 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
           <div className="toolbar">
             <h2>{w.full_name}</h2>
             <div className="row-actions">
-              {canEditFicha ? <button className="button" onClick={() => void startEdit(w.id)}>Editar ficha</button> : null}
+              {canEditFicha ? <button className="button" disabled={busy} onClick={() => void startEdit(w.id)}>Editar ficha</button> : null}
+              {canEditFicha ? <button className="button danger" disabled={busy} onClick={() => remove(w)}>Excluir ficha</button> : null}
               <button className="button" onClick={() => setSelected(null)}>Fechar</button>
             </div>
           </div>
@@ -321,9 +322,7 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
                   <td>{r.last_decision ? <>Diretoria · {dateOnly(r.last_decision.meeting_date)}<br /><span className="small">Registrada por {r.last_decision.decided_by_name}</span></> : r.status === "pending" ? "Aguardando análise" : "—"}</td>
                   <td>
                     <div className="row-actions">
-                      <button className="button" onClick={() => void open(r.id)}>Analisar ficha</button>
-                      {canEditFicha ? <button className="button" disabled={busy} onClick={() => void startEdit(r.id)}>Editar ficha</button> : null}
-                      {canEditFicha ? <button className="button danger" disabled={busy} onClick={() => remove(r)}>Excluir ficha</button> : null}
+                      <button className="button" onClick={() => void open(r.id)}>Abrir ficha</button>
                       {r.status === "pending" && canDecide ? <>
                         <button className="button primary" disabled={busy} onClick={() => void approve([r])}>Aprovar</button>
                         <button className="button danger" disabled={busy} onClick={() => void open(r.id, "rejected")}>Reprovar</button>
