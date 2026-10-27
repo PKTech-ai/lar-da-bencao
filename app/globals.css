@@ -734,3 +734,12 @@ table.visual-table .small { font-size: 13px; color: #617683; }
 .home-mod .mod-ico { width: 34px; height: 34px; border-radius: 9px; flex: 0 0 auto; }
 .home-mod .mod-ico .nav-icon { width: 18px; height: 18px; }
 :root[data-theme="dark"] .home-mod { background: var(--surface); border-color: var(--line); }
+.home-memory-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.home-memory-strip > div { display: grid; gap: 2px; align-content: start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.home-memory-strip > div.featured { background: #eaf3f6; border-color: #b9d3df; }
+.home-memory-strip span { font-size: 12px; color: var(--muted); }
+.home-memory-strip strong { font-size: 17px; color: var(--blue-900); }
+.home-memory-strip small { font-size: 12px; color: var(--muted); }
+:root[data-theme="dark"] .home-memory-strip > div { background: var(--surface); border-color: var(--line); }
+:root[data-theme="dark"] .home-memory-strip > div.featured { background: var(--button-hover); }
+@media (max-width: 720px) { .home-memory-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -119,6 +119,16 @@ export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; 
       {error ? <div className="error" role="alert">{error}</div> : null}
       <p className="home-greeting">{todayLabel} · {home?.institution.motto || "Uma Casa de estudo, acolhimento e caridade."}</p>
 
+      {memory ? (
+        <section className="home-memory-strip" aria-label={`Memória institucional — ${home?.institution.name || "Lar da Bênção"}`}>
+          <div><span>Data de constituição</span><strong>{longDate(memory.foundedOn)}</strong></div>
+          <div className="featured"><span>Idade da Casa</span><strong>{memory.age} anos</strong></div>
+          <div><span>Próximo aniversário</span><strong>{longDate(memory.nextAnniversary)}</strong>
+            <small>{memory.daysToAnniversary === 0 ? "É hoje!" : `faltam ${memory.daysToAnniversary} dia(s)`}</small></div>
+          <div><span>Próxima idade</span><strong>{memory.age + 1} anos</strong></div>
+        </section>
+      ) : null}
+
       {worker && home?.myArea ? (
         <section className="op-section">
           <div className="op-section-head"><h3>Minha área</h3><Link href="/sistema/conta">Abrir</Link></div>
@@ -201,7 +211,6 @@ export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; 
       <SuggestionsBox />
 
       <footer className="lar-system-footer">
-        {memory ? <p className="home-memory">{home?.institution.name || "Lar da Bênção"} · fundado em {longDate(memory.foundedOn)} · <strong>{memory.age} anos</strong> · completa {memory.age + 1} em {brDate(memory.nextAnniversary)}</p> : null}
         <p>Desenvolvido por <strong>PK Instituto</strong>, inspirada pela Espiritualidade Amiga.</p>
         <div className="lar-version-row">
           <span><strong>Versão {SYSTEM_VERSION}</strong> · Atualização: {SYSTEM_VERSION_UPDATED}</span>
