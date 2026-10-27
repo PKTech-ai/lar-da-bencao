@@ -66,6 +66,8 @@ function routineTitle(item: Pending) {
   return `${n} ${item.label}`;
 }
 
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 function longDate(iso: string) {
   return new Date(`${iso}T12:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -107,8 +109,8 @@ export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; 
 
   const attention = [
     ...badgePending.map((item) => ({ key: item.key, href: item.href, count: item.count, title: item.label, hint: item.hint })),
-    ...routines.map((item) => ({ key: item.key, href: item.href, count: item.count, title: routineTitle(item).replace(/^\d+ /, ""), hint: undefined })),
-    ...(undatedEvents ? [{ key: "eventos-sem-data", href: "/sistema/eventos/agenda", count: undatedEvents, title: "evento(s) com data a definir", hint: undefined }] : [])
+    ...routines.map((item) => ({ key: item.key, href: item.href, count: item.count, title: capitalize(routineTitle(item).replace(/^\d+ /, "")), hint: undefined })),
+    ...(undatedEvents ? [{ key: "eventos-sem-data", href: "/sistema/eventos/agenda", count: undatedEvents, title: "Evento(s) com data a definir", hint: undefined }] : [])
   ];
   const worker = home?.myArea?.worker;
 
