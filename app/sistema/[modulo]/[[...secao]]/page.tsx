@@ -44,11 +44,11 @@ export default async function ModuleSectionPage({ params }: Params) {
       <ModuleTabs label={`Seções de ${page.title}`}
         tabs={visible.map((s) => ({ href: `/sistema/${page.slug}${s.slug ? `/${s.slug}` : ""}`, label: s.label }))}
         current={`/sistema/${page.slug}${current.slug ? `/${current.slug}` : ""}`} />
-      <SuggestionsBox />
       {def ? <ResourceManager resourceKey={def.key} />
         : current.panel === "trabalhadores-cadastro" ? <WorkersClient {...await workerPageContext(actor)} />
         : current.panel === "painel" ? <DepartmentDashboard page={page} />
         : current.panel ? <ModulePanel name={current.panel} /> : null}
+      <SuggestionsBox />
     </>
   );
 }

@@ -20,7 +20,7 @@ function apiPath(input: RequestInfo | URL) {
 
 export function SystemFeedback() {
   const pathname = usePathname();
-  const [status, setStatus] = useState("Pronto para uso");
+  const [status, setStatus] = useState("");
   const [alert, setAlert] = useState("");
   const [bar, setBar] = useState(false);
   const skipPath = useRef(true);
@@ -31,7 +31,7 @@ export function SystemFeedback() {
       return;
     }
     setAlert("");
-    setStatus("Módulo aberto.");
+    setStatus("");
     setBar(true);
     const timer = window.setTimeout(() => setBar(false), 900);
     return () => window.clearTimeout(timer);

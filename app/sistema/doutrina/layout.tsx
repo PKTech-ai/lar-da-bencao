@@ -12,8 +12,8 @@ export default async function DoutrinaLayout({ children }: { children: React.Rea
         <div><h1>Dpto de Doutrina</h1><p>Treinamentos, escalas, estudos, palestras, Culto no Lar e trabalhadores.</p></div>
       </header>
       <ModuleTabsByPath tabs={doutrinaSubnav} label="Seções da Doutrina" />
-      <SuggestionsBox />
       {children}
+      <SuggestionsBox />
     </>
   );
 }

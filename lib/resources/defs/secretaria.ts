@@ -10,7 +10,7 @@ export const meetings: ResourceDef = {
   section: "Reuniões e Atas",
   flag: "module_secretaria",
   scope: { resource: "secretaria" },
-  intro: "Registro da reunião, minuta da ata e anexos. O áudio é gravado na aba “Gravador” e fica vinculado à reunião.",
+  intro: "O áudio da reunião é gravado na aba “Gravador”.",
   archiveLabel: "Arquivar",
   orderBy: "r.meeting_date desc, r.created_at desc",
   search: ["title", "place", "chair", "secretary", "participants", "decisions"],
