@@ -112,7 +112,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     sections: [
       { slug: "reunioes", label: "Reuniões e Atas", resource: "secretaria-reunioes" },
       { slug: "", label: "Painel", panel: "painel" },
-      { slug: "admissoes", label: "Admissões", panel: "admissoes-atalho" },
+      { slug: "admissoes", label: "Admissões", panel: "admissoes-atalho", flag: "module_workers" },
       { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-cadastro", flag: "module_workers" },
       { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
       { slug: "gravador", label: "Gravador", panel: "secretaria-gravador" },
@@ -174,7 +174,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     access: { resource: "presidencia" },
     sections: [
       { slug: "", label: "Painel", panel: "presidencia-painel" },
-      { slug: "admissoes", label: "Aprovação de Trabalhadores", panel: "admissoes-atalho" },
+      { slug: "admissoes", label: "Aprovação de Trabalhadores", panel: "admissoes-atalho", flag: "module_workers" },
       { slug: "baixas", label: "Autorizações de Baixa", panel: "presidencia-baixas" },
       { slug: "sugestoes", label: "Sugestões", panel: "sugestoes-atalho" },
       { slug: "os", label: "Ordens de Serviço", panel: "os-diretoria", flag: "module_patrimonio" }

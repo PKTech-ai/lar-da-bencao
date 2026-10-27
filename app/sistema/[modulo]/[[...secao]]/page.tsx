@@ -12,6 +12,7 @@ import { canSeeAdmissions } from "@/lib/workers";
 import { workerPageContext } from "@/lib/worker-page";
 import { RESOURCES } from "@/lib/resources/registry";
 import { WorkersClient } from "@/app/sistema/trabalhadores/workers-client";
+import { AdmissionsSection } from "@/app/sistema/admissoes/admissions-section";
 
 type Params = { params: Promise<{ modulo: string; secao?: string[] }> };
 
@@ -46,6 +47,7 @@ export default async function ModuleSectionPage({ params }: Params) {
         current={`/sistema/${page.slug}${current.slug ? `/${current.slug}` : ""}`} />
       {def ? <ResourceManager resourceKey={def.key} />
         : current.panel === "trabalhadores-cadastro" ? <WorkersClient {...await workerPageContext(actor)} />
+        : current.panel === "admissoes-atalho" ? <AdmissionsSection actor={actor} />
         : current.panel === "painel" ? <DepartmentDashboard page={page} />
         : current.panel ? <ModulePanel name={current.panel} /> : null}
       <SuggestionsBox />

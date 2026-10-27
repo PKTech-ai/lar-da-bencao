@@ -14,6 +14,8 @@ export type NavCapability = ToolCapabilities;
 const DIRETORIA = ["/sistema/presidencia", "/sistema/secretaria", "/sistema/tesouraria"];
 // Trabalhadores fica dentro da Secretaria (aba própria); a tela /sistema/trabalhadores continua para os atalhos.
 const PLACED = new Set(["/sistema/documentos", "/sistema/conselhofiscal", "/sistema/trabalhadores", ...DIRETORIA]);
+// Admissões também é aba da Secretaria; quem não vê a Secretaria (acesso só à admissão) continua com o item no menu.
+const IN_SECRETARIA = "/sistema/admissoes";
 const MENU_LABEL: Record<string, string> = {
   "/sistema/doutrina": "Dpto de Doutrina",
   "/sistema/infancia": "Dpto da Infância",
@@ -62,7 +64,7 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
   });
   const tools = adminTools(capabilities).filter((tool) => show(tool.label));
   const rest = capabilities.modules
-    .filter((mod) => !PLACED.has(mod.href))
+    .filter((mod) => !PLACED.has(mod.href) && !(mod.href === IN_SECRETARIA && byHref.has("/sistema/secretaria")))
     .map((mod) => ({ ...mod, label: menuLabel(mod.href, mod.label) }))
     .filter((mod) => show(mod.label))
     .sort((a, b) => {

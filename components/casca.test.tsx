@@ -33,10 +33,16 @@ describe("menu lateral como no visual", () => {
       expect(group).not.toContain(label);
     }
     const after = html.slice(html.indexOf("Dpto de Doutrina"));
-    // Trabalhadores mudou para uma aba da Secretaria: não aparece mais solto no menu.
+    // Trabalhadores e Admissões são abas da Secretaria: não aparecem soltos no menu.
     expect(html).not.toContain('data-nav-label="Trabalhadores"');
-    expect(after.indexOf("Dedo-duro / Histórico")).toBeGreaterThan(after.indexOf("Admissões"));
+    expect(html).not.toContain('data-nav-label="Admissões"');
+    expect(after.indexOf("Dedo-duro / Histórico")).toBeGreaterThan(0);
     expect(after.indexOf("Sair deste aparelho")).toBeGreaterThan(after.indexOf("Importação v215"));
+  });
+  it("sem a Secretaria, quem tem acesso à admissão continua vendo Admissões no menu", async () => {
+    const { Sidebar } = await import("@/components/sidebar");
+    const html = renderToStaticMarkup(<Sidebar actor={{ name: "Ana", role: "coordenador", email: "a@x" }} capabilities={capabilities} />);
+    expect(html).toContain('data-nav-label="Admissões"');
   });
   it("o grupo Diretoria nasce aberto, como no visual", async () => {
     const { Sidebar } = await import("@/components/sidebar");
