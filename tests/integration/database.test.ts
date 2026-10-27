@@ -203,6 +203,24 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect(mondays.rows.every((r) => r.worker_id === workerId)).toBe(true);
     expect((await fixed.DELETE(json("DELETE", { key: "1|0|0|0" }))).status).toBe(200);
     expect((await fixed.DELETE(json("DELETE", { key: "1|0|0|0" }))).status).toBe(404);
+
+    // Roteiro ESE: escolher o 070 na 1ª quarta coloca 071, 072… nas quartas seguintes da mesma linha.
+    const { TEMPLATES, monthDays } = await import("@/lib/doutrina-scale");
+    const si = TEMPLATES[3].findIndex((s) => s.s === "ESE");
+    const ri = TEMPLATES[3][si].r.findIndex(([, type]) => type === "STUDY");
+    const wednesdays = monthDays(ym, 3);
+    const rots = await query<{ id: string; code: string }>(
+      "select id, code from app.studies where department_key = 'doutrina' and study_type = 'ESE' and active and code like 'ROT. 07_' order by code");
+    const byCode = new Map(rots.rows.map((r) => [r.code, r.id]));
+    const v2 = await query<{ version: number }>("select version from app.scale_months where year=$1 and month=3", [year]);
+    const chosen = await scale.PATCH(json("PATCH", { month: ym, key: `3|${si}|${ri}|${wednesdays[0]}|0`, value: `t:${byCode.get("ROT. 070")}`, version: v2.rows[0].version }));
+    expect(chosen.status).toBe(200);
+    expect((await chosen.json()).sequenced).toEqual(wednesdays.slice(1));
+    const row = await query<{ slot_key: string; study_id: string; edited: boolean }>(
+      `select a.slot_key, a.study_id, a.edited from app.scale_assignments a join app.scale_months m on m.id = a.scale_month_id
+        where m.year = $1 and m.month = 3 and a.slot_key like $2`, [year, `3|${si}|${ri}|%|0`]);
+    const studyOn = new Map(row.rows.map((r) => [Number(r.slot_key.split("|")[3]), r.study_id]));
+    wednesdays.forEach((day, i) => expect(studyOn.get(day)).toBe(byCode.get(`ROT. 07${i}`)));
   });
 
   it("Infância: matrícula, turma, chamada e cronograma", async () => {

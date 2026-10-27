@@ -9,7 +9,7 @@ import {
 } from "@/lib/doutrina-data";
 import {
   buildScale, canAddExtra, isExtraPosition, isValidMonth, monthDays, parseFixedKey, parseSlotKey, roleOf, scaleStatusLabel, slotKey,
-  validateFixed, validateSlotValue, type ScaleStatus
+  studySequence, validateFixed, validateSlotValue, type ScaleStatus
 } from "@/lib/doutrina-scale";
 
 const monthSchema = z.string().refine(isValidMonth, "Mês inválido.");
@@ -211,6 +211,15 @@ export async function PATCH(request: Request) {
           followed.push(day);
         }
       }
+      // Roteiro numerado: os dias seguintes da mesma linha recebem os próximos números.
+      const sequenced: number[] = [];
+      if (roleOf(slot).type === "STUDY" && input.value.startsWith("t:")) {
+        const days = monthDays(input.month, slot.dow).filter((d) => d > slot.day && scale.assignments.has(slotKey({ ...slot, day: d })));
+        const rows = studySequence(options.studies, input.value.slice(2), days.length)
+          .map((study, i): [string, string] => [slotKey({ ...slot, day: days[i] }), `t:${study.id}`]);
+        await insertSlots(client, scale.month.id, input.month, rows, { edited: true });
+        sequenced.push(...days.slice(0, rows.length));
+      }
       const updated = await client.query<{ version: number }>(
         `update app.scale_months set status='in_review', reviewed=false, published_at=null, updated_by=$2, updated_at=now(), version=version+1
           where id=$1 returning version`,
@@ -218,10 +227,10 @@ export async function PATCH(request: Request) {
       );
       await appendAudit(actor, {
         category: "Edição", action: "Alteração manual de escala", ...audit("Escala mensal"), entityId: scale.month.id,
-        details: `${input.month} · ${roleOf(slot).section.n} → ${roleOf(slot).label} · dia ${slot.day}${followed.length ? ` · repetido nos dias ${followed.join(", ")}` : ""}`,
+        details: `${input.month} · ${roleOf(slot).section.n} → ${roleOf(slot).label} · dia ${slot.day}${followed.length ? ` · repetido nos dias ${followed.join(", ")}` : ""}${sequenced.length ? ` · sequência nos dias ${sequenced.join(", ")}` : ""}`,
         before: { value: before }, after: { value: input.value }
       }, client);
-      return { version: updated.rows[0].version, followed: followed.length, busyDays };
+      return { version: updated.rows[0].version, followed: followed.length, busyDays, sequenced };
     });
     return Response.json(result);
   } catch (error) {

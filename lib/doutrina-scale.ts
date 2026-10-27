@@ -255,6 +255,28 @@ export function findConflicts(assignments: ReadonlyMap<string, string>): Conflic
   return conflicts;
 }
 
+/** Número do estudo pelo código ("ROT. 070" → 70); sem número, não há sequência. */
+const studyNumber = (study: ScaleStudy) => {
+  const match = study.code.match(/\d+/);
+  return match ? Number(match[0]) : null;
+};
+
+/** Estudos que vêm depois do escolhido, pela numeração (ROT. 070 → 071, 072…), para os próximos dias da mesma linha. */
+export function studySequence(studies: readonly ScaleStudy[], chosenId: string, count: number): ScaleStudy[] {
+  const chosen = studies.find((s) => s.id === chosenId);
+  const start = chosen ? studyNumber(chosen) : null;
+  if (!chosen || start === null || chosen.type === "PALESTRA") return [];
+  const next: ScaleStudy[] = [];
+  let last = start;
+  for (const study of studies.filter((s) => s.type === chosen.type && (studyNumber(s) ?? -1) > start).sort((a, b) => studyNumber(a)! - studyNumber(b)!)) {
+    if (next.length >= count) break;
+    if (studyNumber(study) === last) continue;
+    next.push(study);
+    last = studyNumber(study)!;
+  }
+  return next;
+}
+
 /**
  * Valida a escolha manual de uma posição. Duplicidade no mesmo dia é permitida (aparece na conferência);
  * a folga quarta/sexta do psicofônico é bloqueada, como no mock.

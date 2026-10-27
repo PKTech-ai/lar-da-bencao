@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { attendanceStats, isValidAttendanceCell } from "@/lib/doutrina-attendance";
 import {
-  FREE_THEME, buildScale, canAddExtra, findConflicts, fixedKey, monthDays, parseFixedKey, parseSlotKey, roleOf, slotKey, validateFixed,
+  FREE_THEME, buildScale, canAddExtra, findConflicts, fixedKey, monthDays, parseFixedKey, parseSlotKey, roleOf, slotKey, studySequence, validateFixed,
   validateSlotValue, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
@@ -15,6 +15,22 @@ const studies = [
   { id: uuid(801), type: "PALESTRA", code: "", title: "Perdão" },
   { id: uuid(802), type: "MEP", code: "R1", title: "Roteiro 1" }
 ];
+
+describe("sequência de roteiros", () => {
+  const rot = (n: number, code = `ROT. ${String(n).padStart(3, "0")}`) => ({ id: uuid(700 + n), type: "ESE", code, title: `Roteiro ${n}` });
+  const ese = [rot(72), rot(70), rot(71), rot(74), rot(71, "ROT. 71"), { id: uuid(799), type: "ESE", code: "", title: "Sem número" }, { ...rot(73), type: "MEP" }];
+
+  it("escolhido o 70, os próximos dias recebem 71, 72, 74 (pula números que faltam e repetidos)", () => {
+    expect(studySequence(ese, uuid(770), 3).map((s) => s.code)).toEqual(["ROT. 071", "ROT. 072", "ROT. 074"]);
+    expect(studySequence(ese, uuid(770), 1).map((s) => s.code)).toEqual(["ROT. 071"]);
+  });
+
+  it("no último número, sem número ou em tema de palestra não preenche nada", () => {
+    expect(studySequence(ese, uuid(774), 3)).toEqual([]);
+    expect(studySequence(ese, uuid(799), 3)).toEqual([]);
+    expect(studySequence([{ id: uuid(1), type: "PALESTRA", code: "1", title: "a" }, { id: uuid(2), type: "PALESTRA", code: "2", title: "b" }], uuid(1), 3)).toEqual([]);
+  });
+});
 
 describe("calendário", () => {
   it("lista os dias do mês por dia da semana", () => {

@@ -277,6 +277,8 @@ export function ScalesClient() {
                                       (body) => {
                                         const skipped = (body.busyDays as number[] | undefined) ?? [];
                                         const note = skipped.length ? ` Fora do(s) dia(s) ${skipped.map((d) => String(d).padStart(2, "0")).join(", ")}: já escalado em outra atividade.` : "";
+                                        const sequenced = (body.sequenced as number[] | undefined) ?? [];
+                                        if (sequenced.length) return `Escala atualizada. Os dias ${sequenced.map((d) => String(d).padStart(2, "0")).join(", ")} receberam os roteiros seguintes, em sequência.`;
                                         return Number(body.followed) ? `Adicional repetido em ${body.followed} semana(s) seguinte(s).${note}` : `Escala atualizada.${note}`;
                                       })}>
                                     <option value="">— selecionar —</option>
