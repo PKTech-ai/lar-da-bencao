@@ -20,7 +20,7 @@ export default async function AdmissoesPage() {
   return (
     <>
       <header className="page-heading">
-        <div><h1>Aprovação de Trabalhadores</h1><p>A Secretaria e os departamentos cadastram as fichas. O Administrador edita a ficha aqui e em Trabalhadores; salvar uma ficha que ainda não está aprovada a aprova. Aprovar e Reprovar aparecem nas fichas que ainda aguardam a Diretoria, para o Administrador e o Presidente.</p></div>
+        <div><h1>Aprovação de Trabalhadores</h1><p>A Secretaria e os departamentos cadastram as fichas. O Administrador edita a ficha aqui e em Trabalhadores; salvar uma ficha que ainda não está aprovada a aprova. Aprovar (direto, sem abrir a ficha), Aprovar todos e Reprovar aparecem nas fichas que ainda aguardam a Diretoria, para o Administrador e o Presidente.</p></div>
         {admin ? (
           <div className="row-actions">
             <Link className="button" href="/sistema/admissoes/cadastros-online">Cadastros online{waiting ? ` (${waiting})` : ""}</Link>

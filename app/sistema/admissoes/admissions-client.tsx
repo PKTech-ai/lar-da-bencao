@@ -6,7 +6,7 @@ import { WEEKDAYS, workerStatusLabel, workerStatusTone, type WorkerStatus } from
 
 type Row = {
   id: string; full_name: string; status: WorkerStatus; departments: string[]; origin_department: string | null;
-  requested_at: string; last_decision: { decision: string; meeting_date: string; decided_by_name: string } | null;
+  requested_at: string; version: number; last_decision: { decision: string; meeting_date: string; decided_by_name: string } | null;
 };
 type Detail = FichaValues & {
   id: string; full_name: string; status: WorkerStatus; version: number;
@@ -170,10 +170,43 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
     }
   }
 
+  async function approveRow(row: Row) {
+    const response = await fetch(`/api/workers/${row.id}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: "approved", meeting_date: today(), minute_ref: "", reason: "", version: row.version })
+    });
+    const body = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) throw new Error(`${row.full_name}: ${body.error || "não foi possível aprovar."}`);
+  }
+
+  /** Aprova direto, sem abrir a ficha; com várias fichas, aprova uma por vez e informa as que falharem. */
+  async function approve(list: Row[]) {
+    if (!list.length) return;
+    if (list.length > 1 && !window.confirm(`Aprovar ${list.length} fichas de uma vez? Todos ficam ativos com a data de hoje.`)) return;
+    setBusy(true); setError(""); setMessage("");
+    const failures: string[] = [];
+    let approved = 0;
+    for (const row of list) {
+      try {
+        await approveRow(row);
+        approved += 1;
+      } catch (caught) {
+        failures.push(caught instanceof TypeError ? `${row.full_name}: sem resposta do sistema.` : caught instanceof Error ? caught.message : `${row.full_name}: não foi possível aprovar.`);
+      }
+    }
+    if (list.some((r) => r.id === selected?.worker.id)) setSelected(null);
+    if (approved) setMessage(list.length === 1 ? `${list[0].full_name}: aprovado e liberado para atuação.` : `${approved} ficha(s) aprovada(s) e liberada(s) para atuação.`);
+    if (failures.length) setError(failures.join(" "));
+    await load().catch(() => undefined);
+    setBusy(false);
+  }
+
   const counts = (key: WorkerStatus) => rows.filter((r) => r.status === key).length;
   const term = search.trim().toLocaleLowerCase("pt-BR");
   const visible = rows.filter((r) => !term || [r.full_name, ...r.departments.map(label)].join(" ").toLocaleLowerCase("pt-BR").includes(term));
   const w = selected?.worker;
+  const pendingVisible = visible.filter((r) => r.status === "pending");
 
   return (
     <div className="grid">
@@ -259,6 +292,14 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
             <article className="card kpi"><span className="small muted">Reprovadas</span><b>{counts("rejected")}</b></article>
           </div>
         ) : null}
+        {canDecide && pendingVisible.length > 1 ? (
+          <div className="toolbar" style={{ marginBottom: 12 }}>
+            <span className="small muted">{pendingVisible.length} fichas aguardando a Diretoria nesta lista.</span>
+            <button className={busy ? "button primary is-loading" : "button primary"} disabled={busy} onClick={() => void approve(pendingVisible)}>
+              {busy ? "Aprovando…" : `Aprovar todos (${pendingVisible.length})`}
+            </button>
+          </div>
+        ) : null}
         <div className="filters">
           <label>Buscar<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome ou departamento" /></label>
           <label>Situação
@@ -284,8 +325,8 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
                       {canEditFicha ? <button className="button" disabled={busy} onClick={() => void startEdit(r.id)}>Editar ficha</button> : null}
                       {canEditFicha ? <button className="button danger" disabled={busy} onClick={() => remove(r)}>Excluir ficha</button> : null}
                       {r.status === "pending" && canDecide ? <>
-                        <button className="button primary" onClick={() => void open(r.id, "approved")}>Aprovar</button>
-                        <button className="button danger" onClick={() => void open(r.id, "rejected")}>Reprovar</button>
+                        <button className="button primary" disabled={busy} onClick={() => void approve([r])}>Aprovar</button>
+                        <button className="button danger" disabled={busy} onClick={() => void open(r.id, "rejected")}>Reprovar</button>
                       </> : null}
                     </div>
                   </td>
