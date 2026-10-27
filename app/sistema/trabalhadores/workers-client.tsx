@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { readFicha, WorkerFichaForm, type FichaValues, type Option } from "@/components/worker-ficha-form";
 import { formatMoney } from "@/lib/resources/types";
 import { workerStatusLabel, workerStatusTone, type WorkerStatus } from "@/lib/worker-constants";
@@ -28,6 +28,8 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<WorkerDetail | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const focus = useRef<HTMLElement>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,6 +47,8 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
   }, [status, department]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
+  const showing = creating ? "new" : editing?.id ?? openId ?? "";
+  useEffect(() => { if (showing) focus.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [showing]);
 
   async function send(url: string, method: string, payload: unknown) {
     const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -77,6 +81,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
     const body = await response.json();
     if (!response.ok) { setError(body.error); return; }
     setCreating(false);
+    setOpenId(null);
     setEditing(body.worker);
   }
 
@@ -98,6 +103,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
     void run(async () => {
       await send(`/api/workers/${worker.id}`, "DELETE", {});
       if (editing?.id === worker.id) setEditing(null);
+      setOpenId(null);
       return "Ficha excluída.";
     });
   }
@@ -116,6 +122,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
     });
   }
 
+  const current = workers.find((w) => w.id === openId) ?? null;
   const term = search.trim().toLocaleLowerCase("pt-BR");
   const visible = workers.filter((w) => !term || [w.full_name, ...w.departments.map(label), ...w.functions].join(" ").toLocaleLowerCase("pt-BR").includes(term));
   const editNotice = editing?.status === "pending" || editing?.status === "rejected"
@@ -129,17 +136,40 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
       {error ? <div className="error" role="alert">{error}</div> : null}
       {message ? <div className="success" role="status">{message}</div> : null}
       {creating ? (
-        <section className="card">
+        <section className="card" ref={focus}>
           <h2>Nova ficha de trabalhador</h2>
           <WorkerFichaForm departments={departments} originOptions={originOptions} busy={busy} submitLabel="Enviar para aprovação" onSubmit={create} onCancel={() => setCreating(false)}
             notice="Ao salvar, o trabalhador ficará PENDENTE — AGUARDANDO DIRETORIA. Ele não poderá ser escalado nem considerado ativo antes da aprovação." />
         </section>
       ) : null}
       {editing ? (
-        <section className="card">
+        <section className="card" ref={focus}>
           <h2>Editar ficha — {editing.full_name}</h2>
           <WorkerFichaForm key={editing.id} departments={departments} initial={editing} busy={busy} notice={editNotice}
             submitLabel="Salvar ficha" onSubmit={update} onCancel={() => setEditing(null)} />
+        </section>
+      ) : null}
+      {current && !editing && !creating ? (
+        <section className="card" ref={focus} aria-label={`Ficha de ${current.full_name}`}>
+          <div className="toolbar">
+            <h2>{current.full_name}</h2>
+            <span className={`status ${workerStatusTone[current.status]}`}>{workerStatusLabel[current.status]}</span>
+          </div>
+          <dl className="details-list">
+            <div><dt>Telefone</dt><dd>{current.phone || "—"}</dd></div>
+            <div><dt>Departamentos</dt><dd>{current.departments.map(label).join(", ") || "—"}</dd></div>
+            <div><dt>Solicitante</dt><dd>{current.origin_department ? label(current.origin_department) : "—"}</dd></div>
+            <div><dt>Funções (Doutrina)</dt><dd>{current.functions.join(", ") || "—"}</dd></div>
+            <div><dt>Contribuição</dt><dd>{contributionLabel(current.contribution_cents, current.contribution_due_day)}</dd></div>
+          </dl>
+          <div className="row-actions" style={{ marginTop: 12 }}>
+            {canEditFicha ? <button className="button primary" disabled={busy} onClick={() => void openEdit(current.id)}>Editar ficha</button> : null}
+            {current.status === "active" || current.status === "inactive" ? <Link className="button" href={`/sistema/trabalhadores/${current.id}/ficha`}>⎙ Imprimir ficha</Link> : null}
+            {canEdit(current) && current.status === "active" ? <button className="button danger" disabled={busy} onClick={() => setActive(current, false)}>Afastar</button> : null}
+            {canEdit(current) && current.status === "inactive" ? <button className="button" disabled={busy} onClick={() => setActive(current, true)}>Reativar</button> : null}
+            {canEditFicha ? <button className="button danger" disabled={busy} onClick={() => remove(current)}>Excluir ficha</button> : null}
+            <button className="button" onClick={() => setOpenId(null)}>Fechar</button>
+          </div>
         </section>
       ) : null}
       <section className="card">
@@ -150,7 +180,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
             <Link className="button" href={`/sistema/trabalhadores/lista?${new URLSearchParams(Object.entries({ status, department, q: search.trim() }).filter(([, v]) => v))}`}>
               ⎙ Lista de trabalhadores
             </Link>
-            {originOptions.length && !creating ? <button className="button primary" onClick={() => { setEditing(null); setCreating(true); }}>Nova ficha</button> : null}
+            {originOptions.length && !creating ? <button className="button primary" onClick={() => { setEditing(null); setOpenId(null); setCreating(true); }}>Nova ficha</button> : null}
           </div>
         </div>
         <div className="filters">
@@ -180,13 +210,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
                   <td>{contributionLabel(w.contribution_cents, w.contribution_due_day)}</td>
                   <td><span className={`status ${workerStatusTone[w.status]}`}>{workerStatusLabel[w.status]}</span></td>
                   <td>
-                    <div className="row-actions">
-                      {canEditFicha ? <button className="button" disabled={busy} onClick={() => void openEdit(w.id)}>Editar ficha</button> : null}
-                      {canEditFicha ? <button className="button danger" disabled={busy} onClick={() => remove(w)}>Excluir ficha</button> : null}
-                      {canEdit(w) && w.status === "active" ? <button className="button danger" disabled={busy} onClick={() => setActive(w, false)}>Afastar</button> : null}
-                      {canEdit(w) && w.status === "inactive" ? <button className="button" disabled={busy} onClick={() => setActive(w, true)}>Reativar</button> : null}
-                      {w.status === "active" || w.status === "inactive" ? <Link className="button" href={`/sistema/trabalhadores/${w.id}/ficha`}>⎙ Ficha</Link> : null}
-                    </div>
+                    <button className="button" style={{ whiteSpace: "nowrap" }} onClick={() => { setEditing(null); setCreating(false); setOpenId(w.id); }}>Abrir ficha</button>
                   </td>
                 </tr>
               ))}
