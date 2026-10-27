@@ -118,8 +118,11 @@ export function ScalesClient() {
       return;
     }
     const name = workerName.get(current.slice(2)) ?? "Trabalhador";
-    void call("POST", { key: patternKey, worker_id: current.slice(2) },
-      () => `${name} agora é fixo 📌 nesta função, toda semana. Use “Gerar novamente” para aplicar em todas as semanas do mês.`, "/api/doutrina/scale/fixed");
+    void call("POST", { key: patternKey, worker_id: current.slice(2) }, (body) => {
+      const skipped = (body.busyDays as number[] | undefined) ?? [];
+      return `${name} agora é fixo 📌 nesta função e já foi colocado em todas as semanas do mês.`
+        + (skipped.length ? ` Fora do(s) dia(s) ${skipped.map((d) => String(d).padStart(2, "0")).join(", ")}: já escalado em outra atividade ou em folga.` : "");
+    }, "/api/doutrina/scale/fixed");
   }
 
   function options(key: string, current: string) {

@@ -4,10 +4,11 @@ import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
-import { loadFixed, loadScaleOptions, requireDoutrina } from "@/lib/doutrina-data";
-import { TEMPLATES, parseFixedKey, validateFixed } from "@/lib/doutrina-scale";
+import { insertSlots, loadFixed, loadScale, loadScaleOptions, requireDoutrina } from "@/lib/doutrina-data";
+import { TEMPLATES, isValidMonth, monthDays, parseFixedKey, parseSlotKey, slotKey, validateFixed, validateSlotValue } from "@/lib/doutrina-scale";
 
-const markSchema = z.object({ key: z.string().max(20), worker_id: z.string().uuid() });
+/** `month`: escala aberta na tela; o fixo já entra em todas as semanas dela. */
+const markSchema = z.object({ key: z.string().max(20), worker_id: z.string().uuid(), month: z.string().refine(isValidMonth).optional() });
 const unmarkSchema = z.object({ key: z.string().max(20) });
 const audit = { module: "Doutrina", section: "Trabalhadores fixos", entityType: "scale_fixed" };
 
@@ -39,11 +40,45 @@ export async function POST(request: Request) {
          values ($1,$2,$3,$4,$5,$6,$7,$8) returning id`,
         [pattern.dow, pattern.si, pattern.ri, pattern.pos, section.n, label, worker!.id, actor.id]
       );
+      // Já coloca o fixo em todas as semanas da escala aberta (na linha toda), sem esperar "Gerar novamente".
+      // Onde ele já está em outra atividade no dia, ou a folga do psicofônico impede, a semana fica como está.
+      const applied: number[] = [];
+      const busyDays: number[] = [];
+      const scale = input.month ? await loadScale(input.month, client, true) : null;
+      if (input.month && scale?.month && scale.month.status !== "deleted") {
+        const value = `w:${worker!.id}`;
+        const current = new Map(scale.assignments);
+        const regular: [string, string][] = [];
+        const extra: [string, string][] = [];
+        for (const day of monthDays(input.month, pattern.dow)) {
+          const prefix = `${pattern.dow}|${pattern.si}|${pattern.ri}|${day}|`;
+          if (![...current.keys()].some((k) => k.startsWith(prefix))) continue;
+          const target = slotKey({ ...pattern, day });
+          if (current.get(target) === value) continue;
+          const elsewhere = [...current].some(([k, v]) => v === value && k !== target && k.startsWith(`${pattern.dow}|`) && k.split("|")[3] === String(day));
+          if (elsewhere || validateSlotValue(parseSlotKey(target)!, value, { ...options, assignments: current })) {
+            busyDays.push(day);
+            continue;
+          }
+          (current.has(target) ? regular : extra).push([target, value]);
+          current.set(target, value);
+          applied.push(day);
+        }
+        await insertSlots(client, scale.month.id, input.month, regular, { edited: true });
+        await insertSlots(client, scale.month.id, input.month, extra, { edited: true, extra: true });
+        if (applied.length) {
+          await client.query(
+            `update app.scale_months set status='in_review', reviewed=false, published_at=null, updated_by=$2, updated_at=now(), version=version+1 where id=$1`,
+            [scale.month.id, actor.id]
+          );
+        }
+      }
       await appendAudit(actor, {
         category: before ? "Edição" : "Inclusão", action: "Trabalhador marcado como fixo na escala", ...audit, entityId: inserted.rows[0].id,
-        details: `${worker!.name} · ${section.n} → ${label}`, before: before ? { worker: before.worker_name } : null, after: { worker: worker!.name }
+        details: `${worker!.name} · ${section.n} → ${label}${applied.length ? ` · aplicado em ${input.month}: dias ${applied.join(", ")}` : ""}`,
+        before: before ? { worker: before.worker_name } : null, after: { worker: worker!.name }
       }, client);
-      return { id: inserted.rows[0].id };
+      return { id: inserted.rows[0].id, applied: applied.length, busyDays };
     });
     return Response.json(result, { status: 201 });
   } catch (error) {

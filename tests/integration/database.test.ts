@@ -171,7 +171,14 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect((await fixed.POST(json("POST", { key: "1|0|0|0", worker_id: workerId }))).status).toBe(403);
     current.actor = coordinator;
     await owner((client) => client.query("delete from app.scale_fixed_assignments where dow = 1 and section_index = 0 and role_index = 0 and position = 0"));
-    expect((await fixed.POST(json("POST", { key: "1|0|0|0", worker_id: workerId }))).status).toBe(201);
+    const marked = await fixed.POST(json("POST", { key: "1|0|0|0", worker_id: workerId, month: ym }));
+    expect(marked.status).toBe(201);
+    // Fixar já preenche a linha inteira do mês aberto, sem gerar de novo.
+    const applied = await query<{ worker_id: string }>(
+      `select a.worker_id from app.scale_assignments a join app.scale_months m on m.id = a.scale_month_id
+        where m.year = $1 and m.month = 3 and a.slot_key like '1|0|0|%|0'`, [year]);
+    const { busyDays } = await marked.json();
+    expect(applied.rows.filter((r) => r.worker_id === workerId).length).toBe(applied.rows.length - busyDays.length);
     expect((await fixed.POST(json("POST", { key: "1|0|1|0", worker_id: workerId }))).status).toBe(409);
     const v = await query<{ version: number }>("select version from app.scale_months where year=$1 and month=3", [year]);
     expect((await post({ action: "regenerate", version: v.rows[0].version })).status).toBe(200);
