@@ -93,13 +93,10 @@ export function ScalesClient() {
     }
     return new Set([
       ...[...byDay.values()].filter((keys) => keys.length > 1).flat(),
-      ...(data?.review?.conflicts ?? []).filter((c) => c.type === "same_day").flatMap((c) => c.keys)
+      ...(data?.review?.conflicts ?? []).flatMap((c) => c.keys)
     ]);
   }, [byKey, data]);
-  const conflictKeys = useMemo(() => new Set([
-    ...(data?.review?.conflicts ?? []).filter((c) => c.type !== "same_day").flatMap((c) => c.keys),
-    ...(data?.review?.invalid ?? []).map((i) => i.key)
-  ]), [data]);
+  const conflictKeys = useMemo(() => new Set((data?.review?.invalid ?? []).map((i) => i.key)), [data]);
   const workerName = useMemo(() => new Map((data?.options.workers ?? []).map((w) => [w.id, w.name])), [data]);
   const fixedByKey = useMemo(() => new Map((data?.fixed ?? []).map((f) => [f.key, f])), [data]);
   // Fixos marcados depois da última geração ainda não aparecem em todas as semanas do mês.
@@ -124,7 +121,7 @@ export function ScalesClient() {
       const moved = days(body.movedDays);
       return `${name} agora é fixo 📌 nesta função e já foi colocado em todas as semanas do mês.`
         + (moved ? ` No(s) dia(s) ${moved} saiu da outra atividade em que estava: escolha quem fica no lugar.` : "")
-        + (skipped ? ` Fora do(s) dia(s) ${skipped}: folga do psicofônico ou indisponível na ficha.` : "");
+        + (skipped ? ` Fora do(s) dia(s) ${skipped}: indisponível na ficha.` : "");
     }, "/api/doutrina/scale/fixed");
   }
 
@@ -144,7 +141,7 @@ export function ScalesClient() {
       return list;
     }
     const sameDay = new Map<string, string>();
-    const blocked = new Map<string, string>();
+    const pairWorked = new Map<string, string>();
     for (const [otherKey, value] of byKey) {
       if (otherKey === key || !value.startsWith("w:")) continue;
       const other = parseSlotKey(otherKey);
@@ -153,13 +150,13 @@ export function ScalesClient() {
       if (type === "Psicofônico" && (slot.dow === 3 || slot.dow === 5)) {
         const pairDow = slot.dow === 3 ? 5 : 3;
         const pairDay = slot.dow === 3 ? slot.day + 2 : slot.day - 2;
-        if (other.dow === pairDow && other.day === pairDay && roleOf(other).type === "Psicofônico") blocked.set(value, `${String(pairDay).padStart(2, "0")}/${ym.slice(5)}`);
+        if (other.dow === pairDow && other.day === pairDay && roleOf(other).type === "Psicofônico") pairWorked.set(value, `${String(pairDay).padStart(2, "0")}/${ym.slice(5)}`);
       }
     }
     data.options.workers.filter((w) => w.functions.includes(type) && w.days.includes(slot.dow)).forEach((w) => {
       const value = `w:${w.id}`;
-      const reason = blocked.has(value) ? ` — FOLGA: trabalhou ${blocked.get(value)}` : sameDay.has(value) ? ` — JÁ ESCALADO EM: ${sameDay.get(value)}` : "";
-      list.push({ value, label: `${w.name}${reason}`, disabled: blocked.has(value) && current !== value });
+      const reason = sameDay.has(value) ? ` — JÁ ESCALADO EM: ${sameDay.get(value)}` : pairWorked.has(value) ? ` — trabalhou ${pairWorked.get(value)}` : "";
+      list.push({ value, label: `${w.name}${reason}` });
     });
     return list;
   }
@@ -225,8 +222,8 @@ export function ScalesClient() {
           <div className="history-list">
             {data.review.conflicts.map((c) => (
               <article key={c.id}>
-                <strong>{workerName.get(c.workerId) ?? "Trabalhador"} — {c.type === "same_day" ? "Duplicidade no mesmo dia" : "Alternância quarta/sexta"}</strong>
-                <p className="small">{c.type === "same_day" ? "Aparece em mais de uma atividade no mesmo dia e horário." : "Psicofônico escalado na quarta e na sexta da mesma semana: deve folgar em um dos dias."}</p>
+                <strong>{workerName.get(c.workerId) ?? "Trabalhador"} — Duplicidade no mesmo dia</strong>
+                <p className="small">Aparece em mais de uma atividade no mesmo dia e horário.</p>
                 {c.keys.map((k) => <p key={k} className="small muted">{describeSlot(k, ym)}</p>)}
               </article>
             ))}

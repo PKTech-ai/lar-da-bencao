@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       );
       // Já coloca o fixo em todas as semanas da escala aberta (na linha toda), sem esperar "Gerar novamente".
       // O fixo tem prioridade, como na geração: se no dia ele estava em outra atividade, sai de lá e a posição fica livre.
-      // Só a folga do psicofônico (ou falta de função/dia na ficha) deixa a semana como está.
+      // Só a falta de função/dia na ficha deixa a semana como está.
       const applied: number[] = [];
       const busyDays: number[] = [];
       const movedDays: number[] = [];

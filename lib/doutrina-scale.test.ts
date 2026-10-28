@@ -71,7 +71,11 @@ describe("geração da escala", () => {
 
   it("respeita a folga quarta/sexta do psicofônico", () => {
     const scale = buildScale("2026-09", team(6, ["Psicofônico"]), [], []);
-    expect(findConflicts(scale).filter((c) => c.type === "psych_pair")).toEqual([]);
+    const psych = (dow: number) => [...scale].filter(([k, v]) => v && parseSlotKey(k)!.dow === dow && roleOf(parseSlotKey(k)!).type === "Psicofônico");
+    for (const [wk, wv] of psych(3)) {
+      const day = parseSlotKey(wk)!.day;
+      expect(psych(5).filter(([fk, fv]) => fv === wv && parseSlotKey(fk)!.day === day + 2)).toEqual([]);
+    }
   });
 
   it("alterna palestrante externo e interno", () => {
@@ -106,14 +110,14 @@ describe("conferência e edição manual", () => {
     expect(conflicts[0]).toMatchObject({ type: "same_day", workerId: workers[0].id });
   });
 
-  it("aponta psicofônico na quarta e na sexta da mesma semana", () => {
+  it("psicofônico na quarta e na sexta da mesma semana não é pendência", () => {
     const assignments = new Map([["3|7|2|2|0", w1], ["5|3|2|4|0", w1]]);
-    expect(findConflicts(assignments).map((c) => c.type)).toEqual(["psych_pair"]);
+    expect(findConflicts(assignments)).toEqual([]);
   });
 
-  it("bloqueia a escolha que quebra a folga, mas aceita duplicidade (vai para a conferência)", () => {
+  it("aceita a escolha fora da folga e a duplicidade (vai para a conferência)", () => {
     const context = { assignments: new Map([["3|7|2|2|0", w1]]), workers, speakers, studies };
-    expect(validateSlotValue(parseSlotKey("5|3|2|4|0")!, w1, context)).toMatch(/Folga obrigatória/);
+    expect(validateSlotValue(parseSlotKey("5|3|2|4|0")!, w1, context)).toBeNull();
     expect(validateSlotValue(parseSlotKey("3|7|0|2|0")!, w1, context)).toBeNull();
   });
 
@@ -249,7 +253,7 @@ describe("trabalhadores fixos", () => {
     expect(validateFixed({ dow: 1, si: 0, ri: 1, pos: 5 }, only, new Map())).toMatch(/Posição inválida/);
     expect(validateFixed({ dow: 1, si: 0, ri: 1, pos: 0 }, undefined, new Map())).toMatch(/fora da Doutrina/);
     expect(validateFixed({ dow: 1, si: 0, ri: 2, pos: 0 }, ana, new Map([["1|0|0|0", ana.id]]))).toMatch(/já está fixo/);
-    expect(validateFixed({ dow: 5, si: 3, ri: 2, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toMatch(/Folga obrigatória/);
+    expect(validateFixed({ dow: 5, si: 3, ri: 2, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toBeNull();
   });
 
   it("fixo em posição adicional (recepção) entra em todas as semanas; onde não aceita adicional, recusa", () => {

@@ -125,7 +125,7 @@ export function parseFixedKey(key: string): FixedPattern | null {
 
 /**
  * Regras para marcar um fixo (puras): só trabalhador, posição prevista no modelo, com a função e o dia na ficha,
- * uma função fixa por dia e sem quebrar a folga quarta/sexta do psicofônico.
+ * uma função fixa por dia. A folga quarta/sexta do psicofônico não impede a escolha.
  */
 export function validateFixed(pattern: FixedPattern, worker: ScaleWorker | undefined, current: ReadonlyMap<string, string>): string | null {
   const row = TEMPLATES[pattern.dow]?.[pattern.si]?.r[pattern.ri];
@@ -141,10 +141,6 @@ export function validateFixed(pattern: FixedPattern, worker: ScaleWorker | undef
     const other = parseFixedKey(key);
     if (!other) continue;
     if (other.dow === pattern.dow) return `${worker.name} já está fixo em ${TEMPLATES[other.dow][other.si].n} neste dia.`;
-    const pair = (pattern.dow === 3 && other.dow === 5) || (pattern.dow === 5 && other.dow === 3);
-    if (pair && type === "Psicofônico" && TEMPLATES[other.dow][other.si].r[other.ri][1] === "Psicofônico") {
-      return "Folga obrigatória: o psicofônico não pode ser fixo na quarta e na sexta.";
-    }
   }
   return null;
 }
@@ -227,30 +223,20 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
   return assignments;
 }
 
-export type Conflict = { id: string; type: "same_day" | "psych_pair"; workerId: string; keys: string[] };
+export type Conflict = { id: string; type: "same_day"; workerId: string; keys: string[] };
 
 export function findConflicts(assignments: ReadonlyMap<string, string>): Conflict[] {
   const conflicts: Conflict[] = [];
   const sameDay = new Map<string, string[]>();
-  const workerSlots: [Slot, string, string][] = [];
   for (const [key, value] of assignments) {
     if (!value.startsWith("w:")) continue;
     const slot = parseSlotKey(key);
     if (!slot) continue;
-    workerSlots.push([slot, key, value]);
     const group = `${slot.dow}|${slot.day}|${value}`;
     sameDay.set(group, [...(sameDay.get(group) ?? []), key]);
   }
   for (const [group, keys] of sameDay) {
     if (keys.length > 1) conflicts.push({ id: `same:${keys.sort().join(":")}`, type: "same_day", workerId: group.split("|")[2].slice(2), keys });
-  }
-  for (const [a, keyA, value] of workerSlots) {
-    if (a.dow !== 3 || roleOf(a).type !== "Psicofônico") continue;
-    for (const [b, keyB, other] of workerSlots) {
-      if (other === value && b.dow === 5 && b.day === a.day + 2 && roleOf(b).type === "Psicofônico") {
-        conflicts.push({ id: `psych:${keyA}::${keyB}`, type: "psych_pair", workerId: value.slice(2), keys: [keyA, keyB] });
-      }
-    }
   }
   return conflicts;
 }
@@ -279,7 +265,7 @@ export function studySequence(studies: readonly ScaleStudy[], chosenId: string, 
 
 /**
  * Valida a escolha manual de uma posição. Duplicidade no mesmo dia é permitida (aparece na conferência);
- * a folga quarta/sexta do psicofônico é bloqueada, como no mock.
+ * psicofônico na quarta e na sexta da mesma semana também: a folga só orienta a geração automática.
  */
 export function validateSlotValue(
   slot: Slot,
@@ -301,17 +287,6 @@ export function validateSlotValue(
   const worker = value.startsWith("w:") ? context.workers.find((w) => w.id === value.slice(2)) : undefined;
   if (!worker) return "Trabalhador sem aprovação da Diretoria ou fora da Doutrina.";
   if (!eligible(worker, type, slot.dow)) return `Trabalhador sem a função ${type} ou indisponível neste dia.`;
-  if (type === "Psicofônico" && (slot.dow === 3 || slot.dow === 5)) {
-    const pairDow = slot.dow === 3 ? 5 : 3;
-    const pairDay = slot.dow === 3 ? slot.day + 2 : slot.day - 2;
-    for (const [key, other] of context.assignments) {
-      if (other !== value) continue;
-      const b = parseSlotKey(key);
-      if (b && b.dow === pairDow && b.day === pairDay && roleOf(b).type === "Psicofônico") {
-        return "Folga obrigatória: o psicofônico trabalha na quarta ou na sexta da mesma semana, não nos dois dias.";
-      }
-    }
-  }
   return null;
 }
 
