@@ -51,6 +51,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     access: { resource: "department", department: "eventos" },
     sections: [
       { slug: "", label: "Painel", panel: "painel" },
+      { slug: "ingressos", label: "Ingressos", panel: "ingressos-atalho" },
       { slug: "agenda", label: "Agenda de Eventos", resource: "eventos-agenda" },
       { slug: "itens", label: "Itens do Evento", resource: "eventos-itens" },
       { slug: "avaliacao", label: "Avaliação do Evento", resource: "eventos-avaliacao" },

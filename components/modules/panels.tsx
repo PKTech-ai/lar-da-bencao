@@ -63,6 +63,8 @@ export function ModulePanel({ name }: { name: string }) {
     case "relatorio-juridico": return <AnnualReport department="juridico" />;
     case "admissoes-atalho": return <Shortcut href="/sistema/admissoes" label="Aprovação de Trabalhadores"
       text="As fichas aguardando decisão ficam no cadastro único de Trabalhadores, com o histórico de cada admissão." />;
+    case "ingressos-atalho": return <Shortcut href="/sistema/ingressos" label="Ingressos"
+      text="Venda de tickets dos eventos beneficentes em 3 toques, entrega da refeição, caixa do evento e metas dos trabalhadores." />;
     case "sugestoes-atalho": return <Shortcut href="/sistema/sugestoes" label="Sugestões e elogios"
       text="Mensagens enviadas pelas pessoas da Casa, com a resposta da Diretoria." />;
     case "conselho-analises": return <FiscalReviewsPanel />;

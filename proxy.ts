@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Rotas com autenticação própria (Bearer/segredo) também ficam fora do redirecionamento de login.
 // /cadastro e /api/public: cadastro online de trabalhadores, sem login (cai numa fila de revisão).
-const publicPaths = ["/login", "/recuperar", "/auth/callback", "/auth/signout", "/api/auth/login", "/api/health", "/api/bootstrap", "/api/maintenance", "/cadastro", "/api/public", "/visual"];
+// /ingressos, /i e /api/ingressos: acesso do trabalhador por link + PIN e página pública dos ingressos.
+// As rotas de /api/ingressos conferem a sessão (login ou acesso do trabalhador) dentro de cada chamada.
+const publicPaths = ["/login", "/recuperar", "/auth/callback", "/auth/signout", "/api/auth/login", "/api/health", "/api/bootstrap", "/api/maintenance", "/cadastro", "/api/public", "/visual",
+  "/ingressos", "/i", "/api/ingressos", "/ingressos.webmanifest"];
 
 export async function proxy(request: NextRequest) {
   if (process.env.VERCEL_ENV === "production" && process.env.APP_URL) {

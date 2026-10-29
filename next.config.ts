@@ -58,7 +58,10 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders
-      }
+      },
+      // Ingressos: página pública e acesso do trabalhador fora dos buscadores.
+      { source: "/i/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      { source: "/ingressos/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] }
     ];
   }
 };

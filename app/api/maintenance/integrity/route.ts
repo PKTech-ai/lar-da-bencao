@@ -4,6 +4,7 @@ import { dbPool, transaction } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { sweepAttachments } from "@/lib/attachment-maintenance";
 import { SUBMISSION_RETENTION_DAYS } from "@/lib/worker-submissions";
+import { logExpiredAccesses } from "@/lib/ingressos/metas";
 
 function validSecret(request: Request) {
   const expected = Buffer.from(`Bearer ${serverEnv().CRON_SECRET}`);
@@ -37,6 +38,8 @@ export async function GET(request: Request) {
     [SUBMISSION_RETENTION_DAYS]
   );
   const submissionsPurged = submissions.rowCount ?? 0;
-  await appendAudit(null, { category: "Segurança", action: "Verificação diária de integridade", module: "Sistema", section: "Auditoria e anexos", result: "success", details: `${result.event_count} evento(s) íntegros; ${removed} upload(s) incompleto(s) removido(s); ${sweep.orphans} anexo(s) órfão(s) descartado(s); ${sweep.quarantinePurged} quarentena(s) antiga(s) sem binário; ${submissionsPurged} cadastro(s) online antigo(s) expurgado(s).` });
+  // Ingressos: acessos temporários de trabalhadores vencidos entram no histórico e as sessões abertas caem.
+  const ticketAccessExpired = await logExpiredAccesses();
+  await appendAudit(null, { category: "Segurança", action: "Verificação diária de integridade", module: "Sistema", section: "Auditoria e anexos", result: "success", details: `${result.event_count} evento(s) íntegros; ${removed} upload(s) incompleto(s) removido(s); ${sweep.orphans} anexo(s) órfão(s) descartado(s); ${sweep.quarantinePurged} quarentena(s) antiga(s) sem binário; ${submissionsPurged} cadastro(s) online antigo(s) expurgado(s); ${ticketAccessExpired} acesso(s) de vendedor de ingressos expirado(s).` });
   return Response.json({ status: "ok", auditEvents: Number(result.event_count), staleUploadsRemoved: removed, submissionsPurged, ...sweep });
 }

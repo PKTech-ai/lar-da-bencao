@@ -1,0 +1,11 @@
+{
+  "name": "Ingressos — Lar da Bênção",
+  "short_name": "Ingressos",
+  "start_url": "/ingressos",
+  "scope": "/ingressos",
+  "display": "standalone",
+  "background_color": "#f8f7f2",
+  "theme_color": "#356f8f",
+  "lang": "pt-BR",
+  "icons": [{ "src": "/marca-lar-da-bencao.png", "sizes": "801x840", "type": "image/png", "purpose": "any" }]
+}

@@ -18,7 +18,10 @@ export type AuditInput = {
   metadata?: Record<string, unknown>;
 };
 
-export async function appendAudit(actor: Actor | null, input: AuditInput, client?: PoolClient) {
+/** Autor sem conta no sistema (ex.: trabalhador que vende ingressos pelo link temporário). */
+export type AuditAuthor = Pick<Actor, "name" | "role"> & { id?: null; authUserId?: null; sessionId?: null };
+
+export async function appendAudit(actor: Actor | AuditAuthor | null, input: AuditInput, client?: PoolClient) {
   const context = await requestContext();
   const executor = client ?? dbPool();
   const result = await executor.query<{ id: string }>(
