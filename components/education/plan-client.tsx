@@ -139,7 +139,7 @@ export function PlanClient({ department }: { department: EducationDepartment }) 
           {canEdit ? <button className="button primary no-print" disabled={busy || !lessonDraft.size} onClick={saveLessons}>{lessonDraft.size ? `Salvar ${lessonDraft.size} aula(s)` : "Tudo salvo"}</button> : null}
         </div>
         <div className="table-wrap" style={{ marginTop: 10 }}>
-          <table>
+          <table data-grid="">
             <thead><tr><th>Data</th><th>Turma</th><th>Tema (cronograma)</th><th>Objetivo da aula</th><th>Referência / material</th><th>Evangelizadores</th><th>Recursos / dinâmica</th><th>Situação</th></tr></thead>
             <tbody>
               {data.lessons.map((l) => (
@@ -195,7 +195,7 @@ export function PlanClient({ department }: { department: EducationDepartment }) 
           </div>
           {!data.saved ? <p className="small muted">Crie o planejamento do ano para incluir itens.</p> : null}
           <div className="table-wrap">
-            <table>
+            <table data-grid="">
               <thead><tr><th>{kind === "special" ? "Data" : "Mês"}</th>{kind === "special" ? <th>Tipo</th> : null}<th>{kind === "special" ? "Atividade" : "Ação"}</th>{kind === "special" ? <><th>Finalidade</th><th>Público / local</th></> : null}<th>Responsável</th><th>{kind === "special" ? "Necessidades" : "Meta"}</th><th>Situação</th>{canEditItems ? <th className="no-print">Ação</th> : null}</tr></thead>
               <tbody>
                 {list.map((i) => (

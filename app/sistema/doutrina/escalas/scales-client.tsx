@@ -242,7 +242,7 @@ export function ScalesClient() {
             <div key={section.n + si}>
               <h3>{section.n}</h3>
               <div className="table-wrap">
-                <table>
+                <table data-grid="">
                   <thead><tr><th>DIAS</th>{dates.map((day) => <th key={day}>{String(day).padStart(2, "0")}</th>)}</tr></thead>
                   <tbody>
                     {section.r.map(([label], ri) => (

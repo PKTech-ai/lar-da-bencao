@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useShowMore } from "@/components/show-more";
 
 type Option = { key: string; label: string };
 type User = { id: string; email: string; full_name: string; role_key: string; status: string; departments: string[]; version: number; invite_pending: boolean | null; last_login: string | null; biennium_id: string | null; worker_id: string | null; access_allowed: boolean; admissions_access: boolean };
@@ -10,6 +11,10 @@ type Payload = { users: User[]; roles: Option[]; departments: Option[]; biennium
 export function UserManager() {
   const [data, setData] = useState<Payload>({ users: [], roles: [], departments: [], bienniums: [], workers: [] });
   const [editing, setEditing] = useState<User | null>(null);
+  const [search, setSearch] = useState("");
+  const term = search.trim().toLocaleLowerCase("pt-BR");
+  const users = data.users.filter((u) => !term || `${u.full_name} ${u.email}`.toLocaleLowerCase("pt-BR").includes(term));
+  const more = useShowMore(users.length, term);
   const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const load = useCallback(async () => { const response = await fetch("/api/users", { cache: "no-store" }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setData(body); }, []);
   // A carga inicial é a sincronização desta tela cliente com a API protegida.
@@ -87,9 +92,9 @@ export function UserManager() {
   </>;
 
   return <div className="grid">
-    <section className="card"><h2>Convidar usuário</h2><form className="form-stack" onSubmit={create}>{fields()}<button className="button primary" disabled={busy}>Enviar convite</button></form></section>
+    <details className="card"><summary><h2 style={{ display: "inline" }}>+ Convidar usuário</h2></summary><form className="form-stack" style={{ marginTop: 16 }} onSubmit={create}>{fields()}<button className="button primary" disabled={busy}>Enviar convite</button></form></details>
     {editing ? <section className="card"><div className="toolbar"><h2>Editar acesso</h2><button className="button" onClick={() => setEditing(null)}>Cancelar</button></div><form className="form-stack" key={editing.id} onSubmit={save}>{fields(editing)}<button className="button primary" disabled={busy}>Salvar alteração</button></form></section> : null}
     {error ? <div className="error" role="alert">{error}</div> : null}{message ? <div className="success">{message}</div> : null}
-    <section className="card"><h2>Contas institucionais</h2><div className="table-wrap"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Departamentos</th><th>Admissão</th><th>Situação</th><th>Acesso</th><th>Ação</th></tr></thead><tbody>{data.users.map((user) => <tr key={user.id}><td><strong>{user.full_name}</strong><br/><span className="muted">{user.email}</span></td><td>{data.roles.find((role) => role.key === user.role_key)?.label ?? user.role_key}</td><td>{user.departments.map((key) => data.departments.find((d) => d.key === key)?.label ?? key).join(", ") || "—"}</td><td>{user.admissions_access || user.role_key === "administrador" || user.role_key === "presidente" ? "Sim" : "Não"}</td><td>{user.status}{user.access_allowed === false ? <><br /><span className="status blocked">Fora do biênio</span></> : null}</td><td className="small">{user.invite_pending ? <span className="status building">Convite pendente</span> : null}<br />{user.last_login ? `Último acesso: ${new Date(user.last_login).toLocaleString("pt-BR")}` : "Nunca acessou"}</td><td><button className="button" onClick={() => setEditing(user)}>Editar</button>{user.invite_pending ? <> <button className="button" disabled={busy} onClick={() => void resendInvite(user)}>Reenviar convite</button></> : null} <button className="button danger" disabled={busy} onClick={() => void revokeSessions(user.id)}>Encerrar sessões</button></td></tr>)}</tbody></table></div></section>
+    <section className="card"><h2>Contas institucionais</h2><label className="filters">Buscar<input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome ou e-mail" /></label><div className="table-wrap"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Departamentos</th><th>Admissão</th><th>Situação</th><th>Acesso</th><th>Ação</th></tr></thead><tbody>{users.map((user, i) => <tr key={user.id} {...more.extra(i)}><td><strong>{user.full_name}</strong><br/><span className="muted">{user.email}</span></td><td>{data.roles.find((role) => role.key === user.role_key)?.label ?? user.role_key}</td><td>{user.departments.map((key) => data.departments.find((d) => d.key === key)?.label ?? key).join(", ") || "—"}</td><td>{user.admissions_access || user.role_key === "administrador" || user.role_key === "presidente" ? "Sim" : "Não"}</td><td>{user.status}{user.access_allowed === false ? <><br /><span className="status blocked">Fora do biênio</span></> : null}</td><td className="small">{user.invite_pending ? <span className="status building">Convite pendente</span> : null}<br />{user.last_login ? `Último acesso: ${new Date(user.last_login).toLocaleString("pt-BR")}` : "Nunca acessou"}</td><td><button className="button" onClick={() => setEditing(user)}>Editar</button>{user.invite_pending ? <> <button className="button" disabled={busy} onClick={() => void resendInvite(user)}>Reenviar convite</button></> : null} <button className="button danger" disabled={busy} onClick={() => void revokeSessions(user.id)}>Encerrar sessões</button></td></tr>)}</tbody></table></div>{more.button}</section>
   </div>;
 }

@@ -34,7 +34,7 @@ export function AnnualReport({ department }: { department: string }) {
       <section className="card">
         <h3>Movimento do ano</h3>
         <div className="table-wrap">
-          <table>
+          <table data-grid="">
             <thead><tr><th>Cadastro</th>{MONTHS.map((m) => <th key={m}>{m}</th>)}<th>Total</th></tr></thead>
             <tbody>
               {(report?.rows ?? []).map((row) => (

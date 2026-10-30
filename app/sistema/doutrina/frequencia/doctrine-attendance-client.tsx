@@ -90,7 +90,7 @@ export function DoctrineAttendanceClient() {
           <section className="card scale-sheet" key={dow}>
             <div className="toolbar"><strong>{config.label}</strong><span className="small muted">{DAY_HOURS[dow]} · {days.length} encontro(s)</span></div>
             <div className="table-wrap">
-              <table>
+              <table data-grid="">
                 <thead><tr><th>Atividade / classificação</th>{dates.map((d) => <th key={d}>{br(d)}</th>)}</tr></thead>
                 <tbody>
                   {config.rows.map((row) => "section" in row ? (

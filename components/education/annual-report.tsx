@@ -41,14 +41,14 @@ export async function AnnualReport({ department, year, groups }: { department: E
         <article className="card kpi"><span className="small muted">Ações de organização concluídas</span><b>{byStatus("management", "Realizado")} / {byStatus("management")}</b></article>
       </div>
       <h3>Matrículas por {label.toLowerCase()}</h3>
-      <div className="table-wrap"><table>
+      <div className="table-wrap"><table data-grid="">
         <thead><tr><th>{label}</th><th>Faixa etária</th><th>Evangelizandos</th></tr></thead>
         <tbody>{GROUPS[department].filter((g) => !groups || groups.includes(g.name)).map((g) => (
           <tr key={g.name}><td>{g.name}</td><td>{g.ages}</td><td>{students.filter((s) => s.current_group === g.name).length}</td></tr>
         ))}</tbody>
       </table></div>
       <h3>Frequência mensal</h3>
-      <div className="table-wrap"><table>
+      <div className="table-wrap"><table data-grid="">
         <thead><tr><th>Mês</th><th>Presenças</th><th>Faltas</th><th>Frequência</th></tr></thead>
         <tbody>{attendance.rows.map((r) => (
           <tr key={r.month}><td>{MONTHS[r.month - 1]}</td><td>{r.present}</td><td>{r.absent}</td><td>{r.present + r.absent ? `${Math.round((r.present / (r.present + r.absent)) * 100)}%` : "—"}</td></tr>

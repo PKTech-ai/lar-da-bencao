@@ -233,7 +233,7 @@ export function TreasuryAccountsPanel() {
       <section className="card">
         <div className="toolbar"><h3>Plano de contas</h3><button type="button" className="button no-print" onClick={() => window.print()}>⎙ Imprimir</button></div>
         <div className="table-wrap">
-          <table>
+          <table data-grid="">
             <thead><tr><th>Código</th><th>Conta</th><th>Natureza</th><th>Grupo</th><th>Recebe lançamento</th></tr></thead>
             <tbody>
               {accounts.map((a) => (

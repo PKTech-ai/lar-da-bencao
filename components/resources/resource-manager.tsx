@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { RESOURCES } from "@/lib/resources/registry";
+import { useShowMore } from "@/components/show-more";
 import { MaskedInput } from "@/components/masked-input";
 import { maskPhoneInput } from "@/lib/input-masks";
 import { completeMoneyInput, maskMoneyInput, brDate, fieldDisplay, formatMoney, parseMoney, type Field, type ResourceDef } from "@/lib/resources/types";
@@ -91,6 +92,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
   const [q, setQ] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [archived, setArchived] = useState("");
+  const more = useShowMore(rows.length, `${q}|${JSON.stringify(filters)}|${archived}`);
   const [editing, setEditing] = useState<{ row: Row | null; edit: boolean } | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [pending, setPending] = useState<{ kind: string; file: File }[]>([]);
@@ -348,8 +350,8 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
           <table>
             <thead><tr>{listFields.map((f) => <th key={f.name}>{f.label}</th>)}{extraColumns.map((c) => <th key={c.label}>{c.label}</th>)}<th className="no-print">Ações</th></tr></thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} style={r.archived_at ? { opacity: 0.6 } : undefined}>
+              {rows.map((r, index) => (
+                <tr key={r.id} style={r.archived_at ? { opacity: 0.6 } : undefined} {...more.extra(index)}>
                   {listFields.map((f, i) => <td key={f.name}>{i === 0 ? <strong>{fieldDisplay(f, r[f.name], lookups)}</strong> : fieldDisplay(f, r[f.name], lookups)}</td>)}
                   {extraColumns.map((c) => <td key={c.label}>{c.render(r)}</td>)}
                   <td className="no-print">
@@ -364,6 +366,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
             </tbody>
           </table>
         </div>
+        {more.button}
         <p className="small muted">{rows.length} registro(s){def.fields.some((f) => f.type === "money") ? ` · total ${formatMoney(rows.reduce((s, r) => s + Number(def.fields.filter((f) => f.type === "money").map((f) => r[f.name] ?? 0)[0] ?? 0), 0))}` : ""}</p>
       </section>
     </div>

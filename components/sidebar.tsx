@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { NavIcon } from "@/components/nav-icon";
@@ -10,6 +10,18 @@ import { adminTools, type ToolCapabilities } from "@/lib/admin-tools";
 import { createClient } from "@/lib/supabase/client";
 
 export type NavCapability = ToolCapabilities;
+
+/**
+ * Menu recolhido (só ícones): a escolha da pessoa fica no aparelho; sem escolha, recolhe em telas de até 1199 px
+ * (tablet). O atributo `data-sidebar` do <html> é definido antes da pintura, em app/layout.tsx.
+ */
+export const SIDEBAR_KEY = "sidebar-collapsed";
+const subscribeSidebar = (onChange: () => void) => {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-sidebar"] });
+  return () => observer.disconnect();
+};
+const sidebarCollapsed = () => document.documentElement.dataset.sidebar === "collapsed";
 
 const DIRETORIA = ["/sistema/presidencia", "/sistema/secretaria", "/sistema/tesouraria"];
 // Trabalhadores fica dentro da Secretaria (aba própria); a tela /sistema/trabalhadores continua para os atalhos.
@@ -47,7 +59,7 @@ function NavItem({ href, label, current }: { href: string; label: string; curren
 export function Sidebar({ capabilities }: { actor: { name: string; role: string; email: string }; capabilities: NavCapability }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const collapsed = useSyncExternalStore(subscribeSidebar, sidebarCollapsed, () => false);
   // No celular o menu fica fechado atrás do botão "Menu" para a tela começar no conteúdo.
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -73,16 +85,10 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
       return (left === -1 ? 99 : left) - (right === -1 ? 99 : right);
     });
 
-  useEffect(() => {
-    setCollapsed(localStorage.getItem("sidebar-collapsed") === "1");
-  }, []);
-
   function toggleCollapsed() {
-    setCollapsed((current) => {
-      const next = !current;
-      localStorage.setItem("sidebar-collapsed", next ? "1" : "0");
-      return next;
-    });
+    const next = !sidebarCollapsed();
+    document.documentElement.dataset.sidebar = next ? "collapsed" : "open";
+    try { localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0"); } catch { /* sem armazenamento */ }
   }
 
   async function logout(scope: "local" | "global") {
@@ -98,7 +104,7 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
   }
 
   return (
-    <aside className={`${collapsed ? "sidebar is-collapsed" : "sidebar"}${menuOpen ? " menu-open" : ""}`}>
+    <aside className={`sidebar${menuOpen ? " menu-open" : ""}`}>
       <button className="sidebar-collapse" type="button" aria-pressed={collapsed} aria-label={collapsed ? "Expandir menu" : "Recolher menu"} onClick={toggleCollapsed}>
         <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h16"/></svg></span>
         <span className="nav-label">{collapsed ? "Expandir" : "Recolher"}</span>
@@ -131,6 +137,10 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
         {tools.map((tool) => <NavItem key={tool.href} href={tool.href} label={tool.label} current={current(tool.href)} />)}
       </nav>
       <div className="sidebar-session">
+        {/* No celular o topo do sistema fica oculto: Minha área vem para o menu. */}
+        <Link className="button mobile-only" href="/sistema/conta" onClick={() => setMenuOpen(false)}>
+          <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span><span className="nav-label">Minha área</span>
+        </Link>
         {show("Sair deste aparelho") ? <button className="button" type="button" title="Sair deste aparelho" onClick={() => void logout("local")}><span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 7V4h10v16H10v-3M4 12h11m0 0-3-3m3 3-3 3"/></svg></span><span className="nav-label">Sair deste aparelho</span></button> : null}
         {show("Sair de todos os aparelhos") ? <button className="button" type="button" title="Sair de todos os aparelhos" onClick={() => void logout("global")}><span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7V4h11v16H9v-3M3 12h12m0 0-3-3m3 3-3 3"/></svg></span><span className="nav-label">Sair de todos os aparelhos</span></button> : null}
         {show("Tema") ? <ThemeToggle /> : null}

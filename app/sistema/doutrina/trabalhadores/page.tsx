@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ShowMoreRows } from "@/components/show-more";
 import { query } from "@/lib/db";
 import { requireModulePage } from "@/lib/page-auth";
 import { WEEKDAYS, workerStatusLabel, workerStatusTone, type WorkerStatus } from "@/lib/worker-constants";
@@ -20,18 +21,16 @@ export default async function DoutrinaWorkersPage() {
         <div className="table-wrap">
           <table>
             <thead><tr><th>Nome</th><th>Funções</th><th>Dias</th><th>WhatsApp</th><th>Situação</th></tr></thead>
-            <tbody>
-              {rows.rows.map((w) => (
-                <tr key={w.id}>
-                  <td><strong>{w.full_name}</strong></td>
-                  <td>{w.functions.join(", ") || "—"}</td>
-                  <td>{w.available_days.map((d) => WEEKDAYS[d].slice(0, 3)).join(", ")}</td>
-                  <td>{w.phone ?? "—"}</td>
-                  <td><span className={`status ${workerStatusTone[w.status]}`}>{workerStatusLabel[w.status]}</span></td>
-                </tr>
-              ))}
-              {!rows.rowCount ? <tr><td colSpan={5}>Nenhum trabalhador vinculado à Doutrina.</td></tr> : null}
-            </tbody>
+            <ShowMoreRows columns={5} empty="Nenhum trabalhador vinculado à Doutrina." rows={rows.rows.map((w) => ({
+              key: w.id,
+              cells: [
+                <strong key="n">{w.full_name}</strong>,
+                w.functions.join(", ") || "—",
+                w.available_days.map((d) => WEEKDAYS[d].slice(0, 3)).join(", "),
+                w.phone ?? "—",
+                <span key="s" className={`status ${workerStatusTone[w.status]}`}>{workerStatusLabel[w.status]}</span>
+              ]
+            }))} />
           </table>
         </div>
       </section>

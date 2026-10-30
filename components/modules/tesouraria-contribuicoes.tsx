@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, postJson, todayLocal } from "@/lib/client-api";
 import { PAYMENT_METHODS } from "@/lib/resources/defs/tesouraria";
 import { MaskedInput } from "@/components/masked-input";
+import { useShowMore } from "@/components/show-more";
 import { brDate, completeMoneyInput, formatMoney, maskMoneyInput, parseMoney } from "@/lib/resources/types";
 
 type Row = {
@@ -35,6 +36,7 @@ export function ContributionsPanel() {
   useEffect(() => { void load(); }, [load]);
 
   const visible = rows.filter((row) => !q.trim() || row.full_name.toLowerCase().includes(q.trim().toLowerCase()));
+  const more = useShowMore(visible.length, `${q}|${month}`);
   const expected = visible.reduce((sum, row) => sum + Number(row.expected_cents), 0);
   const paid = visible.reduce((sum, row) => sum + Number(row.paid_cents), 0);
   const paidCount = visible.filter((row) => Number(row.paid_cents) > 0).length;
@@ -121,8 +123,8 @@ export function ContributionsPanel() {
           <table>
             <thead><tr><th>Pessoa</th><th>Dia previsto</th><th>Combinado</th><th>Recebido</th><th>Data / forma</th><th className="no-print">Ação</th></tr></thead>
             <tbody>
-              {visible.map((row) => (
-                <tr key={row.worker_id}>
+              {visible.map((row, i) => (
+                <tr key={row.worker_id} {...more.extra(i)}>
                   <td><strong>{row.full_name}</strong></td>
                   <td>{row.contribution_due_day ?? "—"}</td>
                   <td>{formatMoney(row.expected_cents)}</td>
@@ -139,6 +141,7 @@ export function ContributionsPanel() {
             </tbody>
           </table>
         </div>
+        {more.button}
       </section>
     </div>
   );

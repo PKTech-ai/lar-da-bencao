@@ -80,7 +80,7 @@ export function EducationAttendanceClient({ department }: { department: Educatio
       {data && data.dates.length ? (
         <section className="card scale-sheet">
           <div className="table-wrap">
-            <table>
+            <table data-grid="">
               <thead><tr><th>Evangelizando</th><th>{department === "infancia" ? "Turma" : "Grupo"}</th>{data.dates.map((d) => <th key={d}>{d.slice(8)}/{d.slice(5, 7)}</th>)}<th>P</th><th>F</th><th>Freq.</th></tr></thead>
               <tbody>
                 {students.map((s) => {

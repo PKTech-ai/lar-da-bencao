@@ -97,7 +97,7 @@ export function AccessMatrix({ canSimulate }: { canSimulate: boolean }) {
             O Administrador enxerga tudo e não aparece na matriz.
           </p>
           <div className="table-wrap">
-            <table>
+            <table data-grid="">
               <thead><tr><th>Perfil</th>{pages.map((p) => <th key={p.key}>{p.label}</th>)}</tr></thead>
               <tbody>
                 {roles.filter((r) => r.key !== "administrador").map((role) => (

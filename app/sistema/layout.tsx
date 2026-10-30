@@ -1,3 +1,4 @@
+import { ResponsiveTables } from "@/components/responsive-tables";
 import { Sidebar } from "@/components/sidebar";
 import { SystemBar } from "@/components/system-bar";
 import { SystemFeedback } from "@/components/system-feedback";
@@ -18,6 +19,7 @@ export default async function SystemLayout({ children }: Readonly<{ children: Re
       <main className="app-main">
         <SystemBar actor={actor} roleLabel={nav.roleLabel} capabilities={nav.capabilities} />
         <SystemFeedback />
+        <ResponsiveTables />
         {env.production ? null : (
           <details className="lar-demo-note">
             <summary>Ambiente de teste · dados fictícios</summary>

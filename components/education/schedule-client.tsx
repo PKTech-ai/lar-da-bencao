@@ -64,7 +64,7 @@ export function ScheduleClient({ department }: { department: EducationDepartment
       {!rows.length ? <div className="notice">Sem aulas neste mês (recesso de janeiro e fevereiro).</div> : (
         <section className="card">
           <div className="table-wrap">
-            <table>
+            <table data-grid="">
               <thead><tr><th>Data</th><th>Dia</th><th>{department === "infancia" ? "Turma" : "Grupo"}</th><th>Tema / atividade</th><th>Evangelizadores</th></tr></thead>
               <tbody>
                 {rows.map((row) => {

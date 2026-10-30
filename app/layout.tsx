@@ -8,7 +8,8 @@ export const metadata: Metadata = {
 };
 
 // O visual aprovado é o claro. O tema escuro só entra quando a pessoa escolhe no menu.
-const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();`;
+// Menu lateral: a escolha salva no aparelho vale; sem escolha, fica recolhido em telas de 721 a 1199 px (tablet); no celular o menu abre pelo botão Menu.
+const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t);}catch(e){}var s=null;try{s=localStorage.getItem("sidebar-collapsed");}catch(e){}var w=window.innerWidth;d.setAttribute("data-sidebar",w>720&&(s==="1"||(s===null&&w<1200))?"collapsed":"open");})();`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

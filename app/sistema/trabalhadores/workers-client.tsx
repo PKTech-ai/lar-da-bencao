@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useShowMore } from "@/components/show-more";
 import { readFicha, WorkerFichaForm, type FichaValues, type Option } from "@/components/worker-ficha-form";
 import { formatMoney } from "@/lib/resources/types";
 import { workerStatusLabel, workerStatusTone, type WorkerStatus } from "@/lib/worker-constants";
@@ -125,6 +126,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
   const current = workers.find((w) => w.id === openId) ?? null;
   const term = search.trim().toLocaleLowerCase("pt-BR");
   const visible = workers.filter((w) => !term || [w.full_name, ...w.departments.map(label), ...w.functions].join(" ").toLocaleLowerCase("pt-BR").includes(term));
+  const more = useShowMore(visible.length, `${term}|${status}|${department}`);
   const editNotice = editing?.status === "pending" || editing?.status === "rejected"
     ? "Esta ficha ainda não está aprovada. Ao salvar, ela é aprovada e o trabalhador fica ativo."
     : editing?.status === "active" || editing?.status === "inactive"
@@ -202,8 +204,8 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
           <table>
             <thead><tr><th>Nome</th><th>Departamentos</th><th>Funções (Doutrina)</th><th>Contribuição</th><th>Situação</th><th>Ações</th></tr></thead>
             <tbody>
-              {visible.map((w) => (
-                <tr key={w.id}>
+              {visible.map((w, i) => (
+                <tr key={w.id} {...more.extra(i)}>
                   <td><strong>{w.full_name}</strong><br /><span className="muted small">{w.phone || "—"}</span></td>
                   <td>{w.departments.map(label).join(", ")}<br /><span className="muted small">Solicitante: {w.origin_department ? label(w.origin_department) : "—"}</span></td>
                   <td>{w.functions.join(", ") || "—"}</td>
@@ -218,6 +220,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
             </tbody>
           </table>
         </div>
+        {more.button}
       </section>
     </div>
   );
