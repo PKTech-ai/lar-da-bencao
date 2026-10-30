@@ -47,6 +47,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/sistema/trabalhadores/cadastros-online", destination: "/sistema/admissoes/cadastros-online", permanent: false },
+      // Eventos: itens, escala e avaliação passaram para dentro do evento.
+      { source: "/sistema/eventos/:secao(itens|escala|avaliacao)", destination: "/sistema/eventos/evento", permanent: false },
       { source: "/sistema/trabalhadores/cadastros-online/:path*", destination: "/sistema/admissoes/cadastros-online/:path*", permanent: false }
     ];
   },

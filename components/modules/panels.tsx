@@ -15,6 +15,8 @@ import { DisposalsPanel } from "@/components/modules/patrimonio-baixas";
 import { CleaningPanel } from "@/components/modules/patrimonio-limpeza";
 import { PatrimonyReport } from "@/components/modules/patrimonio-relatorio";
 import { ServiceOrdersPanel } from "@/components/modules/ordens-servico";
+import { EventoCompleto } from "@/components/modules/eventos-evento";
+import { LivrariaVendas } from "@/components/modules/livraria-venda";
 
 /** Aba que leva para uma tela já existente, sem duplicar cadastro. */
 function Shortcut({ href, label, text }: { href: string; label: string; text: string }) {
@@ -62,6 +64,8 @@ export function ModulePanel({ name }: { name: string }) {
     case "relatorio-juridico": return <AnnualReport department="juridico" />;
     case "admissoes-atalho": return <Shortcut href="/sistema/admissoes" label="Aprovação de Trabalhadores"
       text="As fichas aguardando decisão ficam no cadastro único de Trabalhadores, com o histórico de cada admissão." />;
+    case "eventos-evento": return <EventoCompleto />;
+    case "divulgacao-vendas": return <LivrariaVendas />;
     case "ingressos-atalho": return <Shortcut href="/sistema/ingressos" label="Ingressos"
       text="Venda de tickets dos eventos beneficentes em 3 toques, entrega da refeição, caixa do evento e metas dos trabalhadores." />;
     case "sugestoes-atalho": return <Shortcut href="/sistema/sugestoes" label="Sugestões e elogios"

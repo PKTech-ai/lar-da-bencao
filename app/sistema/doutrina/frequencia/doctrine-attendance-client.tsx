@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMobileDay } from "@/components/mobile-day-columns";
 import { ATTENDANCE_CONFIG, ATTENDANCE_DOWS, type AttendanceValue } from "@/lib/doutrina-attendance";
 import { DAY_HOURS, monthDays } from "@/lib/doutrina-scale";
 
@@ -87,11 +88,13 @@ export function DoctrineAttendanceClient() {
         if (!days.length) return null;
         const dates = days.map((day) => `${ym}-${String(day).padStart(2, "0")}`);
         return (
-          <section className="card scale-sheet" key={dow}>
+          <AttendanceDay key={dow} dates={dates}>{(scope, picker) => (
+          <section className={`card scale-sheet ${scope}`}>
             <div className="toolbar"><strong>{config.label}</strong><span className="small muted">{DAY_HOURS[dow]} · {days.length} encontro(s)</span></div>
+            {picker}
             <div className="table-wrap">
               <table data-grid="">
-                <thead><tr><th>Atividade / classificação</th>{dates.map((d) => <th key={d}>{br(d)}</th>)}</tr></thead>
+                <thead><tr><th>Atividade / classificação</th>{dates.map((d) => <th key={d} data-day={d}>{br(d)}</th>)}</tr></thead>
                 <tbody>
                   {config.rows.map((row) => "section" in row ? (
                     <tr key={row.section}><td colSpan={dates.length + 1}><strong>{row.section}</strong></td></tr>
@@ -101,7 +104,7 @@ export function DoctrineAttendanceClient() {
                       {dates.map((date) => {
                         const key = `${date}|${row.id}`;
                         return (
-                          <td key={date}>
+                          <td key={date} data-day={date}>
                             <input type="number" min={0} step={1} inputMode="numeric" disabled={!canEdit} value={cell(key)}
                               aria-label={`${row.label} em ${br(date)}`}
                               onChange={(e) => setDraft((current) => new Map(current).set(key, e.target.value))} style={{ minHeight: 36, width: 80 }} />
@@ -110,14 +113,22 @@ export function DoctrineAttendanceClient() {
                       })}
                     </tr>
                   ))}
-                  <tr><td><strong>TOTAL DO DIA</strong><br /><span className="small muted">Soma automática</span></td>{dates.map((date) => <td key={date}><strong>{dayTotal(date, dow)}</strong></td>)}</tr>
+                  <tr><td><strong>TOTAL DO DIA</strong><br /><span className="small muted">Soma automática</span></td>{dates.map((date) => <td key={date} data-day={date}><strong>{dayTotal(date, dow)}</strong></td>)}</tr>
                 </tbody>
               </table>
             </div>
           </section>
+          )}</AttendanceDay>
         );
       })}
       <p className="small muted">O total do dia é a soma das participações nas atividades. Uma pessoa em mais de uma atividade pode aparecer mais de uma vez na soma.</p>
     </div>
   );
+}
+
+/** Celular: uma data por vez em cada folha de frequência. */
+function AttendanceDay({ dates, children }: { dates: string[]; children: (scope: string, picker: ReactNode) => ReactNode }) {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const mobile = useMobileDay(dates.map((d) => ({ key: d, label: `${d.slice(8)}/${d.slice(5, 7)}` })), today);
+  return <>{children(mobile.scope, mobile.picker)}</>;
 }

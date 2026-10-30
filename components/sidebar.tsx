@@ -16,6 +16,7 @@ export type NavCapability = ToolCapabilities;
  * (tablet). O atributo `data-sidebar` do <html> é definido antes da pintura, em app/layout.tsx.
  */
 export const SIDEBAR_KEY = "sidebar-collapsed";
+const CONFIG_TOOLS = new Set(["/sistema/auditoria", "/sistema/anexos", "/sistema/usuarios", "/sistema/instituicao", "/sistema/modulos", "/sistema/importacao"]);
 const subscribeSidebar = (onChange: () => void) => {
   const observer = new MutationObserver(onChange);
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-sidebar"] });
@@ -75,6 +76,11 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
     return mod && show(label) ? [{ ...mod, label }] : [];
   });
   const tools = adminTools(capabilities).filter((tool) => show(tool.label));
+  // Ferramentas de administração ficam juntas em "Configurações" (fechado, abre quando uma delas está aberta).
+  const settings = [
+    ...(capabilities.users && show("Controle de Acesso") ? [{ href: "/sistema/acesso", label: "Controle de Acesso" }] : []),
+    ...tools.filter((tool) => CONFIG_TOOLS.has(tool.href))
+  ];
   const rest = capabilities.modules
     .filter((mod) => !PLACED.has(mod.href) && !(mod.href === IN_SECRETARIA && byHref.has("/sistema/secretaria")))
     .map((mod) => ({ ...mod, label: menuLabel(mod.href, mod.label) }))
@@ -123,7 +129,6 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
         {show("Demonstração") ? <NavItem href="/visual" label="Demonstração" current={false} /> : null}
         {documentos && show(documentos.label) ? <NavItem href={documentos.href} label={documentos.label} current={current(documentos.href)} /> : null}
         {show("Organograma") ? <NavItem href="/sistema/organograma" label="Organograma" current={current("/sistema/organograma")} /> : null}
-        {capabilities.users && show("Controle de Acesso") ? <NavItem href="/sistema/acesso" label="Controle de Acesso" current={current("/sistema/acesso")} /> : null}
         {diretoria.length ? (
           <details className="nav-group" open>
             <summary><span className="nav-label">Diretoria</span></summary>
@@ -134,7 +139,18 @@ export function Sidebar({ capabilities }: { actor: { name: string; role: string;
         ) : null}
         {conselho && show(conselho.label) ? <NavItem href={conselho.href} label={conselho.label} current={current(conselho.href)} /> : null}
         {rest.map((mod) => <NavItem key={mod.href} href={mod.href} label={mod.label} current={current(mod.href)} />)}
-        {tools.map((tool) => <NavItem key={tool.href} href={tool.href} label={tool.label} current={current(tool.href)} />)}
+        {tools.filter((tool) => !CONFIG_TOOLS.has(tool.href)).map((tool) => <NavItem key={tool.href} href={tool.href} label={tool.label} current={current(tool.href)} />)}
+        {settings.length ? (
+          <details className="nav-group settings-group" open={settings.some((tool) => current(tool.href)) || Boolean(needle)}>
+            <summary title="Configurações">
+              <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+              <span className="nav-label">Configurações</span>
+            </summary>
+            <div className="diretoria-nav-items">
+              {settings.map((tool) => <NavItem key={tool.href} href={tool.href} label={tool.label} current={current(tool.href)} />)}
+            </div>
+          </details>
+        ) : null}
       </nav>
       <div className="sidebar-session">
         {/* No celular o topo do sistema fica oculto: Minha área vem para o menu. */}

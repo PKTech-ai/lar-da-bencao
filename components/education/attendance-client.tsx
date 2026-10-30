@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMobileDay } from "@/components/mobile-day-columns";
 import { attendanceSummary, type EducationDepartment, type Mark } from "@/lib/education";
 
 type Payload = { dates: string[]; students: { id: string; full_name: string; group: string }[]; marks: { evangelizando_id: string; date: string; mark: Mark }[]; canEdit?: boolean };
@@ -36,6 +37,14 @@ export function EducationAttendanceClient({ department }: { department: Educatio
   const students = (data?.students ?? []).filter((s) => !group || s.group === group);
   const allMarks = students.flatMap((s) => (data?.dates ?? []).map((d) => value(`${s.id}|${d}`)).filter(Boolean).map((mark) => ({ evangelizando_id: s.id, mark: mark as Mark })));
   const summary = attendanceSummary(allMarks);
+  // Celular: um domingo por vez (o de hoje ou o último que passou), com "Todos presentes".
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const mobile = useMobileDay((data?.dates ?? []).map((d) => ({ key: d, label: `${d.slice(8)}/${d.slice(5, 7)}` })), today);
+  const allPresent = () => setDraft((current) => {
+    const next = new Map(current);
+    for (const s of students) if (!value(`${s.id}|${mobile.day}`)) next.set(`${s.id}|${mobile.day}`, "P");
+    return next;
+  });
 
   async function save() {
     setBusy(true); setError(""); setMessage("");
@@ -78,10 +87,16 @@ export function EducationAttendanceClient({ department }: { department: Educatio
       </div>
       {data && !data.dates.length ? <div className="notice">Sem aulas neste mês (recesso de janeiro e fevereiro).</div> : null}
       {data && data.dates.length ? (
-        <section className="card scale-sheet">
+        <section className={`card scale-sheet ${mobile.scope}`}>
+          {mobile.picker}
+          {canEdit && mobile.day ? (
+            <button type="button" className="button mobile-flex no-print" style={{ marginBottom: 10, width: "100%" }} disabled={busy} onClick={allPresent}>
+              Marcar presentes os que estão sem chamada em {mobile.day.slice(8)}/{mobile.day.slice(5, 7)}
+            </button>
+          ) : null}
           <div className="table-wrap">
             <table data-grid="">
-              <thead><tr><th>Evangelizando</th><th>{department === "infancia" ? "Turma" : "Grupo"}</th>{data.dates.map((d) => <th key={d}>{d.slice(8)}/{d.slice(5, 7)}</th>)}<th>P</th><th>F</th><th>Freq.</th></tr></thead>
+              <thead><tr><th>Evangelizando</th><th>{department === "infancia" ? "Turma" : "Grupo"}</th>{data.dates.map((d) => <th key={d} data-day={d}>{d.slice(8)}/{d.slice(5, 7)}</th>)}<th className="hide-mobile">P</th><th className="hide-mobile">F</th><th>Freq.</th></tr></thead>
               <tbody>
                 {students.map((s) => {
                   const marks = data.dates.map((d) => value(`${s.id}|${d}`));
@@ -95,14 +110,14 @@ export function EducationAttendanceClient({ department }: { department: Educatio
                         const key = `${s.id}|${d}`;
                         const mark = value(key);
                         return (
-                          <td key={d}>
-                            <button type="button" className={`button${mark === "P" ? " primary" : mark === "F" ? " danger" : ""}`} disabled={!canEdit || busy}
+                          <td key={d} data-day={d}>
+                            <button type="button" className={`button attendance-mark${mark === "P" ? " primary" : mark === "F" ? " danger" : ""}`} disabled={!canEdit || busy}
                               aria-label={`${s.full_name} em ${d}: ${mark || "sem chamada"}`} style={{ minHeight: 36, minWidth: 44, padding: "4px 8px" }}
                               onClick={() => setDraft((current) => new Map(current).set(key, cycle[mark]))}>{mark || "—"}</button>
                           </td>
                         );
                       })}
-                      <td>{p}</td><td>{f}</td><td>{p + f ? `${Math.round((p / (p + f)) * 100)}%` : "—"}</td>
+                      <td className="hide-mobile">{p}</td><td className="hide-mobile">{f}</td><td>{p + f ? `${Math.round((p / (p + f)) * 100)}%` : "—"}</td>
                     </tr>
                   );
                 })}

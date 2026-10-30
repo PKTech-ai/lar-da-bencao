@@ -14,6 +14,8 @@ export type ModuleSection = {
   access?: SectionAccess;
   /** Flag própria da aba, além da do módulo. */
   flag?: string;
+  /** Abas do mesmo grupo viram uma aba só, com sub-abas dentro (ex.: Assistência). */
+  group?: string;
 };
 
 export type ModulePage = {
@@ -52,10 +54,9 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     sections: [
       { slug: "", label: "Painel", panel: "painel" },
       { slug: "ingressos", label: "Ingressos", panel: "ingressos-atalho" },
+      // Itens, escala e avaliação ficam dentro do evento (aba "Evento").
+      { slug: "evento", label: "Evento", panel: "eventos-evento" },
       { slug: "agenda", label: "Agenda de Eventos", resource: "eventos-agenda" },
-      { slug: "itens", label: "Itens do Evento", resource: "eventos-itens" },
-      { slug: "avaliacao", label: "Avaliação do Evento", resource: "eventos-avaliacao" },
-      { slug: "escala", label: "Escala de Trabalho", resource: "eventos-escala" },
       { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-eventos" },
       { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-eventos" },
       { slug: "os", label: "Ordens de Serviço", panel: "os-eventos", flag: "module_patrimonio" }
@@ -69,22 +70,22 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     access: { resource: "department", department: "assistencia_social" },
     sections: [
       { slug: "", label: "Painel", panel: "painel" },
-      { slug: "rancho", label: "Rancho dos Evangelizandos", resource: "assistencia-rancho" },
-      { slug: "voluntarios", label: "Cadastro de Voluntários", resource: "assistencia-voluntarios" },
-      { slug: "mantenedores", label: "Mantenedores da Cesta Básica", resource: "assistencia-mantenedores" },
-      { slug: "cafe", label: "Doadores do Café das Crianças", resource: "assistencia-cafe" },
-      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-assistencia" },
-      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes" },
-      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-assistencia" },
-      { slug: "os", label: "Ordens de Serviço", panel: "os-assistencia_social", flag: "module_patrimonio" },
-      { slug: "brecho", label: "Brechó — Livro Caixa", resource: "brecho-caixa", access: { resource: "social_brecho" } },
-      { slug: "clube-maes", label: "Clube de Mães — Livro Caixa", resource: "clube-maes-caixa", access: { resource: "social_clube_maes" } },
-      { slug: "clube-maes-pessoas", label: "Clube de Mães — Pessoas", resource: "clube-maes-pessoas", access: { resource: "social_clube_maes" } },
-      { slug: "clube-maes-entregas", label: "Clube de Mães — Entregas", resource: "clube-maes-entregas", access: { resource: "social_clube_maes" } },
-      { slug: "planejamento", label: "Planejamento Anual", resource: "assistencia-planejamento" },
-      { slug: "atividades", label: "Controle de Atividades", resource: "assistencia-atividades" },
-      { slug: "kits", label: "Kits de Higiene", resource: "assistencia-kits" },
-      { slug: "familias", label: "Famílias", resource: "assistencia-familias" }
+      { slug: "familias", label: "Famílias", resource: "assistencia-familias", group: "Famílias e entregas" },
+      { slug: "rancho", label: "Rancho dos Evangelizandos", resource: "assistencia-rancho", group: "Famílias e entregas" },
+      { slug: "kits", label: "Kits de Higiene", resource: "assistencia-kits", group: "Famílias e entregas" },
+      { slug: "atividades", label: "Controle de Atividades", resource: "assistencia-atividades", group: "Famílias e entregas" },
+      { slug: "voluntarios", label: "Cadastro de Voluntários", resource: "assistencia-voluntarios", group: "Voluntários e doadores" },
+      { slug: "mantenedores", label: "Mantenedores da Cesta Básica", resource: "assistencia-mantenedores", group: "Voluntários e doadores" },
+      { slug: "cafe", label: "Doadores do Café das Crianças", resource: "assistencia-cafe", group: "Voluntários e doadores" },
+      { slug: "brecho", label: "Brechó — Livro Caixa", resource: "brecho-caixa", access: { resource: "social_brecho" }, group: "Setores" },
+      { slug: "clube-maes", label: "Clube de Mães — Livro Caixa", resource: "clube-maes-caixa", access: { resource: "social_clube_maes" }, group: "Setores" },
+      { slug: "clube-maes-pessoas", label: "Clube de Mães — Pessoas", resource: "clube-maes-pessoas", access: { resource: "social_clube_maes" }, group: "Setores" },
+      { slug: "clube-maes-entregas", label: "Clube de Mães — Entregas", resource: "clube-maes-entregas", access: { resource: "social_clube_maes" }, group: "Setores" },
+      { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-assistencia", group: "Relatórios" },
+      { slug: "planejamento", label: "Planejamento Anual", resource: "assistencia-planejamento", group: "Relatórios" },
+      { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-assistencia", group: "Equipe" },
+      { slug: "aniversariantes", label: "Aniversariantes", panel: "aniversariantes", group: "Equipe" },
+      { slug: "os", label: "Ordens de Serviço", panel: "os-assistencia_social", flag: "module_patrimonio" }
     ]
   },
   {
@@ -98,7 +99,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
       { slug: "obras", label: "Obras", resource: "divulgacao-obras" },
       { slug: "estoque", label: "Estoque", resource: "divulgacao-estoque" },
       { slug: "emprestimos", label: "Empréstimos", panel: "divulgacao-emprestimos" },
-      { slug: "vendas", label: "Vendas", resource: "divulgacao-vendas" },
+      { slug: "vendas", label: "Vendas", panel: "divulgacao-vendas" },
       { slug: "trabalhadores", label: "Trabalhadores", panel: "trabalhadores-divulgacao" },
       { slug: "relatorio", label: "Relatório Anual", panel: "relatorio-divulgacao" },
       { slug: "os", label: "Ordens de Serviço", panel: "os-divulgacao", flag: "module_patrimonio" }

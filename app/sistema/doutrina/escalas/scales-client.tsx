@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMobileDay } from "@/components/mobile-day-columns";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, TEMPLATES, canAddExtra, monthDays, parseSlotKey, roleOf, slotKey,
@@ -163,6 +164,9 @@ export function ScalesClient() {
 
   const readOnly = !data?.canEdit || !active || busy;
   const dates = monthDays(ym, dow);
+  // Celular: uma data por vez (a de hoje ou a última que já passou no mês).
+  const todayKey = currentMonth() === ym ? String(Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()).slice(8))).padStart(2, "0") : "00";
+  const mobile = useMobileDay(dates.map((d) => ({ key: String(d).padStart(2, "0"), label: `${String(d).padStart(2, "0")}/${ym.slice(5)}` })), todayKey);
 
   return (
     <div className="grid">
@@ -235,7 +239,8 @@ export function ScalesClient() {
       ) : null}
 
       {active ? (
-        <section className="card scale-sheet">
+        <section className={`card scale-sheet ${mobile.scope}`}>
+          {mobile.picker}
           <div className="sheet-title">CENTRO ESPÍRITA FILANTRÓPICO LAR DA BÊNÇÃO</div>
           <div className="sheet-sub">ESCALA DE TRABALHADORES — {DAY_NAME[dow]} — {ym.split("-").reverse().join("/")} · HORÁRIO: {DAY_HOURS[dow]}</div>
           {TEMPLATES[dow].map((section, si) => (
@@ -243,7 +248,7 @@ export function ScalesClient() {
               <h3>{section.n}</h3>
               <div className="table-wrap">
                 <table data-grid="">
-                  <thead><tr><th>DIAS</th>{dates.map((day) => <th key={day}>{String(day).padStart(2, "0")}</th>)}</tr></thead>
+                  <thead><tr><th>DIAS</th>{dates.map((day) => <th key={day} data-day={String(day).padStart(2, "0")}>{String(day).padStart(2, "0")}</th>)}</tr></thead>
                   <tbody>
                     {section.r.map(([label], ri) => (
                       <tr key={label + ri}>
@@ -252,7 +257,7 @@ export function ScalesClient() {
                           const prefix = `${dow}|${si}|${ri}|${day}|`;
                           const keys = [...byKey.keys()].filter((k) => k.startsWith(prefix)).sort((a, b) => Number(a.split("|")[4]) - Number(b.split("|")[4]));
                           return (
-                            <td key={day}>
+                            <td key={day} data-day={String(day).padStart(2, "0")}>
                               {keys.map((key) => {
                                 const current = byKey.get(key) ?? "";
                                 const patternKey = `${dow}|${si}|${ri}|${key.split("|")[4]}`;

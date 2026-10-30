@@ -83,9 +83,11 @@ export type ResourceManagerProps = {
   header?: (rows: Row[]) => ReactNode;
   /** Colunas calculadas extras. */
   extraColumns?: { label: string; render: (row: Row) => ReactNode }[];
+  /** Filtro fixo (ex.: itens de um evento): aplicado na busca, já preenchido no "+ Novo" e sem seletor na tela. */
+  fixedFilters?: Record<string, string>;
 };
 
-export function ResourceManager({ resourceKey, rowActions, header, extraColumns = [] }: ResourceManagerProps) {
+export function ResourceManager({ resourceKey, rowActions, header, extraColumns = [], fixedFilters }: ResourceManagerProps) {
   const def: ResourceDef = RESOURCES[resourceKey];
   const [rows, setRows] = useState<Row[]>([]);
   const [caps, setCaps] = useState<Capabilities>({ create: false, update: false, delete: false });
@@ -107,7 +109,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
 
   const needsDepartments = def.fields.some((f) => f.type === "department");
   const workerField = def.fields.find((f): f is Extract<Field, { type: "worker" }> => f.type === "worker");
-  const listFields = def.fields.filter((f) => !f.hideInList);
+  const listFields = def.fields.filter((f) => !f.hideInList && !fixedFilters?.[f.name]);
   const referenceFields = useMemo(() => def.fields.filter((f): f is Extract<Field, { type: "reference" }> => f.type === "reference"), [def]);
   const lookups = useMemo(() => ({
     departments: new Map(departments.map((d) => [d.key, d.label])),
@@ -119,11 +121,11 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
     if (archived) params.set("archived", archived);
-    for (const [k, v] of Object.entries(filters)) if (v) params.set(k, v);
+    for (const [k, v] of Object.entries({ ...filters, ...fixedFilters })) if (v) params.set(k, v);
     const body = await api<{ records: Row[]; capabilities: Capabilities }>(`/api/r/${def.key}?${params}`);
     setRows(body.records);
     setCaps(body.capabilities);
-  }, [def.key, q, archived, filters]);
+  }, [def.key, q, archived, filters, fixedFilters]);
 
   useEffect(() => { const t = setTimeout(() => void load().catch((e) => setError(e.message)), 200); return () => clearTimeout(t); }, [load]);
   useEffect(() => {
@@ -250,7 +252,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
           <form className="form-stack" onSubmit={save} onChange={() => setDirty(true)} key={`${row?.id ?? "new"}-${row?.version ?? 0}`}>
             <div className="form-row">
               {def.fields.map((field) => (
-                <FieldInput key={field.name} field={field} value={row?.[field.name]} disabled={!canWrite || busy} departments={departments} workers={workers} references={references} />
+                <FieldInput key={field.name} field={field} value={row ? row[field.name] : fixedFilters?.[field.name]} disabled={!canWrite || busy} departments={departments} workers={workers} references={references} />
               ))}
             </div>
             {def.attachments ? (
@@ -330,7 +332,7 @@ export function ResourceManager({ resourceKey, rowActions, header, extraColumns 
         </div>
         <div className="filters no-print">
           <label>Buscar<input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pesquisar" /></label>
-          {(def.filters ?? []).map((f) => (
+          {(def.filters ?? []).filter((f) => !fixedFilters?.[f.name]).map((f) => (
             <label key={f.name}>{f.label}
               <select value={filters[f.name] ?? ""} onChange={(e) => setFilters((c) => ({ ...c, [f.name]: e.target.value }))}>
                 <option value="">Todos</option>
