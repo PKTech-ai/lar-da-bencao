@@ -169,7 +169,8 @@ export function ServiceOrdersPanel({ area, department }: { area?: "patrimonio"; 
   // Leva a tela até o formulário ou a OS aberta (no celular eles ficam acima da lista), inclusive vindo do Painel.
   const showing = creating ? "new" : current?.id ?? "";
   useEffect(() => { if (showing) focus.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [showing]);
-  const shown = orders.filter((o) => status === "active" ? ACTIVE.includes(o.status) : !status || o.status === status);
+  const urgent = (o: Order) => ACTIVE.includes(o.status) && o.priority === "Urgente";
+  const shown = orders.filter((o) => status === "active" ? ACTIVE.includes(o.status) : status === "urgent" ? urgent(o) : !status || o.status === status);
   const count = (s: Status) => orders.filter((o) => o.status === s).length;
   const canWrite = (o: Order) => ACTIVE.includes(o.status) && (caps.execute || caps.requesterOf.includes(o.department_key));
 
@@ -236,11 +237,14 @@ export function ServiceOrdersPanel({ area, department }: { area?: "patrimonio"; 
       {error ? <div className="error" role="alert">{error}</div> : null}
       {message ? <div className="success" role="status">{message}</div> : null}
       {busy ? <div className="notice" role="status">{busy}</div> : null}
-      <div className="grid cards">
-        <article className="card kpi"><span className="small">Abertas</span><b>{count("open")}</b></article>
-        <article className="card kpi"><span className="small">Em andamento</span><b>{count("in_progress")}</b></article>
-        <article className="card kpi"><span className="small">Urgentes em aberto</span><b>{orders.filter((o) => ACTIVE.includes(o.status) && o.priority === "Urgente").length}</b></article>
-        <article className="card kpi"><span className="small">Concluídas</span><b>{count("done")}</b></article>
+      {/* Os números também filtram a lista: toque em "Abertas" para ver só as abertas; de novo, volta às em aberto. */}
+      <div className="grid cards os-filter-cards" role="group" aria-label="Filtrar por situação">
+        {([["open", "Abertas", count("open")], ["in_progress", "Em andamento", count("in_progress")],
+          ["urgent", "Urgentes em aberto", orders.filter(urgent).length], ["done", "Concluídas", count("done")]] as const).map(([key, label, total]) => (
+          <button key={key} type="button" className="card kpi" aria-pressed={status === key} onClick={() => setStatus(status === key ? "active" : key)}>
+            <span className="small">{label}</span><b>{total}</b>
+          </button>
+        ))}
       </div>
 
       {creating ? (
@@ -368,6 +372,7 @@ export function ServiceOrdersPanel({ area, department }: { area?: "patrimonio"; 
           <label>Situação
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="active">Em aberto</option>
+              <option value="urgent">Urgentes em aberto</option>
               <option value="">Todas</option>
               {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>

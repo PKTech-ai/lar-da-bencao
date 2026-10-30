@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { BirthdaysPanel } from "@/components/modules/aniversariantes";
 import { FiscalReviewsPanel } from "@/components/modules/conselho-fiscal";
-import { BookLoansPanel, BookshopSummary } from "@/components/modules/divulgacao-livraria";
+import { BookLoansPanel } from "@/components/modules/divulgacao-livraria";
 import { MeetingRecorder } from "@/components/modules/secretaria-gravador";
 import { AnnualReport } from "@/components/modules/relatorio-anual";
 import { DepartmentWorkers } from "@/components/modules/trabalhadores-departamento";
@@ -39,7 +39,6 @@ export function ModulePanel({ name }: { name: string }) {
     case "presidencia-baixas": return <DisposalsPanel area="diretoria" />;
     case "patrimonio-limpeza": return <CleaningPanel />;
     case "patrimonio-relatorio": return <PatrimonyReport />;
-    case "divulgacao-painel": return <BookshopSummary />;
     case "divulgacao-emprestimos": return <BookLoansPanel />;
     case "secretaria-gravador": return <MeetingRecorder />;
     case "aniversariantes": return <BirthdaysPanel />;

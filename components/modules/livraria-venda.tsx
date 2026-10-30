@@ -29,7 +29,7 @@ export function LivrariaVendas() {
   }, [round]);
 
   const term = q.trim().toLocaleLowerCase("pt-BR");
-  const forSale = books.filter((b) => b.purpose === "Revenda" && b.active !== "Inativo" && b.available > 0 && b.price_cents);
+  const forSale = books.filter((b) => b.purpose === "Revenda" && b.active === "Ativo" && b.available > 0 && b.price_cents);
   const found = term ? forSale.filter((b) => `${b.code} ${b.title}`.toLocaleLowerCase("pt-BR").includes(term)).slice(0, 8) : forSale.slice(0, 6);
   const price = Number(book?.price_cents ?? 0);
 

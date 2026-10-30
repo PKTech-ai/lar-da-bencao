@@ -95,7 +95,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
     flag: "module_divulgacao",
     access: { resource: "department", department: "divulgacao" },
     sections: [
-      { slug: "", label: "Painel da Livraria", panel: "divulgacao-painel" },
+      { slug: "", label: "Painel da Livraria", panel: "painel" },
       { slug: "obras", label: "Obras", resource: "divulgacao-obras" },
       { slug: "estoque", label: "Estoque", resource: "divulgacao-estoque" },
       { slug: "emprestimos", label: "Empréstimos", panel: "divulgacao-emprestimos" },

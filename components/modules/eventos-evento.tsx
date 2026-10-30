@@ -28,8 +28,10 @@ export function EventoCompleto() {
   // Próximo evento primeiro; depois os realizados, do mais recente para o mais antigo.
   const today = todayLocal();
   const ordered = useMemo(() => {
-    const next = events.filter((e) => !e.event_date || e.event_date >= today).sort((a, b) => (a.event_date ?? "9999").localeCompare(b.event_date ?? "9999"));
-    const past = events.filter((e) => e.event_date && e.event_date < today).sort((a, b) => (b.event_date ?? "").localeCompare(a.event_date ?? ""));
+    // Mesmo critério do Painel: o próximo evento ainda não realizado nem cancelado.
+    const pending = (e: EventRow) => (!e.event_date || e.event_date >= today) && !["Realizado", "Cancelado"].includes(e.status);
+    const next = events.filter(pending).sort((a, b) => (a.event_date ?? "9999").localeCompare(b.event_date ?? "9999"));
+    const past = events.filter((e) => !pending(e)).sort((a, b) => (b.event_date ?? "").localeCompare(a.event_date ?? ""));
     return [...next, ...past];
   }, [events, today]);
   const current = ordered.find((e) => e.id === chosen) ?? ordered[0];

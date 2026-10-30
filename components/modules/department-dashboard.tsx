@@ -1,31 +1,40 @@
 import type { Actor } from "@/lib/auth";
 import { DepartmentAbout } from "@/components/department-about";
 import { PainelView } from "@/components/painel";
+import { BookshopSummary } from "@/components/modules/divulgacao-livraria";
 import { PatrimonyOpenOrders } from "@/components/modules/patrimonio-os-resumo";
 import { query } from "@/lib/db";
 import { buildDepartmentDashboard, workerDepartmentKey } from "@/lib/department-dashboard";
 import { departmentInfoFor } from "@/lib/department-info";
 import type { ModulePage } from "@/lib/module-pages";
-import { painelAssistencia, painelPatrimonio, painelPresidencia, painelTesouraria } from "@/lib/paineis";
+import {
+  painelAssistencia, painelConselho, painelDivulgacao, painelEventos, painelJuridico, painelPatrimonio, painelPresidencia,
+  painelSecretaria, painelTesouraria, type Painel
+} from "@/lib/paineis";
+
+const PAINEIS: Record<string, (actor: Actor) => Promise<Painel>> = {
+  tesouraria: painelTesouraria, patrimonio: painelPatrimonio, assistencia: painelAssistencia, secretaria: painelSecretaria,
+  conselhofiscal: painelConselho, juridico: painelJuridico, eventos: painelEventos, divulgacao: painelDivulgacao
+};
 
 /**
- * Aba "Painel" dos departamentos. Tesouraria, Patrimônio, Assistência e Presidência mostram os números do próprio
- * trabalho (lib/paineis.ts); os demais, o quadro de trabalhadores com alertas.
+ * Aba "Painel" dos departamentos: os números do próprio trabalho (lib/paineis.ts). Departamento sem painel próprio
+ * mostra o quadro de trabalhadores com alertas.
  */
 export async function DepartmentDashboard({ page, actor }: { page: ModulePage; actor: Actor }) {
   if (page.slug === "presidencia") {
     const { departamentos, ...painel } = await painelPresidencia(actor);
     return <PainelView painel={painel} departamentos={departamentos} />;
   }
-  const specific = page.slug === "tesouraria" ? painelTesouraria : page.slug === "patrimonio" ? painelPatrimonio
-    : page.slug === "assistencia" ? painelAssistencia : null;
+  const specific = PAINEIS[page.slug];
   if (specific) {
-    const [painel, coordinators] = await Promise.all([specific(), departmentCoordinators(workerDepartmentKey(page))]);
+    const [painel, coordinators] = await Promise.all([specific(actor), departmentCoordinators(workerDepartmentKey(page))]);
     const info = departmentInfoFor(page.slug);
     return (
       <>
         <PainelView painel={painel} />
         {page.slug === "patrimonio" ? <PatrimonyOpenOrders /> : null}
+        {page.slug === "divulgacao" ? <BookshopSummary /> : null}
         {info ? <DepartmentAbout info={info} coordinators={coordinators} /> : null}
       </>
     );

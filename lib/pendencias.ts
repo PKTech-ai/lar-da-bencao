@@ -47,8 +47,9 @@ export async function pendingFor(actor: Actor): Promise<Pending[]> {
   await add("parecer", "Meses aguardando parecer do Conselho Fiscal", "/sistema/conselhofiscal/analises", "module_conselho_fiscal",
     hasPermission(actor, "conselho_fiscal", "update"),
     `select count(*)::text as count from app.treasury_months m
-      where m.status = 'Enviado ao Conselho Fiscal'
-        and not exists (select 1 from app.fiscal_reviews r where r.reference_month = m.reference_month and r.archived_at is null)`,
+      where m.status = 'Fechado'
+        and not exists (select 1 from app.fiscal_reviews r where r.reference_month = m.reference_month
+                         and r.archived_at is null and r.status in ('Deferido', 'Indeferido'))`,
     "Emitir o parecer do Conselho Fiscal");
   await add("emprestimos", "Empréstimos de livros atrasados", "/sistema/divulgacao/emprestimos", "module_divulgacao",
     hasPermission(actor, "department", "update", "divulgacao"),
