@@ -8,7 +8,6 @@ import { BookLoansPanel, BookshopSummary } from "@/components/modules/divulgacao
 import { MeetingRecorder } from "@/components/modules/secretaria-gravador";
 import { AnnualReport } from "@/components/modules/relatorio-anual";
 import { DepartmentWorkers } from "@/components/modules/trabalhadores-departamento";
-import { PresidenciaPainel } from "@/components/modules/presidencia-painel";
 import { ContributionsPanel } from "@/components/modules/tesouraria-contribuicoes";
 import { TreasuryAccountsPanel, TreasuryMonthPanel, TreasuryReportPanel, TreasuryStatementPanel } from "@/components/modules/tesouraria";
 import { WhatsappQueue } from "@/components/modules/whatsapp";
@@ -68,7 +67,6 @@ export function ModulePanel({ name }: { name: string }) {
     case "sugestoes-atalho": return <Shortcut href="/sistema/sugestoes" label="Sugestões e elogios"
       text="Mensagens enviadas pelas pessoas da Casa, com a resposta da Diretoria." />;
     case "conselho-analises": return <FiscalReviewsPanel />;
-    case "presidencia-painel": return <PresidenciaPainel />;
     default: return <p className="notice">Painel em preparação.</p>;
   }
 }

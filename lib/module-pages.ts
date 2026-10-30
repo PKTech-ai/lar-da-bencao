@@ -170,11 +170,11 @@ export const MODULE_PAGES: readonly ModulePage[] = [
   {
     slug: "presidencia",
     title: "Presidência",
-    intro: "Painel da Diretoria: decisões pendentes e situação dos módulos.",
+    intro: "Painel da Diretoria: decisões pendentes e os números dos departamentos.",
     flag: "module_presidencia",
     access: { resource: "presidencia" },
     sections: [
-      { slug: "", label: "Painel", panel: "presidencia-painel" },
+      { slug: "", label: "Painel", panel: "painel" },
       { slug: "admissoes", label: "Aprovação de Trabalhadores", panel: "admissoes-atalho", flag: "module_workers" },
       { slug: "baixas", label: "Autorizações de Baixa", panel: "presidencia-baixas" },
       { slug: "sugestoes", label: "Sugestões", panel: "sugestoes-atalho" },

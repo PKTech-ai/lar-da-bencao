@@ -13,7 +13,7 @@ export default async function DashboardPage() {
           <h1>Visão Geral</h1>
         </div>
       </header>
-      <HomeClient modules={nav.modules} showAccess={nav.capabilities.users} />
+      <HomeClient modules={nav.modules} />
     </>
   );
 }

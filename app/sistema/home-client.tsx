@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { NavIcon } from "@/components/nav-icon";
 import { SuggestionsBox } from "@/components/suggestions-box";
 import { api } from "@/lib/client-api";
 import { addDays, filterAgenda, todayInSaoPaulo, type AgendaItem } from "@/lib/home-dashboard";
@@ -21,29 +20,11 @@ type Home = {
   memory: { foundedOn: string; age: number; nextAnniversary: string; daysToAnniversary: number };
   cards: { key: string; label: string; value: string; href?: string; hint?: string }[];
   myArea: Area | null;
+  departamentos: { label: string; value: string; hint: string; href: string }[];
 };
 type VisibleModule = { href: string; label: string };
 
 const BADGE_KEYS = new Set(["admissoes", "baixas", "sugestoes"]);
-const MODULE_CARDS: { href: string; title: string; text: string; when?: "always" | "access" }[] = [
-  { href: "/sistema/documentos", title: "Estatuto e Regimento", text: "Acesso institucional para todos os trabalhadores ativos, com os documentos completos e resumo das principais normas." },
-  { href: "/sistema/organograma", title: "Organograma", text: "Visão sintética e analítica da estrutura institucional conforme Estatuto e Regimento.", when: "always" },
-  { href: "/sistema/acesso", title: "Controle de Acesso", text: "Perfis, permissões, usuários e trilha de auditoria conforme a estrutura institucional da Casa.", when: "access" },
-  { href: "/sistema/doutrina", title: "Dpto de Doutrina", text: "Escalas, estudos, palestras e trabalhadores." },
-  { href: "/sistema/infancia", title: "Dpto da Infância", text: "Evangelização infantil: Maternal, Jardim e 1º ao 3º Ciclo." },
-  { href: "/sistema/juventude", title: "Dpto da Juventude", text: "Pré-Juventude (13–14) e Juventude (15–21)." },
-  { href: "/sistema/assistencia", title: "Assistência e Promoção Social", text: "Atendimentos, ações e relatórios do departamento." },
-  { href: "/sistema/tesouraria", title: "Tesouraria", text: "Contribuições, fechamento de caixa mensal e relatório ao Conselho Fiscal." },
-  { href: "/sistema/conselhofiscal", title: "Conselho Fiscal", text: "Recebimento, análise e parecer sobre o fechamento mensal da Tesouraria." },
-  { href: "/sistema/patrimonio", title: "Dpto de Patrimônio", text: "Cadastro de bens, tombamento, fotos, notas fiscais e acompanhamento do patrimônio da Casa." },
-  { href: "/sistema/eventos", title: "Dpto de Eventos", text: "Eventos, campanhas e promoções realizadas em benefício da Casa." },
-  { href: "/sistema/divulgacao", title: "Dpto de Divulgação", text: "Comunicação social e setores de Relações Públicas, Livraria, Biblioteca e Brinquedoteca." },
-  { href: "/sistema/juridico", title: "Dpto Jurídico", text: "Assistência, representação e orientação jurídica da instituição." },
-  { href: "/sistema/secretaria", title: "Secretaria", text: "Cadastros gerais compartilhados e rotinas administrativas." },
-  { href: "/sistema/presidencia", title: "Presidência", text: "Painel consolidado e supervisão." },
-  { href: "/sistema/trabalhadores", title: "Trabalhadores", text: "Cadastro, funções e vínculos dos trabalhadores da Casa." },
-  { href: "/sistema/admissoes", title: "Admissões", text: "Fichas encaminhadas à Diretoria para decisão." }
-];
 const SHORTCUTS = [
   { href: "/sistema/tesouraria/contribuicoes", needs: "/sistema/tesouraria", title: "Contribuições" },
   { href: "/sistema/assistencia/atividades", needs: "/sistema/assistencia", title: "Atividades sociais" },
@@ -78,7 +59,7 @@ function monthShort(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase();
 }
 
-export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; showAccess: boolean }) {
+export function HomeClient({ modules }: { modules: VisibleModule[] }) {
   const [home, setHome] = useState<Home | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
@@ -101,7 +82,6 @@ export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; 
   const badgePending = pending.filter((item) => BADGE_KEYS.has(item.key));
   const routines = pending.filter((item) => !BADGE_KEYS.has(item.key));
   const allowed = new Set(modules.map((mod) => mod.href));
-  const cards = MODULE_CARDS.filter((card) => card.when === "always" || (card.when === "access" ? showAccess : allowed.has(card.href)));
   const shortcuts = SHORTCUTS.filter((item) => allowed.has(item.needs)).slice(0, 6);
   const memory = home?.memory;
   const visibleAgenda = filterAgenda(agenda, today, period);
@@ -119,34 +99,7 @@ export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; 
       {error ? <div className="error" role="alert">{error}</div> : null}
       <p className="home-greeting">{todayLabel} · {home?.institution.motto || "Uma Casa de estudo, acolhimento e caridade."}</p>
 
-      {memory ? (
-        <section className="home-memory-strip" aria-label={`Memória institucional — ${home?.institution.name || "Lar da Bênção"}`}>
-          <div><span>Data de constituição</span><strong>{longDate(memory.foundedOn)}</strong></div>
-          <div className="featured"><span>Idade da Casa</span><strong>{memory.age} anos</strong></div>
-          <div><span>Próximo aniversário</span><strong>{longDate(memory.nextAnniversary)}</strong>
-            <small>{memory.daysToAnniversary === 0 ? "É hoje!" : `faltam ${memory.daysToAnniversary} dia(s)`}</small></div>
-          <div><span>Próxima idade</span><strong>{memory.age + 1} anos</strong></div>
-        </section>
-      ) : null}
 
-      {worker && home?.myArea ? (
-        <section className="op-section">
-          <div className="op-section-head"><h3>Minha área</h3><Link href="/sistema/conta">Abrir</Link></div>
-          <p className="small muted">{worker.full_name} · {worker.departments.join(" / ") || "sem departamento"}{worker.functions.length ? ` · ${worker.functions.join(", ")}` : ""}</p>
-          <ul className="home-mine">
-            {home.myArea.cleaning.slice(0, 2).map((item) => (
-              <li key={item.clean_date}>Limpeza {brDate(item.clean_date)} · {CLEANING[item.status] ?? item.status}{item.fee_cents ? ` · ${formatMoney(item.fee_cents)} ${item.payment_status === "paid" ? "recebida" : "pendente"}` : ""}</li>
-            ))}
-            {home.myArea.shifts.slice(0, 2).map((item, index) => (
-              <li key={`${item.name}-${index}`}>Evento {item.event_date ? brDate(item.event_date) : "data a definir"} · {item.name}</li>
-            ))}
-            {home.myArea.contributions.slice(0, 1).map((item, index) => (
-              <li key={`${item.reference_month}-${index}`}>Última contribuição {item.reference_month.split("-").reverse().join("/")} · {formatMoney(item.amount_cents)}</li>
-            ))}
-            {!home.myArea.cleaning.length && !home.myArea.shifts.length && !home.myArea.contributions.length ? <li className="muted">Nada marcado para você nos próximos dias.</li> : null}
-          </ul>
-        </section>
-      ) : null}
 
       <div className="op-columns">
         <section className="op-section">
@@ -191,6 +144,36 @@ export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; 
         </section>
       </div>
 
+      {home?.departamentos.length ? (
+        <section className="op-section">
+          <div className="op-section-head"><h3>A Casa em números</h3></div>
+          <div className="home-numbers">
+            {home.departamentos.map((d) => (
+              <Link key={d.label} href={d.href} className="home-number"><span>{d.label}</span><b>{d.value}</b><small>{d.hint}</small></Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {worker && home?.myArea ? (
+        <section className="op-section">
+          <div className="op-section-head"><h3>Minha área</h3><Link href="/sistema/conta">Abrir</Link></div>
+          <p className="small muted">{worker.full_name} · {worker.departments.join(" / ") || "sem departamento"}{worker.functions.length ? ` · ${worker.functions.join(", ")}` : ""}</p>
+          <ul className="home-mine">
+            {home.myArea.cleaning.slice(0, 2).map((item) => (
+              <li key={item.clean_date}>Limpeza {brDate(item.clean_date)} · {CLEANING[item.status] ?? item.status}{item.fee_cents ? ` · ${formatMoney(item.fee_cents)} ${item.payment_status === "paid" ? "recebida" : "pendente"}` : ""}</li>
+            ))}
+            {home.myArea.shifts.slice(0, 2).map((item, index) => (
+              <li key={`${item.name}-${index}`}>Evento {item.event_date ? brDate(item.event_date) : "data a definir"} · {item.name}</li>
+            ))}
+            {home.myArea.contributions.slice(0, 1).map((item, index) => (
+              <li key={`${item.reference_month}-${index}`}>Última contribuição {item.reference_month.split("-").reverse().join("/")} · {formatMoney(item.amount_cents)}</li>
+            ))}
+            {!home.myArea.cleaning.length && !home.myArea.shifts.length && !home.myArea.contributions.length ? <li className="muted">Nada marcado para você nos próximos dias.</li> : null}
+          </ul>
+        </section>
+      ) : null}
+
       <section className="home-go">
         <h3>Ir para</h3>
         {shortcuts.length ? (
@@ -198,17 +181,15 @@ export function HomeClient({ modules, showAccess }: { modules: VisibleModule[]; 
             {shortcuts.map((item) => <Link key={item.href} className="button" href={item.href}>{item.title}</Link>)}
           </div>
         ) : null}
-        <div className="home-mods">
-          {cards.map((card) => (
-            <Link key={card.href} className="home-mod" href={card.href} title={card.text}>
-              <span className="mod-ico"><NavIcon href={card.href} /></span>
-              <span>{card.title}</span>
-            </Link>
-          ))}
-        </div>
       </section>
 
       <SuggestionsBox />
+
+      {memory ? (
+        <p className="home-memory-line">
+          {home?.institution.name || "Lar da Bênção"} · {memory.age} anos, fundada em {longDate(memory.foundedOn)} · {memory.daysToAnniversary === 0 ? "hoje é o aniversário da Casa!" : `próximo aniversário em ${memory.daysToAnniversary} dia(s)`}
+        </p>
+      ) : null}
 
       <footer className="lar-system-footer">
         <p>Desenvolvido por <strong>PK Instituto</strong>, inspirada pela Espiritualidade Amiga.</p>
