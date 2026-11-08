@@ -34,7 +34,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
     ),
     query<{ coordinator: string | null; phone: string | null }>(
       `select (select string_agg(u.full_name, ' / ' order by u.full_name) from app.users u
-                 join app.user_departments ud on ud.user_id = u.id and ud.department_key = 'doutrina'
+                 join app.user_departments ud on ud.user_id = u.id and ud.department_key = 'doutrina' and ud.access_level = 'coordenacao'
                 where u.status = 'active' and u.role_key = 'coordenador') as coordinator,
               (select phone from app.department_contacts where department_key = 'doutrina') as phone`
     )

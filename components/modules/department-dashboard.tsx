@@ -47,7 +47,7 @@ export async function DepartmentDashboard({ page, actor }: { page: ModulePage; a
               count(*) filter (where w.status = 'active' and extract(month from w.birth_date) = extract(month from (now() at time zone 'America/Sao_Paulo')))::int as birthdays
          from app.workers w join app.worker_departments d on d.worker_id = w.id and d.department_key = $1`, [key]),
     query<{ full_name: string }>(
-      `select u.full_name from app.users u join app.user_departments ud on ud.user_id = u.id and ud.department_key = $1
+      `select u.full_name from app.users u join app.user_departments ud on ud.user_id = u.id and ud.department_key = $1 and ud.access_level = 'coordenacao'
         where u.status = 'active' and u.role_key = 'coordenador' order by u.full_name`, [key])
   ]);
   const c = counts.rows[0] ?? { active: 0, pending: 0, birthdays: 0 };
@@ -73,7 +73,7 @@ export async function DepartmentDashboard({ page, actor }: { page: ModulePage; a
 
 async function departmentCoordinators(key: string) {
   const result = await query<{ full_name: string }>(
-    `select u.full_name from app.users u join app.user_departments ud on ud.user_id = u.id and ud.department_key = $1
+    `select u.full_name from app.users u join app.user_departments ud on ud.user_id = u.id and ud.department_key = $1 and ud.access_level = 'coordenacao'
       where u.status = 'active' and u.role_key = 'coordenador' order by u.full_name`, [key]);
   return result.rows.map((r) => r.full_name);
 }

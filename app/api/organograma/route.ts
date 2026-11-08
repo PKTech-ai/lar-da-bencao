@@ -22,7 +22,7 @@ export async function GET() {
                 coalesce(json_agg(json_build_object('name', u.full_name, 'role', r.label) order by u.full_name)
                          filter (where u.id is not null), '[]') as people
            from app.departments d
-           left join app.user_departments ud on ud.department_key = d.key
+           left join app.user_departments ud on ud.department_key = d.key and ud.access_level = 'coordenacao'
            left join app.users u on u.id = ud.user_id and u.status = 'active' and u.role_key in ('coordenador','subcoordenador')
            left join app.roles r on r.key = u.role_key
           where d.active group by d.key, d.label order by d.label`

@@ -973,6 +973,11 @@ a.pn-kpi:hover { border-color: var(--border-soft); background: var(--surface-hov
 .level-switch button[aria-pressed="true"][data-level="full"] { background: var(--blue-100); color: var(--blue-800); box-shadow: inset 0 0 0 2px var(--blue-800); }
 .level-switch button[aria-pressed="true"][data-level="read"] { background: var(--sage-100); color: var(--sage-700); box-shadow: inset 0 0 0 2px var(--sage-700); }
 .level-switch button[aria-pressed="true"][data-level="none"] { background: var(--surface-sunken); color: var(--blue-900); box-shadow: inset 0 0 0 2px var(--muted); }
+.level-switch button[aria-pressed="true"][data-level="call"] { background: var(--bg-warning); color: var(--warning); box-shadow: inset 0 0 0 2px var(--warning); }
+.level-switch.four { grid-template-columns: repeat(4, 108px); }
+.person-access-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.person-access-head h3 { margin: 0; }
+.person-access-dept p { margin: 8px 0 0; }
 .access-exceptions { margin-top: 16px; }
 .access-exceptions summary { cursor: pointer; font-weight: 700; color: var(--blue-900); }
 .access-print { display: none; }
@@ -984,6 +989,9 @@ a.pn-kpi:hover { border-color: var(--border-soft); background: var(--surface-hov
 @media screen and (max-width: 720px) {
   .access-list li { flex-direction: column; align-items: stretch; gap: 8px; }
   .level-switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .level-switch.four { grid-template-columns: repeat(4, auto); }
+  .level-switch.four button { font-size: 12px; }
+  .person-access-head .level-switch { width: 100%; }
   .level-switch button { min-height: 44px; padding: 6px 2px; font-size: 13px; white-space: nowrap; }
 }
 @media print {

@@ -126,7 +126,7 @@ describe("provisionamento do acesso", () => {
     expect(result.createdAuthUserId).toBe("auth-1");
     expect(db.users[0]).toMatchObject({
       role_key: "trabalhador", must_reset_password: true, cpf: "52998224725", worker_id: "w-1",
-      email: "52998224725@acesso.lardabencao.org", departments: ["doutrina", "infancia"]
+      email: "52998224725@acesso.lardabencao.org", departments: []
     });
   });
 

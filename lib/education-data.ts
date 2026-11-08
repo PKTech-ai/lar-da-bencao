@@ -21,18 +21,45 @@ export async function canEditEducation(actor: Actor, department: EducationDepart
 }
 
 /**
- * Turmas visíveis: o perfil Evangelizador enxerga só as turmas/grupos em que está vinculado
- * (vínculo pela ficha de trabalhador com o mesmo e-mail da conta). Demais perfis: todas (`null`).
+ * Turmas visíveis: todas (`null`) para quem tem Coordenação no departamento, e para quem o vê sem ser do perfil
+ * Evangelizador. O perfil Evangelizador e quem tem só a Chamada enxergam as turmas em que estão vinculados:
+ * pela ficha ligada à conta (contas por CPF têm e-mail técnico) ou, nas contas antigas, pelo e-mail da ficha.
  */
 export async function allowedGroups(actor: Actor, department: EducationDepartment): Promise<string[] | null> {
-  if (actor.role !== "evangelizador") return null;
+  if (await hasPermission(actor, "department", "update", department)) return null;
+  if (actor.role !== "evangelizador" && await hasPermission(actor, "department", "read", department)) return null;
   const result = await query<{ class_group: string }>(
     `select distinct g.class_group from app.education_group_evangelizers g
        join app.workers w on w.id = g.worker_id and w.status = 'active'
-      where g.department_key = $1 and lower(w.email) = lower($2)`,
-    [department, actor.email]
+      where g.department_key = $1
+        and (w.id = (select worker_id from app.users where id = $3) or lower(w.email) = lower($2))`,
+    [department, actor.email, actor.id]
   );
   return result.rows.map((row) => row.class_group);
+}
+
+/**
+ * Frequência (chamada dominical): quem vê o departamento ou tem a Chamada nele. As demais telas da Evangelização
+ * continuam exigindo ver o departamento (`requireEducation`).
+ */
+export async function requireAttendance(actor: Actor, department: string) {
+  if (!isEducationDepartment(department)) throw new AppError("Departamento não encontrado.", 404, "NOT_FOUND");
+  await requireFlag(flagForDepartment(department));
+  if (!(await canOpenAttendance(actor, department))) throw new AuthorizationError();
+  return department;
+}
+
+export async function canOpenAttendance(actor: Actor, department: EducationDepartment) {
+  return (await hasPermission(actor, "department", "read", department)) || (await hasCallAccess(actor, department));
+}
+
+/** Acesso "Chamada" da pessoa no departamento (escolhido em Usuários › Acesso). */
+export async function hasCallAccess(actor: Actor, department: string) {
+  const result = await query(
+    "select 1 from app.user_departments where user_id = $1 and department_key = $2 and access_level = 'chamada'",
+    [actor.id, department]
+  );
+  return Boolean(result.rowCount);
 }
 
 export function assertGroupAllowed(groups: string[] | null, group: string) {
@@ -81,13 +108,17 @@ export async function activeForYear(department: EducationDepartment, year: numbe
   });
 }
 
-/** Lançamentos de turma (chamada/cronograma): coordenação em todo o departamento; evangelizador só nas suas turmas. */
-export async function requireClassWrite(actor: Actor, department: string) {
+/**
+ * Lançamentos de turma (chamada/cronograma): coordenação em todo o departamento; evangelizador só nas suas turmas.
+ * Quem tem só a Chamada lança apenas a frequência (`attendance`), nunca o cronograma.
+ */
+export async function requireClassWrite(actor: Actor, department: string, options: { attendance?: boolean } = {}) {
   if (!isEducationDepartment(department)) throw new AppError("Departamento não encontrado.", 404, "NOT_FOUND");
   await requireFlag(flagForDepartment(department));
   if (!(await hasPermission(actor, "education_class", "update", department)) && !(await hasPermission(actor, "department", "update", department))) {
     throw new AuthorizationError();
   }
+  if (!options.attendance && !(await hasPermission(actor, "department", "read", department))) throw new AuthorizationError();
   return { department, groups: await allowedGroups(actor, department) };
 }
 

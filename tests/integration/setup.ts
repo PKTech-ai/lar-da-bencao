@@ -47,9 +47,14 @@ const DIRECTOR_ROLES = new Set(["presidente", "vice_presidente", "secretario", "
  * Cria um usuário institucional real (auth.users + app.users) para ser o ator das operações.
  * Cargos da Diretoria só acessam com biênio vigente: recebem um biênio do ano corrente.
  */
-export async function createActor(role = "administrador", departments: string[] = []) {
+/**
+ * Usuário de teste. O acesso aos departamentos segue a migração 202611072100_acesso_por_pessoa: Coordenador e
+ * Subcoordenador com Coordenação, Evangelizador com Chamada, os demais com Consulta. `level` força outro nível.
+ */
+export async function createActor(role = "administrador", departments: string[] = [], level?: "chamada" | "consulta" | "coordenacao") {
   const authId = randomUUID();
   const email = `${role}-${authId.slice(0, 8)}@teste.local`;
+  const access = level ?? (["coordenador", "subcoordenador"].includes(role) ? "coordenacao" : role === "evangelizador" ? "chamada" : "consulta");
   const id = await owner(async (client) => {
     await client.query("insert into auth.users (id) values ($1)", [authId]);
     const inserted = await client.query<{ id: string }>(
@@ -63,8 +68,13 @@ export async function createActor(role = "administrador", departments: string[] 
       );
       await client.query("update app.users set biennium_id = $1 where id = $2", [biennium.rows[0].id, inserted.rows[0].id]);
     }
-    for (const d of departments) await client.query("insert into app.user_departments (user_id, department_key) values ($1,$2)", [inserted.rows[0].id, d]);
+    for (const d of departments) {
+      await client.query("insert into app.user_departments (user_id, department_key, access_level) values ($1,$2,$3)", [inserted.rows[0].id, d, access]);
+    }
     return inserted.rows[0].id;
   });
-  return { id, authUserId: authId, email, name: `Teste ${role}`, role, status: "active" as const, departments, sessionId: null, mustResetPassword: false };
+  return {
+    id, authUserId: authId, email, name: `Teste ${role}`, role, status: "active" as const,
+    departments: access === "chamada" ? [] : departments, sessionId: null, mustResetPassword: false
+  };
 }

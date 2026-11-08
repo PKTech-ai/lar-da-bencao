@@ -6,7 +6,7 @@ import { query, transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import { isValidMonth } from "@/lib/doutrina-scale";
 import { EDUCATION_LABEL, classSundays, isClassSunday } from "@/lib/education";
-import { activeForYear, allowedGroups, canWriteClasses, requireClassWrite, requireEducation } from "@/lib/education-data";
+import { activeForYear, allowedGroups, canWriteClasses, requireAttendance, requireClassWrite } from "@/lib/education-data";
 
 type Params = { params: Promise<{ department: string }> };
 const monthSchema = z.string().refine(isValidMonth, "Mês inválido.");
@@ -36,7 +36,7 @@ async function sheet(department: "infancia" | "juventude", ym: string, groups: s
 export async function GET(request: Request, context: Params) {
   try {
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "read");
+    const department = await requireAttendance(actor, (await context.params).department);
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
     const groups = await allowedGroups(actor, department);
     return Response.json({ ...(await sheet(department, ym, groups)), canEdit: await canWriteClasses(actor, department) }, { headers: { "Cache-Control": "private, no-store" } });
@@ -50,7 +50,7 @@ export async function PUT(request: Request, context: Params) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    const { department, groups } = await requireClassWrite(actor, (await context.params).department);
+    const { department, groups } = await requireClassWrite(actor, (await context.params).department, { attendance: true });
     const input = putSchema.parse(await request.json());
     const current = await sheet(department, input.month, groups);
     const allowed = new Set(current.students.map((s) => s.id));

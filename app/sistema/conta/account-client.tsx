@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "@/lib/client-api";
 import type { MyArea } from "@/lib/my-area";
@@ -107,7 +108,22 @@ export function AccountClient() {
             {!area.contributions.length ? <li>Nenhum lançamento registrado.</li> : null}
           </ul>
 
-          <h3>Minhas escalas de limpeza e eventos</h3>
+          {area.classes.length ? (
+            <>
+              <h3>Minhas turmas</h3>
+              <ul className="mb-own-list">
+                {area.classes.map((item) => (
+                  <li key={`${item.department}-${item.group}`}>
+                    <strong>Turma {item.group}</strong>
+                    {item.department}
+                    {item.callHref ? <small><Link href={item.callHref}>Fazer a chamada</Link></small> : null}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+
+          <h3>Minhas escalas</h3>
           <ul className="mb-own-list">
             {area.scales.map((item, index) => (
               <li key={`${item.date}-${item.activity}-${index}`}>

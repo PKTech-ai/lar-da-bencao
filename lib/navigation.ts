@@ -44,6 +44,16 @@ export const loadNavigation = cache(async (actor: Actor) => {
         : await hasPermission(actor, mod.permissionResource, "read");
     if (allowed) modules.push({ href: mod.href, label: mod.label });
   }
+  // Quem tem só a Chamada num departamento da Evangelização vê um atalho direto para a chamada.
+  const calls = await query<{ department_key: string }>(
+    "select department_key from app.user_departments where user_id = $1 and access_level = 'chamada' and department_key in ('infancia','juventude')",
+    [actor.id]
+  );
+  for (const { department_key: key } of calls.rows) {
+    const mod = moduleCatalog.find((item) => item.key === key);
+    if (!mod || !flags.get(mod.flagKey) || modules.some((item) => item.href === mod.href)) continue;
+    modules.push({ href: `${mod.href}/frequencia`, label: `Chamada · ${mod.label}` });
+  }
   const serviceOrders = Boolean(flags.get("module_patrimonio")) && await hasAnyDepartmentPermission(actor, "read");
   return {
     modules,

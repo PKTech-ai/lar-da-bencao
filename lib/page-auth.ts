@@ -5,6 +5,8 @@ import { query } from "@/lib/db";
 import { AuthenticationError } from "@/lib/errors";
 import { isFlagEnabled } from "@/lib/feature-flags";
 import { hasAnyDepartmentPermission, hasPermission, type PermissionAction } from "@/lib/permissions";
+import type { EducationDepartment } from "@/lib/education";
+import { hasCallAccess } from "@/lib/education-data";
 import { CURRENT_TERMS_VERSION } from "@/lib/terms";
 
 export async function requirePageActor() {
@@ -44,6 +46,18 @@ type ModuleAccess = {
  * Página de módulo: exige flag ligada e permissão. Falha em qualquer um → 404,
  * sem revelar se o módulo existe para quem não pode vê-lo.
  */
+/**
+ * Frequência da Evangelização: abre para quem vê o departamento e também para quem tem só a Chamada nele.
+ * `seesDepartment` diz se as outras abas do departamento podem aparecer.
+ */
+export async function requireAttendancePage(flag: string, department: EducationDepartment) {
+  const actor = await requirePageActor();
+  if (!(await isFlagEnabled(flag))) notFound();
+  const seesDepartment = await hasPermission(actor, "department", "read", department);
+  if (!seesDepartment && !(await hasCallAccess(actor, department))) notFound();
+  return { actor, seesDepartment };
+}
+
 export async function requireModulePage(flag: string, access: ModuleAccess = {}): Promise<Actor> {
   const actor = await requirePageActor();
   const { resource = "department", action = "read", department } = access;

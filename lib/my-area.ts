@@ -1,5 +1,8 @@
 import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
+import type { EducationDepartment } from "@/lib/education";
+import { canOpenAttendance } from "@/lib/education-data";
+import { isFlagEnabled } from "@/lib/feature-flags";
 import { todayInSaoPaulo } from "@/lib/home-dashboard";
 import { workerStatusLabel, type WorkerStatus } from "@/lib/worker-constants";
 
@@ -49,11 +52,15 @@ export type MyAreaWorker = {
   status: string;
 };
 
+/** Turma da Evangelização em que a pessoa é evangelizadora; `callHref` leva à chamada quando ela pode abrir. */
+export type MyAreaClass = { department: string; group: string; callHref: string | null };
+
 export type MyArea = {
   profile: { name: string; roleLabel: string };
   worker: MyAreaWorker | null;
   contributions: MyAreaContribution[];
   scales: MyAreaScale[];
+  classes: MyAreaClass[];
 };
 
 /** Dados da Minha área: só a ficha, as contribuições e as escalas da própria pessoa. */
@@ -64,10 +71,10 @@ export async function loadMyArea(actor: Actor): Promise<MyArea> {
   ]);
   const profile = { name: actor.name, roleLabel: role.rows[0]?.label ?? actor.role };
   const workerId = linked.rows[0]?.worker_id;
-  if (!workerId) return { profile, worker: null, contributions: [], scales: [] };
+  if (!workerId) return { profile, worker: null, contributions: [], scales: [], classes: [] };
 
   const today = todayInSaoPaulo();
-  const [worker, departments, contributions, cleaning, events, doctrine, culto] = await Promise.all([
+  const [worker, departments, contributions, cleaning, events, doctrine, culto, groups] = await Promise.all([
     query<{ full_name: string; phone: string | null; status: WorkerStatus }>(
       "select full_name, phone, status from app.workers where id = $1",
       [workerId]
@@ -115,8 +122,20 @@ export async function loadMyArea(actor: Actor): Promise<MyArea> {
           and (requester_id = $1 or leader_id = $1 or speaker_id = $1)
         order by culto_date`,
       [workerId, today]
+    ),
+    query<{ department_key: EducationDepartment; class_group: string; label: string }>(
+      `select g.department_key, g.class_group, d.label from app.education_group_evangelizers g
+         join app.departments d on d.key = g.department_key
+        where g.worker_id = $1 order by d.label, g.class_group`,
+      [workerId]
     )
   ]);
+  const classes: MyAreaClass[] = await Promise.all(groups.rows.map(async (g) => ({
+    department: g.label,
+    group: g.class_group,
+    callHref: (await isFlagEnabled(`module_${g.department_key}`)) && (await canOpenAttendance(actor, g.department_key))
+      ? `/sistema/${g.department_key}/frequencia` : null
+  })));
 
   const row = worker.rows[0];
   const scales: MyAreaScale[] = [
@@ -158,6 +177,7 @@ export async function loadMyArea(actor: Actor): Promise<MyArea> {
         paid_date: r.paid_date
       };
     }),
-    scales: upcoming(scales, today)
+    scales: upcoming(scales, today),
+    classes
   };
 }

@@ -57,8 +57,6 @@ export async function provisionWorkerAccess(
     [created.data.user.id, email, worker.full_name, cpf, worker.id, authorId]
   );
   const userId = (inserted.rows[0] as { id: string }).id;
-  for (const department of worker.departments) {
-    await db.query("insert into app.user_departments(user_id, department_key) values ($1,$2)", [userId, department]);
-  }
+  // A conta nasce só com Minha área: o acesso aos departamentos é dado pelo Administrador em Usuários > Acesso.
   return { userId, createdAuthUserId: created.data.user.id };
 }

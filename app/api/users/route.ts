@@ -21,7 +21,8 @@ export async function GET() {
     const [users, roles, departments, bienniums, workers] = await Promise.all([
       dbPool().query(`select u.id,u.auth_user_id,u.email,u.full_name,u.role_key,u.status,u.created_at,u.version,u.biennium_id,u.worker_id,u.admissions_access,
         app.user_access_allowed(u.id) as access_allowed,
-        coalesce(array_agg(ud.department_key) filter (where ud.department_key is not null),'{}') departments
+        coalesce(array_agg(ud.department_key order by ud.department_key) filter (where ud.department_key is not null),'{}') departments,
+        coalesce(json_object_agg(ud.department_key, ud.access_level) filter (where ud.department_key is not null),'{}') access
         from app.users u left join app.user_departments ud on ud.user_id=u.id group by u.id order by u.full_name`),
       dbPool().query("select key,label from app.roles order by label"),
       dbPool().query("select key,label from app.departments where active order by label"),
@@ -68,7 +69,9 @@ export async function POST(request: Request) {
     authId = invited.data.user.id;
     const id = await transaction(async (client) => {
       const inserted = await client.query<{ id: string }>(`insert into app.users (auth_user_id,email,full_name,role_key,status,admissions_access,created_by,updated_by) values ($1,$2,$3,$4,$5,$6,$7,$7) returning id`, [authId, input.email.toLowerCase(), input.name, input.role, input.status, input.admissions_access, actor!.id]);
-      for (const department of input.departments) await client.query("insert into app.user_departments(user_id,department_key) values($1,$2)", [inserted.rows[0].id, department]);
+      // Coordenador e Subcoordenador já entram coordenando; os demais só consultam (o Administrador ajusta em Acesso).
+      const level = ["coordenador", "subcoordenador"].includes(input.role) ? "coordenacao" : "consulta";
+      for (const department of input.departments) await client.query("insert into app.user_departments(user_id,department_key,access_level,updated_by) values($1,$2,$3,$4)", [inserted.rows[0].id, department, level, actor!.id]);
       await appendAudit(actor!, { category: "Inclusão", action: "Convite de usuário", module: "Controle de Acesso", section: "Usuários e Perfis", entityType: "user", entityId: inserted.rows[0].id, result: "success", details: `${input.name} · ${input.role} · ${input.status}${input.admissions_access ? " · com admissão" : ""}.` }, client);
       return inserted.rows[0].id;
     });

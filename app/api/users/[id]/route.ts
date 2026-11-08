@@ -8,7 +8,9 @@ import { assertSameOrigin } from "@/lib/csrf";
 
 const schema = z.object({
   name: z.string().trim().min(3).max(160), role: z.string().regex(/^[a-z_]+$/),
-  status: z.enum(["pending", "active", "suspended"]), departments: z.array(z.string().regex(/^[a-z_]+$/)).max(12),
+  status: z.enum(["pending", "active", "suspended"]),
+  /** Ignorado: o acesso aos departamentos é por pessoa, em /api/users/[id]/access. */
+  departments: z.array(z.string()).optional(),
   biennium_id: z.string().uuid().nullable().optional(),
   worker_id: z.string().uuid().nullable().optional(),
   admissions_access: z.boolean().default(false),
@@ -38,9 +40,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         [id, input.name, input.role, input.status, actor!.id, input.version, input.biennium_id ?? null, input.worker_id ?? null, input.admissions_access]
       );
       if (!updated.rowCount) throw new AppError("Conflito ao atualizar usuário.", 409, "VERSION_CONFLICT");
-      await client.query("delete from app.user_departments where user_id=$1", [id]);
-      for (const department of input.departments) await client.query("insert into app.user_departments(user_id,department_key) values($1,$2)", [id, department]);
-      await appendAudit(actor!, { category: "Segurança", action: "Alteração de acesso", module: "Controle de Acesso", section: "Usuários e Perfis", entityType: "user", entityId: id, result: "success", details: `${input.name} · ${input.role} · ${input.status}${input.admissions_access ? " · com admissão" : ""}.`, before, after: { name: input.name, role: input.role, status: input.status, departments: input.departments, biennium_id: input.biennium_id ?? null, worker_id: input.worker_id ?? null, admissions_access: input.admissions_access } }, client);
+      await appendAudit(actor!, { category: "Segurança", action: "Alteração de acesso", module: "Controle de Acesso", section: "Usuários e Perfis", entityType: "user", entityId: id, result: "success", details: `${input.name} · ${input.role} · ${input.status}${input.admissions_access ? " · com admissão" : ""}.`, before, after: { name: input.name, role: input.role, status: input.status, biennium_id: input.biennium_id ?? null, worker_id: input.worker_id ?? null, admissions_access: input.admissions_access } }, client);
     });
     return Response.json({ status: "updated" });
   } catch (error) {

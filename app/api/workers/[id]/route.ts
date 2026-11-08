@@ -9,7 +9,7 @@ import { requireFlag } from "@/lib/feature-flags";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { provisionWorkerAccess } from "@/lib/worker-access";
 import {
-  assertWorkerScope, canEditWorkerFicha, departmentsWith, fichaSchema, normalizeFicha, statusAfterEdit, todayInSaoPaulo, updateWorkerFicha, type WorkerStatus
+  assertWorkerScope, canEditWorkerFicha, canSeeContact, contactScope, fichaBasica, departmentsWith, fichaSchema, normalizeFicha, statusAfterEdit, todayInSaoPaulo, updateWorkerFicha, type WorkerStatus
 } from "@/lib/workers";
 
 const patchSchema = fichaSchema.extend({
@@ -48,7 +48,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         where x.worker_id = $1 order by x.decided_at desc`,
       [id]
     );
-    return Response.json({ worker, history: history.rows }, { headers: { "Cache-Control": "private, no-store" } });
+    const visible = canSeeContact(await contactScope(actor), worker.departments) ? worker : fichaBasica(worker);
+    return Response.json({ worker: visible, history: history.rows }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }

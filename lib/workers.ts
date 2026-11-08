@@ -191,3 +191,23 @@ export async function updateWorkerFicha(
     await db.query("insert into app.worker_departments(worker_id, department_key) values ($1,$2)", [id, department]);
   }
 }
+
+/**
+ * Telefone, e-mail e dados pessoais da ficha: só para quem coordena (edita) o departamento da ficha,
+ * Secretaria e Presidência. Quem tem só Consulta vê nome, funções e situação.
+ */
+export async function contactScope(actor: Actor): Promise<string[] | null> {
+  if (await hasPermission(actor, "presidencia", "read")) return null;
+  return departmentsWith(actor, "update");
+}
+
+export function canSeeContact(scope: string[] | null, departments: readonly string[]) {
+  return scope === null || departments.some((department) => scope.includes(department));
+}
+
+const FICHA_BASICA = ["id", "full_name", "status", "functions", "departments", "available_days", "origin_department", "requested_at", "approved_at", "version"] as const;
+
+/** Versão da ficha para quem só consulta: sem contato, CPF, endereço nem data de nascimento. */
+export function fichaBasica<T extends Record<string, unknown>>(worker: T) {
+  return Object.fromEntries(FICHA_BASICA.filter((key) => key in worker).map((key) => [key, worker[key]])) as Partial<T>;
+}

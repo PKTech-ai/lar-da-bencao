@@ -36,7 +36,8 @@ export async function requireActor(): Promise<Actor> {
 
   const result = await query<ActorRow>(
     `select u.id, u.auth_user_id, u.email, u.full_name, u.role_key, u.status, u.sessions_valid_after, u.must_reset_password, app.user_access_allowed(u.id) as access_allowed,
-            coalesce(array_agg(ud.department_key) filter (where ud.department_key is not null), '{}') as departments
+            -- Só Consulta e Coordenação: a Chamada não dá acesso ao departamento (ver lib/education-data.ts).
+            coalesce(array_agg(ud.department_key) filter (where ud.department_key is not null and ud.access_level <> 'chamada'), '{}') as departments
        from app.users u
        left join app.user_departments ud on ud.user_id = u.id
       where u.auth_user_id = $1

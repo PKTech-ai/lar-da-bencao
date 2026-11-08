@@ -5,7 +5,7 @@ import { assertSameOrigin } from "@/lib/csrf";
 import { query, transaction } from "@/lib/db";
 import { AppError, AuthorizationError, errorResponse } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
-import { departmentsWith, fichaSchema, insertWorker, normalizeFicha } from "@/lib/workers";
+import { canSeeContact, contactScope, departmentsWith, fichaSchema, insertWorker, normalizeFicha } from "@/lib/workers";
 
 const createSchema = fichaSchema.extend({ origin_department: z.string().regex(/^[a-z_]+$/).optional() });
 const listSchema = z.object({
@@ -39,7 +39,9 @@ export async function GET(request: Request) {
         order by (w.status = 'pending') desc, w.full_name`,
       [filters.status ?? null, scope, filters.department ?? null]
     );
-    return Response.json({ workers: result.rows }, { headers: { "Cache-Control": "private, no-store" } });
+    const contacts = await contactScope(actor);
+    const workers = result.rows.map((w) => canSeeContact(contacts, w.departments as string[]) ? w : { ...w, phone: null, email: null, birth_date: null });
+    return Response.json({ workers }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }

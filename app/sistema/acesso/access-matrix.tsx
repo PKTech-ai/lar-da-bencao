@@ -57,12 +57,12 @@ export function AccessMatrix({ canSimulate }: { canSimulate: boolean }) {
   const selectedRole = editableRoles.find((r) => r.key === roleKey) ?? editableRoles[0];
   const exceptionsOf = (role: string) => overrides.filter((o) => o.role_key === role && o.page_key !== "acesso").length;
   const accessOf = (role: string, page: string) => {
-    const fallback = defaultAccess(role, page, grantOf(role, page), departmentPages);
+    const fallback = defaultAccess(page, grantOf(role, page), departmentPages);
     const exception = overrideOf(role, page);
     const level = asLevel(exception?.level);
     return { fallback, exception, level, current: level ?? fallback.level };
   };
-  const pagesWith = (role: string, level: AccessLevel | null) =>
+  const pagesWith = (role: string, level: AccessLevel) =>
     editablePages.filter((p) => accessOf(role, p.key).current === level).map((p) => p.label);
 
   function change(role: string, page: string, level: AccessLevel | "default") {
@@ -120,6 +120,10 @@ export function AccessMatrix({ canSimulate }: { canSimulate: boolean }) {
             Escolha um perfil e veja o que ele acessa em cada página. Para mudar, toque no nível desejado: fica registrado
             como exceção, com autor e data. O Administrador vê tudo.
           </p>
+          <p className="small muted no-print">
+            Nas páginas de departamento, cada pessoa ainda recebe o próprio acesso (Nenhum, Chamada, Consulta ou Coordenação)
+            em Usuários, no botão Acesso. Esse acesso vale por cima das exceções do perfil.
+          </p>
           {selectedRole ? (
             <div className="access-layout no-print">
               <nav className="folder-tree access-roles" aria-label="Perfis">
@@ -145,7 +149,6 @@ export function AccessMatrix({ canSimulate }: { canSimulate: boolean }) {
                 <h3 className="access-title">{selectedRole.label}</h3>
                 <p className="small muted access-summary">
                   Completo em {pagesWith(selectedRole.key, "full").length} · Consulta em {pagesWith(selectedRole.key, "read").length}
-                  {pagesWith(selectedRole.key, null).length ? ` · Pelo departamento em ${pagesWith(selectedRole.key, null).length}` : ""}
                   {" "}· Sem acesso em {pagesWith(selectedRole.key, "none").length}
                 </p>
                 <ul className="access-list">
@@ -162,7 +165,7 @@ export function AccessMatrix({ canSimulate }: { canSimulate: boolean }) {
                               <button type="button" className="link-button" disabled={busy} onClick={() => change(selectedRole.key, page.key, "default")}>Voltar ao padrão</button>
                             </span>
                           ) : (
-                            <span className={fallback.level ? "small muted" : "small access-dept"}>{fallback.level ? "Padrão do perfil" : fallback.text}</span>
+                            <span className="small muted">Padrão do perfil{fallback.byPerson ? <> · <span className="access-dept">mais o acesso de cada pessoa</span></> : null}</span>
                           )}
                         </div>
                         <div className="level-switch" role="group" aria-label={`Acesso de ${selectedRole.label} em ${page.label}`}>
@@ -201,16 +204,15 @@ export function AccessMatrix({ canSimulate }: { canSimulate: boolean }) {
           ) : <p className="small muted no-print">Nenhuma exceção registrada: todos os perfis seguem o padrão.</p>}
           {editableRoles.length ? <div className="access-print">
             <h2>Acesso por perfil</h2>
-            <p className="small">O Administrador vê tudo. Páginas que não aparecem na linha do perfil ficam sem acesso. Impresso em {new Date().toLocaleDateString("pt-BR")}.</p>
+            <p className="small">O Administrador vê tudo. Páginas que não aparecem na linha do perfil ficam sem acesso, salvo o acesso por departamento dado a cada pessoa em Usuários. Impresso em {new Date().toLocaleDateString("pt-BR")}.</p>
             <table data-grid="">
-              <thead><tr><th>Perfil</th><th>Completo</th><th>Consulta</th><th>Pelo departamento</th></tr></thead>
+              <thead><tr><th>Perfil</th><th>Completo</th><th>Consulta</th></tr></thead>
               <tbody>
                 {editableRoles.map((role) => (
                   <tr key={role.key}>
                     <td><strong>{role.label}</strong></td>
                     <td>{pagesWith(role.key, "full").join(", ") || "—"}</td>
                     <td>{pagesWith(role.key, "read").join(", ") || "—"}</td>
-                    <td>{pagesWith(role.key, null).join(", ") || "—"}</td>
                   </tr>
                 ))}
               </tbody>

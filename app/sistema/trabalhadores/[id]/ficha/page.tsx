@@ -8,7 +8,7 @@ import { appendAudit } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { requireModulePage } from "@/lib/page-auth";
 import { WEEKDAYS, workerStatusLabel, type WorkerStatus } from "@/lib/worker-constants";
-import { departmentsWith } from "@/lib/workers";
+import { contactScope } from "@/lib/workers";
 
 type Ficha = {
   id: string; full_name: string; cpf: string | null; phone: string | null; email: string | null; birth_date: Date | null; naturality: string | null;
@@ -35,7 +35,8 @@ export default async function WorkerFichaPage({ params }: { params: Promise<{ id
   );
   const ficha = result.rows[0] as (Ficha & { department_keys: string[] }) | undefined;
   if (!ficha || (ficha.status !== "active" && ficha.status !== "inactive")) notFound();
-  const scope = await departmentsWith(actor, "read");
+  // Ficha completa (CPF, endereço, contato): só quem coordena o departamento, Secretaria e Presidência.
+  const scope = await contactScope(actor);
   if (scope && !ficha.department_keys.some((d) => scope.includes(d))) notFound();
   const decision = await query<{ meeting_date: Date; minute_ref: string; decided_by_name: string }>(
     `select x.meeting_date, x.minute_ref, u.full_name as decided_by_name

@@ -5,34 +5,24 @@ const DEPT = ["infancia", "tesouraria"];
 
 describe("defaultAccess", () => {
   it("Documentos e Organograma são consulta para todos", () => {
-    expect(defaultAccess("brecho", "documentos", null, DEPT)).toEqual({ level: "read", text: "Consulta" });
-    expect(defaultAccess("coordenador", "organograma", "full", DEPT).level).toBe("read");
+    expect(defaultAccess("documentos", null, DEPT)).toEqual({ level: "read", text: "Consulta", byPerson: false });
+    expect(defaultAccess("organograma", "full", DEPT).level).toBe("read");
   });
 
-  it("concessão completa vale sempre", () => {
-    expect(defaultAccess("coordenador", "infancia", "full", DEPT).level).toBe("full");
+  it("segue a concessão do perfil", () => {
+    expect(defaultAccess("infancia", "full", DEPT).level).toBe("full");
+    expect(defaultAccess("infancia", "read", DEPT).level).toBe("read");
+    expect(defaultAccess("visaogeral", null, DEPT)).toEqual({ level: "none", text: "Sem acesso", byPerson: false });
   });
 
-  it("coordenação depende do departamento nas páginas ligadas a um", () => {
-    expect(defaultAccess("coordenador", "infancia", null, DEPT)).toEqual({ level: null, text: "Completo só para quem é do departamento" });
-    expect(defaultAccess("subcoordenador", "infancia", "read", DEPT).level).toBeNull();
-    expect(defaultAccess("coordenador", "visaogeral", null, DEPT)).toEqual({ level: "none", text: "Sem acesso" });
-  });
-
-  it("trabalhador ganha consulta pelo departamento", () => {
-    expect(defaultAccess("trabalhador", "infancia", null, DEPT).level).toBeNull();
-    expect(defaultAccess("evangelizador", "infancia", "read", DEPT).level).toBe("read");
-  });
-
-  it("os demais perfis seguem só a concessão", () => {
-    expect(defaultAccess("auditoria", "infancia", "read", DEPT).level).toBe("read");
-    expect(defaultAccess("auditoria", "infancia", null, DEPT).level).toBe("none");
+  it("marca as páginas de departamento, em que vale também o acesso de cada pessoa", () => {
+    expect(defaultAccess("infancia", null, DEPT)).toEqual({ level: "none", text: "Sem acesso", byPerson: true });
+    expect(defaultAccess("visaogeral", "read", DEPT).byPerson).toBe(false);
   });
 });
 
 describe("levelToSave", () => {
-  const consulta = { level: "read" as const, text: "Consulta" };
-  const porDepartamento = { level: null, text: "Completo só para quem é do departamento" };
+  const consulta = { level: "read" as const, text: "Consulta", byPerson: false };
 
   it("não grava o que já está valendo", () => {
     expect(levelToSave("read", null, consulta)).toBeNull();
@@ -45,6 +35,6 @@ describe("levelToSave", () => {
 
   it("escolher outro nível grava exceção", () => {
     expect(levelToSave("full", null, consulta)).toBe("full");
-    expect(levelToSave("read", null, porDepartamento)).toBe("read");
+    expect(levelToSave("none", null, consulta)).toBe("none");
   });
 });

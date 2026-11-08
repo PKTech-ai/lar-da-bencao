@@ -59,6 +59,32 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect(await hasPermission(coordinator, "education_class", "update", "infancia")).toBe(true);
   });
 
+  it("acesso por pessoa: Chamada, Consulta e Coordenação", async () => {
+    // Evangelizador que também é médium: Chamada na Infância, nada na Doutrina.
+    const caller = await createActor("trabalhador", ["infancia"], "chamada");
+    expect(await hasPermission(caller, "department", "read", "infancia")).toBe(false);
+    expect(await hasPermission(caller, "education_class", "update", "infancia")).toBe(true);
+    expect(await hasPermission(caller, "education_class", "update", "juventude")).toBe(false);
+    expect(await hasPermission(caller, "department", "read", "doutrina")).toBe(false);
+    expect(await query<{ level: string | null }>("select app.page_level($1, 'infancia') as level", [caller.id]).then((r) => r.rows[0].level)).toBeNull();
+    // Consulta vê sem alterar; Coordenação altera, mesmo sem o perfil de Coordenador.
+    const reader = await createActor("trabalhador", ["doutrina"], "consulta");
+    expect(await hasPermission(reader, "department", "read", "doutrina")).toBe(true);
+    expect(await hasPermission(reader, "department", "update", "doutrina")).toBe(false);
+    // Coordenador de outro departamento com só Consulta aqui: vê, mas não altera turma, cronograma nem anexos.
+    const visitor = await createActor("coordenador", ["infancia"], "consulta");
+    expect(await hasPermission(visitor, "department", "read", "infancia")).toBe(true);
+    expect(await hasPermission(visitor, "department", "update", "infancia")).toBe(false);
+    expect(await hasPermission(visitor, "education_class", "update", "infancia")).toBe(false);
+    expect(await hasPermission(visitor, "attachments", "create", "infancia")).toBe(false);
+    expect(await hasPermission(visitor, "attachments", "read", "infancia")).toBe(true);
+    const evangelizer = await createActor("evangelizador", ["infancia"], "consulta");
+    expect(await hasPermission(evangelizer, "education_class", "update", "infancia")).toBe(false);
+    const lead = await createActor("trabalhador", ["doutrina"], "coordenacao");
+    expect(await hasPermission(lead, "department", "update", "doutrina")).toBe(true);
+    expect(await hasPermission(lead, "department", "update", "juventude")).toBe(false);
+  });
+
   it.each([
     // [perfil, departamentos, recurso, ação, departamento, esperado]
     ["trabalhador", ["doutrina"], "department", "create", "doutrina", false],
