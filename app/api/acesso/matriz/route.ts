@@ -17,14 +17,19 @@ export async function GET() {
   try {
     const actor = await requireActor();
     await assertPermission(actor, "users", "admin");
-    const [pages, roles, grants, overrides] = await Promise.all([
+    const [pages, roles, grants, overrides, departmentPages] = await Promise.all([
       query("select key, label, sort_order from app.pages order by sort_order, label"),
       query("select key, label from app.roles order by label"),
       query("select role_key, page_key, level from app.page_grants"),
-      query("select o.role_key, o.page_key, o.level, o.updated_at, u.full_name as updated_by_name from app.page_grant_overrides o left join app.users u on u.id = o.updated_by")
+      query("select o.role_key, o.page_key, o.level, o.updated_at, u.full_name as updated_by_name from app.page_grant_overrides o left join app.users u on u.id = o.updated_by"),
+      // Páginas ligadas a um departamento: nelas, quem é do departamento ganha acesso pelo vínculo (app.page_level).
+      query<{ page_key: string }>("select distinct page_key from app.departments where page_key is not null")
     ]);
     return Response.json(
-      { pages: pages.rows, roles: roles.rows, grants: grants.rows, overrides: overrides.rows },
+      {
+        pages: pages.rows, roles: roles.rows, grants: grants.rows, overrides: overrides.rows,
+        departmentPages: departmentPages.rows.map((row) => row.page_key)
+      },
       { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch (error) {
