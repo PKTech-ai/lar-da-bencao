@@ -5,14 +5,30 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useShowMore } from "@/components/show-more";
 
 type Option = { key: string; label: string };
-type User = { id: string; email: string; full_name: string; role_key: string; status: string; departments: string[]; access: Record<string, string>; version: number; invite_pending: boolean | null; last_login: string | null; biennium_id: string | null; worker_id: string | null; access_allowed: boolean; admissions_access: boolean };
+type User = { id: string; email: string; full_name: string; role_key: string; status: string; departments: string[]; version: number; invite_pending: boolean | null; last_login: string | null; biennium_id: string | null; worker_id: string | null; access_allowed: boolean; admissions_access: boolean };
 type Biennium = { id: string; label: string; starts_on: string; ends_on: string; status: string };
 type Payload = { users: User[]; roles: Option[]; departments: Option[]; bienniums: Biennium[]; workers: { id: string; full_name: string }[] };
-const LEVEL_LABEL: Record<string, string> = { chamada: "Chamada", consulta: "Consulta", coordenacao: "Coordenação" };
+
+function departmentsText(user: User, departments: Option[]) {
+  if (!user.departments.length) return "Só Minha área";
+  const names = user.departments.map((key) => departments.find((d) => d.key === key)?.label ?? key);
+  return names.length > 2 ? `${names.slice(0, 2).join(", ")} +${names.length - 2}` : names.join(", ");
+}
+
+/** Só o que precisa de atenção aparece na linha. */
+function flagsOf(user: User) {
+  const flags: { label: string; tone: "building" | "danger" }[] = [];
+  if (user.status === "suspended") flags.push({ label: "Suspenso", tone: "danger" });
+  if (user.status === "active" && user.access_allowed === false) flags.push({ label: "Fora do biênio", tone: "danger" });
+  if (user.invite_pending) flags.push({ label: "Convite pendente", tone: "building" });
+  else if (user.status === "pending") flags.push({ label: "Pendente", tone: "building" });
+  return flags;
+}
 
 export function UserManager() {
   const [data, setData] = useState<Payload>({ users: [], roles: [], departments: [], bienniums: [], workers: [] });
   const [editing, setEditing] = useState<User | null>(null);
+  const [menu, setMenu] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const term = search.trim().toLocaleLowerCase("pt-BR");
   const users = data.users.filter((u) => !term || `${u.full_name} ${u.email}`.toLocaleLowerCase("pt-BR").includes(term));
@@ -63,7 +79,15 @@ export function UserManager() {
     }
   }
 
+  /** Ações dos três pontinhos: o resultado aparece no topo da tela. */
+  function act(work: () => void) {
+    setMenu(null);
+    work();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   const fields = (user?: User) => <>
+    {user ? <p className="small muted">E-mail de acesso: {user.email}<br />{user.last_login ? `Último acesso: ${new Date(user.last_login).toLocaleString("pt-BR")}` : "Nunca acessou"}</p> : null}
     <label>Nome completo<input name="name" defaultValue={user?.full_name} required minLength={3} maxLength={160} /></label>
     {!user ? <label>E-mail<input name="email" type="email" required /></label> : null}
     <label>Perfil<select name="role" defaultValue={user?.role_key ?? "trabalhador"}>{data.roles.map((role) => <option key={role.key} value={role.key}>{role.label}</option>)}</select></label>
@@ -96,6 +120,31 @@ export function UserManager() {
     <details className="card"><summary><h2 style={{ display: "inline" }}>+ Convidar usuário</h2></summary><form className="form-stack" style={{ marginTop: 16 }} onSubmit={create}>{fields()}<button className="button primary" disabled={busy}>Enviar convite</button></form></details>
     {editing ? <section className="card"><div className="toolbar"><h2>Editar acesso</h2><button className="button" onClick={() => setEditing(null)}>Cancelar</button></div><form className="form-stack" key={editing.id} onSubmit={save}>{fields(editing)}<button className="button primary" disabled={busy}>Salvar alteração</button></form></section> : null}
     {error ? <div className="error" role="alert">{error}</div> : null}{message ? <div className="success">{message}</div> : null}
-    <section className="card"><h2>Contas institucionais</h2><label className="filters">Buscar<input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome ou e-mail" /></label><div className="table-wrap"><table><thead><tr><th>Usuário</th><th>Perfil</th><th>Departamentos</th><th>Admissão</th><th>Situação</th><th>Acesso</th><th>Ação</th></tr></thead><tbody>{users.map((user, i) => <tr key={user.id} {...more.extra(i)}><td><strong>{user.full_name}</strong><br/><span className="muted">{user.email}</span></td><td>{data.roles.find((role) => role.key === user.role_key)?.label ?? user.role_key}</td><td className="small">{user.departments.map((key) => `${data.departments.find((d) => d.key === key)?.label ?? key}: ${LEVEL_LABEL[user.access?.[key]] ?? "Consulta"}`).join(" · ") || "Só Minha área"}</td><td>{user.admissions_access || user.role_key === "administrador" || user.role_key === "presidente" ? "Sim" : "Não"}</td><td>{user.status}{user.access_allowed === false ? <><br /><span className="status blocked">Fora do biênio</span></> : null}</td><td className="small">{user.invite_pending ? <span className="status building">Convite pendente</span> : null}<br />{user.last_login ? `Último acesso: ${new Date(user.last_login).toLocaleString("pt-BR")}` : "Nunca acessou"}</td><td><Link className="button primary" href={`/sistema/usuarios/${user.id}/acesso`}>Acesso</Link> <button className="button" onClick={() => setEditing(user)}>Editar</button>{user.invite_pending ? <> <button className="button" disabled={busy} onClick={() => void resendInvite(user)}>Reenviar convite</button></> : null} <button className="button danger" disabled={busy} onClick={() => void revokeSessions(user.id)}>Encerrar sessões</button></td></tr>)}</tbody></table></div>{more.button}</section>
+    <section className="card">
+      <h2>Contas institucionais</h2>
+      <input className="ul-search" type="search" aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nome" />
+      <ul className="ul-list">
+        {users.map((user, i) => <li key={user.id} {...more.extra(i)}>
+          <div className="ul-row">
+            <div className="ul-person">
+              <strong>{user.full_name}</strong>
+              <span className="small muted">{data.roles.find((role) => role.key === user.role_key)?.label ?? user.role_key} · {departmentsText(user, data.departments)}</span>
+            </div>
+            <div className="ul-flags">{flagsOf(user).map((flag) => <span key={flag.label} className={`status ${flag.tone}`}>{flag.label}</span>)}</div>
+            <div className="ul-actions">
+              <Link className="button" href={`/sistema/usuarios/${user.id}/acesso`}>Acesso</Link>
+              <button type="button" className="button ul-more" aria-label={`Mais opções de ${user.full_name}`} aria-expanded={menu === user.id} onClick={() => setMenu(menu === user.id ? null : user.id)}>⋯</button>
+            </div>
+          </div>
+          {menu === user.id ? <div className="ul-menu">
+            <button type="button" className="button" onClick={() => act(() => setEditing(user))}>Editar</button>
+            {user.invite_pending ? <button type="button" className="button" disabled={busy} onClick={() => act(() => void resendInvite(user))}>Reenviar convite</button> : null}
+            <button type="button" className="button danger" disabled={busy} onClick={() => act(() => void revokeSessions(user.id))}>Encerrar sessões</button>
+          </div> : null}
+        </li>)}
+      </ul>
+      {term && !users.length ? <p className="small muted">Ninguém encontrado.</p> : null}
+      {more.button}
+    </section>
   </div>;
 }

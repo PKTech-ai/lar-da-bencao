@@ -818,7 +818,7 @@ tfoot:has(.show-more) { display: none; }
   table[data-cards] > tbody > tr > td:empty { display: none; }
 
   /* Listas longas: o resto aparece com "Mostrar mais". */
-  tr[data-extra] { display: none !important; }
+  tr[data-extra], li[data-extra] { display: none !important; }
   .show-more { display: flex; width: 100%; margin-top: 4px; }
   tfoot:has(.show-more) { display: block; }
   tfoot:has(.show-more) td { display: block; border: 0; padding: 8px 0 0; background: none; }
@@ -1043,4 +1043,22 @@ a.pn-kpi:hover { border-color: var(--border-soft); background: var(--surface-hov
   .access-print { display: block; }
   .access-print table { min-width: 0; }
   .access-print th, .access-print td { font-size: 11px; padding: 5px 6px; border: 1px solid #d4e3e9; }
+}
+
+/* Usuários: uma linha por pessoa; o que é menos usado fica nos três pontinhos. */
+.ul-search { margin-top: 12px; }
+.ul-list { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--border-faint); }
+.ul-list > li { border-bottom: 1px solid var(--border-faint); }
+.ul-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px 14px; padding: 10px 2px; }
+.ul-person strong, .ul-person span { display: block; overflow-wrap: anywhere; }
+.ul-flags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.ul-flags .status { white-space: nowrap; }
+.ul-actions { display: flex; gap: 8px; }
+.ul-more { min-width: 46px; padding: 0 10px; font-size: 20px; line-height: 1; }
+.ul-menu { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 0 2px 12px; }
+@media (max-width: 720px) {
+  .ul-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ul-flags { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .ul-flags:empty { display: none; }
+  .ul-menu { justify-content: flex-start; }
 }

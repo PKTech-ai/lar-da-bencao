@@ -21,8 +21,7 @@ export async function GET() {
     const [users, roles, departments, bienniums, workers] = await Promise.all([
       dbPool().query(`select u.id,u.auth_user_id,u.email,u.full_name,u.role_key,u.status,u.created_at,u.version,u.biennium_id,u.worker_id,u.admissions_access,
         app.user_access_allowed(u.id) as access_allowed,
-        coalesce(array_agg(ud.department_key order by ud.department_key) filter (where ud.department_key is not null),'{}') departments,
-        coalesce(json_object_agg(ud.department_key, ud.access_level) filter (where ud.department_key is not null),'{}') access
+        coalesce(array_agg(ud.department_key order by ud.department_key) filter (where ud.department_key is not null),'{}') departments
         from app.users u left join app.user_departments ud on ud.user_id=u.id group by u.id order by u.full_name`),
       dbPool().query("select key,label from app.roles order by label"),
       dbPool().query("select key,label from app.departments where active order by label"),

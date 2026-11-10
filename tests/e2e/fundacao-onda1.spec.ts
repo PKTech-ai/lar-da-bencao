@@ -256,7 +256,8 @@ test("Minha área: troca de senha", async () => {
 
 test("Encerrar sessões derruba o coordenador na hora", async () => {
   await admin.goto("/sistema/usuarios");
-  await admin.locator("tr", { hasText: COORD }).getByRole("button", { name: "Encerrar sessões" }).click();
+  await admin.getByRole("button", { name: "Mais opções de Coordenadora E2E" }).click();
+  await admin.getByRole("button", { name: "Encerrar sessões" }).click();
   await expect(admin.getByText("Sessões encerradas")).toBeVisible();
   await coord.goto("/sistema/doutrina");
   await expect(coord).toHaveURL(/\/login/);
