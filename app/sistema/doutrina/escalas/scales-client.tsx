@@ -120,7 +120,9 @@ export function ScalesClient() {
       const days = (list: unknown) => ((list as number[] | undefined) ?? []).map((d) => String(d).padStart(2, "0")).join(", ");
       const skipped = days(body.busyDays);
       const moved = days(body.movedDays);
+      const replaced = ((body.replaced as string[] | undefined) ?? []).join(", ");
       return `${name} agora é fixo 📌 nesta função e já foi colocado em todas as semanas do mês.`
+        + (replaced ? ` O fixo antigo em ${replaced}, que não estava valendo, foi retirado.` : "")
         + (moved ? ` No(s) dia(s) ${moved} saiu da outra atividade em que estava: escolha quem fica no lugar.` : "")
         + (skipped ? ` Fora do(s) dia(s) ${skipped}: indisponível na ficha.` : "");
     }, "/api/doutrina/scale/fixed");

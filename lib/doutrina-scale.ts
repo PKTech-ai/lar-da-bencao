@@ -146,6 +146,21 @@ export function validateFixed(pattern: FixedPattern, worker: ScaleWorker | undef
 }
 
 /**
+ * Fixos antigos da pessoa no mesmo dia que não estão valendo: a ficha já não permite (a geração os ignora)
+ * ou ela não aparece nessa posição em nenhuma semana da escala aberta. Não impedem fixar em outra função: dão lugar ao novo.
+ */
+export function supersededFixed(pattern: FixedPattern, worker: ScaleWorker | undefined, current: ReadonlyMap<string, string>,
+  sheet?: { ym: string; assignments: ReadonlyMap<string, string> }) {
+  if (!worker) return [];
+  return [...current].flatMap(([key, id]) => {
+    const other = id === worker.id && key !== fixedKey(pattern) ? parseFixedKey(key) : null;
+    if (!other || other.dow !== pattern.dow) return [];
+    const onSheet = !sheet || monthDays(sheet.ym, other.dow).some((day) => sheet.assignments.get(slotKey({ ...other, day })) === `w:${worker.id}`);
+    return validateFixed(other, worker, new Map()) || !onSheet ? [key] : [];
+  });
+}
+
+/**
  * Gera a escala do mês. `fixed` (`dia-da-semana|seção|linha|posição` → trabalhador) entra primeiro em todas as
  * ocorrências e já conta na divisão do mês; o restante segue a regra de sempre. Sem fixos, o resultado é o mesmo de antes.
  */

@@ -5,7 +5,7 @@ import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import { insertSlots, loadFixed, loadScale, loadScaleOptions, requireDoutrina } from "@/lib/doutrina-data";
-import { TEMPLATES, isValidMonth, monthDays, parseFixedKey, parseSlotKey, slotKey, validateFixed, validateSlotValue } from "@/lib/doutrina-scale";
+import { TEMPLATES, isValidMonth, monthDays, parseFixedKey, parseSlotKey, slotKey, supersededFixed, validateFixed, validateSlotValue } from "@/lib/doutrina-scale";
 
 /** `month`: escala aberta na tela; o fixo já entra em todas as semanas dela. */
 const markSchema = z.object({ key: z.string().max(20), worker_id: z.string().uuid(), month: z.string().refine(isValidMonth).optional() });
@@ -24,13 +24,20 @@ export async function POST(request: Request) {
     const result = await transaction(async (client) => {
       await client.query("select pg_advisory_xact_lock(hashtext('scale_fixed:doutrina'))");
       const [options, rows] = [await loadScaleOptions(client), await loadFixed(client)];
+      const scale = input.month ? await loadScale(input.month, client, true) : null;
+      const sheet = input.month && scale?.month && scale.month.status !== "deleted" ? { ym: input.month, assignments: scale.assignments } : undefined;
       const current = new Map(rows.filter((r) => r.key !== input.key).map((r) => [r.key, r.worker_id]));
       const worker = options.workers.find((w) => w.id === input.worker_id);
+      // Fixo antigo que não está valendo não bloqueia: dá lugar ao novo.
+      const supersededKeys = new Set(supersededFixed(pattern, worker, current, sheet));
+      const superseded = rows.filter((r) => supersededKeys.has(r.key));
+      for (const key of supersededKeys) current.delete(key);
       const problem = validateFixed(pattern, worker, current);
       if (problem) throw new AppError(problem, 409, "FIXED_INVALID");
       const section = TEMPLATES[pattern.dow][pattern.si];
       const label = section.r[pattern.ri][0];
       const before = rows.find((r) => r.key === input.key);
+      if (superseded.length) await client.query("delete from app.scale_fixed_assignments where id = any($1::uuid[])", [superseded.map((r) => r.id)]);
       await client.query(
         "delete from app.scale_fixed_assignments where department_key='doutrina' and dow=$1 and section_index=$2 and role_index=$3 and position=$4",
         [pattern.dow, pattern.si, pattern.ri, pattern.pos]
@@ -46,7 +53,6 @@ export async function POST(request: Request) {
       const applied: number[] = [];
       const busyDays: number[] = [];
       const movedDays: number[] = [];
-      const scale = input.month ? await loadScale(input.month, client, true) : null;
       if (input.month && scale?.month && scale.month.status !== "deleted") {
         const value = `w:${worker!.id}`;
         const current = new Map(scale.assignments);
@@ -93,10 +99,10 @@ export async function POST(request: Request) {
       }
       await appendAudit(actor, {
         category: before ? "Edição" : "Inclusão", action: "Trabalhador marcado como fixo na escala", ...audit, entityId: inserted.rows[0].id,
-        details: `${worker!.name} · ${section.n} → ${label}${applied.length ? ` · aplicado em ${input.month}: dias ${applied.join(", ")}` : ""}${movedDays.length ? ` · retirado de outra atividade nos dias ${movedDays.join(", ")}` : ""}`,
+        details: `${worker!.name} · ${section.n} → ${label}${applied.length ? ` · aplicado em ${input.month}: dias ${applied.join(", ")}` : ""}${movedDays.length ? ` · retirado de outra atividade nos dias ${movedDays.join(", ")}` : ""}${superseded.length ? ` · deixou de ser fixo em ${superseded.map((r) => r.section_name).join(", ")}` : ""}`,
         before: before ? { worker: before.worker_name } : null, after: { worker: worker!.name }
       }, client);
-      return { id: inserted.rows[0].id, applied: applied.length, busyDays, movedDays };
+      return { id: inserted.rows[0].id, applied: applied.length, busyDays, movedDays, replaced: superseded.map((r) => r.section_name) };
     });
     return Response.json(result, { status: 201 });
   } catch (error) {

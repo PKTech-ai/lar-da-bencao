@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { attendanceStats, isValidAttendanceCell } from "@/lib/doutrina-attendance";
 import {
-  FREE_THEME, buildScale, canAddExtra, findConflicts, fixedKey, monthDays, parseFixedKey, parseSlotKey, roleOf, slotKey, studySequence, validateFixed,
+  FREE_THEME, buildScale, canAddExtra, findConflicts, fixedKey, monthDays, parseFixedKey, parseSlotKey, roleOf, slotKey, studySequence, supersededFixed, validateFixed,
   validateSlotValue, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
@@ -254,6 +254,28 @@ describe("trabalhadores fixos", () => {
     expect(validateFixed({ dow: 1, si: 0, ri: 1, pos: 0 }, undefined, new Map())).toMatch(/fora da Doutrina/);
     expect(validateFixed({ dow: 1, si: 0, ri: 2, pos: 0 }, ana, new Map([["1|0|0|0", ana.id]]))).toMatch(/já está fixo/);
     expect(validateFixed({ dow: 5, si: 3, ri: 2, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toBeNull();
+  });
+
+  it("fixo antigo que não está valendo não bloqueia; o que está na escala continua bloqueando", () => {
+    const recep = { dow: 3, si: 0, ri: 0, pos: 1 };
+    const entrev = fixedKey({ dow: 3, si: 1, ri: 0, pos: 0 });
+    const fixedNow = new Map([[entrev, ana.id]]);
+    const days = monthDays("2026-11", 3);
+    const inEntrev = (list: number[]) => new Map(list.map((day): [string, string] => [slotKey({ dow: 3, si: 1, ri: 0, day, pos: 0 }), `w:${ana.id}`]));
+    const empty = new Map(days.map((day): [string, string] => [slotKey({ dow: 3, si: 1, ri: 0, day, pos: 0 }), ""]));
+    const both = { ...ana, functions: ["Recepcionista", "Entrevistador"], days: [3] };
+
+    // Fora da folha em todas as semanas: dá lugar ao novo.
+    expect(supersededFixed(recep, both, fixedNow, { ym: "2026-11", assignments: empty })).toEqual([entrev]);
+    // Em pelo menos uma semana continua lá: o aviso é verdadeiro e fica.
+    expect(supersededFixed(recep, both, fixedNow, { ym: "2026-11", assignments: new Map([...empty, ...inEntrev([days[2]])]) })).toEqual([]);
+    // Sem escala aberta para comparar, não mexe.
+    expect(supersededFixed(recep, both, fixedNow)).toEqual([]);
+    // A ficha já não tem a função: a geração ignora esse fixo, então não bloqueia, mesmo estando na folha antiga.
+    expect(supersededFixed(recep, { ...both, functions: ["Recepcionista"] }, fixedNow, { ym: "2026-11", assignments: inEntrev(days) })).toEqual([entrev]);
+    // Outro dia da semana e outra pessoa não entram na conta.
+    expect(supersededFixed({ ...recep, dow: 5 }, both, fixedNow, { ym: "2026-11", assignments: empty })).toEqual([]);
+    expect(supersededFixed(recep, { ...both, id: uuid(998) }, fixedNow, { ym: "2026-11", assignments: empty })).toEqual([]);
   });
 
   it("fixo em posição adicional (recepção) entra em todas as semanas; onde não aceita adicional, recusa", () => {
