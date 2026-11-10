@@ -95,7 +95,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
       setEditing(null);
       if (body.approved && body.linkedExisting) return "Ficha salva e aprovada. Ela foi vinculada ao acesso que este CPF já possui. O login e o perfil permanecem os mesmos.";
       if (body.approved) return "Ficha salva e aprovada. O trabalhador fica ativo.";
-      return body.resubmitted ? "Ficha atualizada e encaminhada para nova análise da Diretoria." : "Ficha atualizada.";
+      return "Ficha atualizada.";
     });
   }
 

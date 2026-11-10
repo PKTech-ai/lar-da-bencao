@@ -9,7 +9,7 @@ import { requireFlag } from "@/lib/feature-flags";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { provisionWorkerAccess } from "@/lib/worker-access";
 import {
-  assertWorkerScope, canEditWorkerFicha, canSeeContact, contactScope, fichaBasica, departmentsWith, fichaSchema, normalizeFicha, statusAfterEdit, todayInSaoPaulo, updateWorkerFicha, type WorkerStatus
+  assertWorkerScope, canEditWorkerFicha, canSeeContact, contactScope, fichaBasica, departmentsWith, fichaSchema, normalizeFicha, todayInSaoPaulo, updateWorkerFicha, type WorkerStatus
 } from "@/lib/workers";
 
 const patchSchema = fichaSchema.extend({
@@ -94,24 +94,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           module: "Trabalhadores", section: "Admissões", entityType: "worker", entityId: id, details: before.full_name,
           before: { status: before.status }, after: { status }
         }, client);
-        return { status, resubmitted: false };
+        return { status };
       }
 
-      const edit = statusAfterEdit(before.status, before, input);
-      let resubmitted = edit.resubmitted;
-      let status = edit.status;
+      // Só o Administrador chega aqui, e o salvar dele já vale como aprovação: ficha aprovada continua aprovada e na escala.
       const approveOnSave = before.status === "pending" || before.status === "rejected";
-      if (approveOnSave) {
-        status = "active";
-        resubmitted = false;
-      } else if (raw.active !== undefined && !resubmitted) {
-        if (before.status !== "active" && before.status !== "inactive") {
-          throw new AppError("Somente trabalhador aprovado pela Diretoria pode ser ativado ou afastado.", 409, "NOT_APPROVED");
-        }
-        status = raw.active ? "active" : "inactive";
-      }
+      const status: WorkerStatus = approveOnSave ? "active" : raw.active === undefined ? before.status : raw.active ? "active" : "inactive";
 
-      await updateWorkerFicha(client, id, input, { status, resubmitted, authorId: author.id });
+      await updateWorkerFicha(client, id, input, { status, resubmitted: false, authorId: author.id });
       let accessNote = "";
       if (approveOnSave) {
         const today = todayInSaoPaulo();
@@ -139,7 +129,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       }
       await appendAudit(author, {
         category: "Edição",
-        action: approveOnSave ? "Ficha editada e aprovada" : resubmitted ? "Ficha reenviada para análise da Diretoria" : status !== before.status ? (status === "active" ? "Trabalhador reativado" : "Trabalhador afastado") : "Atualização de ficha de trabalhador",
+        action: approveOnSave ? "Ficha editada e aprovada" : status !== before.status ? (status === "active" ? "Trabalhador reativado" : "Trabalhador afastado") : "Atualização de ficha de trabalhador",
         module: "Trabalhadores",
         section: "Admissões",
         entityType: "worker",
@@ -148,7 +138,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         before: { status: before.status, departments: before.departments, functions: before.functions },
         after: { status, departments: input.departments, functions: input.functions }
       }, client);
-      return { status, resubmitted, approved: approveOnSave, linkedExisting: approveOnSave && !createdAuthUserId && Boolean(accessNote) };
+      return { status, approved: approveOnSave, linkedExisting: approveOnSave && !createdAuthUserId && Boolean(accessNote) };
     });
     return Response.json({ result: "updated", ...outcome });
   } catch (error) {

@@ -120,16 +120,14 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...readFicha(form), version: editing.version })
         });
-        const body = await response.json().catch(() => ({})) as { error?: string; approved?: boolean; resubmitted?: boolean; linkedExisting?: boolean };
+        const body = await response.json().catch(() => ({})) as { error?: string; approved?: boolean; linkedExisting?: boolean };
         if (!response.ok) throw new Error(body.error || "Não foi possível salvar a ficha.");
         setEditing(null);
         setMessage(body.linkedExisting
           ? "Ficha salva e aprovada. Ela foi vinculada ao acesso que este CPF já possui. O login e o perfil permanecem os mesmos."
           : wasUnapproved || body.approved
           ? "Ficha salva e aprovada. O trabalhador fica ativo."
-          : body.resubmitted
-            ? "Ficha atualizada e encaminhada para nova análise da Diretoria."
-            : "Ficha atualizada.");
+          : "Ficha atualizada.");
         await load();
       } catch (caught) {
         setError(caught instanceof TypeError ? "Sem resposta do sistema. Tente de novo." : caught instanceof Error ? caught.message : "Não foi possível concluir a operação.");
@@ -280,7 +278,7 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
           ) : w.status !== "pending" ? (
             <p className="notice small">{w.status === "rejected" && canEditFicha
               ? "Ficha reprovada. Edite e salve para aprová-la."
-              : "Decisão já registrada. Alterações de departamento ou funções de uma ficha aprovada geram nova análise."}</p>
+              : "Decisão já registrada. Alterações de departamento ou funções vindas do cadastro online geram nova análise."}</p>
           ) : null}
         </section>
       ) : null}

@@ -226,7 +226,7 @@ describe("fluxo de admissão", () => {
     expect(stale.status).toBe(409);
   });
 
-  it("só o administrador edita a ficha; mudar funções de aprovado devolve para a Diretoria", async () => {
+  it("só o administrador edita a ficha; mudar funções de aprovado mantém aprovado", async () => {
     const { id } = await createAs("doutrina");
     await decide(id, { decision: "approved" });
     coordinator("doutrina");
@@ -236,8 +236,19 @@ describe("fluxo de admissão", () => {
 
     state.role = "administrador";
     const edited = await workerRoute.PATCH(json("PATCH", ficha({ functions: ["Palestrante"], version: state.workers.get(id)!.version })), params(id));
-    expect(await edited.json()).toMatchObject({ status: "pending", resubmitted: true });
+    expect(await edited.json()).toMatchObject({ status: "active", approved: false });
+    expect(state.workers.get(id)?.status).toBe("active");
+    expect(state.decisions).toHaveLength(1);
+    expect(state.audits).toContain("Atualização de ficha de trabalhador");
 
+    const away = await workerRoute.PATCH(json("PATCH", ficha({ active: false, version: state.workers.get(id)!.version })), params(id));
+    expect(await away.json()).toMatchObject({ status: "inactive" });
+    const stillAway = await workerRoute.PATCH(json("PATCH", ficha({ functions: ["Passista"], version: state.workers.get(id)!.version })), params(id));
+    expect(await stillAway.json()).toMatchObject({ status: "inactive", approved: false });
+  });
+
+  it("ficha reprovada fica aprovada ao ser salva pelo administrador", async () => {
+    const { id } = await createAs("doutrina");
     await decide(id, { decision: "rejected", reason: "Rever funções" });
     state.role = "administrador";
     const resent = await workerRoute.PATCH(json("PATCH", ficha({ version: state.workers.get(id)!.version })), params(id));
