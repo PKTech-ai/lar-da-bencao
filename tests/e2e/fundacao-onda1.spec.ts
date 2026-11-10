@@ -89,10 +89,14 @@ test("convite do coordenador chega por e-mail e completa senha e termos", async 
   await coord.getByLabel("Confirme a senha").fill(PASSWORD);
   await coord.getByRole("button", { name: "Salvar senha" }).click();
   await acceptTerms(coord);
-  const nav = coord.getByRole("navigation", { name: "Módulos principais" });
-  await expect(nav.getByRole("link", { name: "Doutrina" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Juventude" })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: "Usuários e permissões" })).toHaveCount(0);
+  const menu = coord.locator(".tn-panel");
+  await coord.getByRole("button", { name: /^Departamentos/ }).click();
+  await expect(menu.getByRole("link", { name: "Doutrina" })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Juventude" })).toHaveCount(0);
+  await coord.keyboard.press("Escape");
+  await coord.getByRole("button", { name: /^Ajustes/ }).click();
+  await expect(menu.getByRole("link", { name: "Usuários e permissões" })).toHaveCount(0);
+  await coord.keyboard.press("Escape");
 });
 
 test("coordenador não acessa telas de administração", async () => {
@@ -157,7 +161,7 @@ test("Infância: matrícula com turma pela idade e chamada dominical", async () 
 
 test("todas as telas da fundação e da onda 1 abrem sem erro", async () => {
   const pages: [string, RegExp][] = [
-    ["/sistema", /Visão Geral/], ["/sistema/conta", /Minha área/], ["/sistema/usuarios", /Usuários e permissões/],
+    ["/sistema", /Bom dia|Boa tarde|Boa noite/], ["/sistema/conta", /Minha área/], ["/sistema/usuarios", /Usuários e permissões/],
     ["/sistema/modulos", /Módulos e ondas/], ["/sistema/auditoria", /Dedo-duro/], ["/sistema/anexos", /Anexos/],
     ["/sistema/importacao", /Importação do backup v215/], ["/sistema/documentos", /Estatuto e Regimento/],
     ["/sistema/trabalhadores", /Trabalhadores/], ["/sistema/admissoes", /Aprovação de Trabalhadores/],

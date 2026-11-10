@@ -6,14 +6,5 @@ export default async function DashboardPage() {
   const actor = await requirePageActor();
   const nav = await loadNavigation(actor);
 
-  return (
-    <>
-      <header className="page-heading">
-        <div>
-          <h1>Visão Geral</h1>
-        </div>
-      </header>
-      <HomeClient modules={nav.modules} />
-    </>
-  );
+  return <HomeClient modules={nav.modules} firstName={actor.name.trim().split(/\s+/)[0] ?? ""} />;
 }

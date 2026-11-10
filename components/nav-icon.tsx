@@ -13,7 +13,15 @@ const ICONS: Record<string, string> = {
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2m-8 3h2"/>',
   megaphone: '<path d="m3 9 17-6v18L3 15zm0 0v6m4 2 1 5h4l-2-5M23 8v8"/>',
   scales: '<path d="M12 3v18m-6 0h12M3 7h18M5 7l-4 8h8Zm14 0-4 8h8Z"/>',
-  building: '<path d="m2 8 10-6 10 6ZM4 11v8m5-8v8m6-8v8m5-8v8M2 22h20"/>'
+  building: '<path d="m2 8 10-6 10 6ZM4 11v8m5-8v8m6-8v8m5-8v8M2 22h20"/>',
+  eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  clip: '<path d="m21 11.5-8.5 8.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/>',
+  grid: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>',
+  upload: '<path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v4h16v-4"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-12 7l-6 2 2-6a8 8 0 1 1 16-3Z"/>',
+  tool: '<path d="M15 6a4 4 0 0 1 5-1l-3 3 2 2 3-3a4 4 0 0 1-5 5l-8 8a2 2 0 0 1-3-3l8-8a4 4 0 0 1 1-3Z"/>',
+  person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+  star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/>'
 };
 
 function iconName(href: string) {
@@ -27,11 +35,20 @@ function iconName(href: string) {
   if (href.includes("assistencia")) return "heart";
   if (href.includes("tesouraria")) return "wallet";
   if (href.includes("conselho")) return "search";
+  if (href.includes("ordens-servico")) return "tool";
   if (href.includes("patrimonio")) return "box";
   if (href.includes("eventos")) return "calendar";
   if (href.includes("divulgacao")) return "megaphone";
   if (href.includes("juridico")) return "scales";
-  if (href.includes("presidencia")) return "building";
+  if (href.includes("presidencia")) return "star";
+  if (href.includes("instituicao")) return "building";
+  if (href.includes("auditoria")) return "eye";
+  if (href.includes("anexos")) return "clip";
+  if (href.includes("modulos")) return "grid";
+  if (href.includes("importacao")) return "upload";
+  if (href.includes("sugestoes")) return "chat";
+  if (href.includes("ordens-servico")) return "tool";
+  if (href.includes("conta")) return "person";
   return "document";
 }
 

@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display", axes: ["opsz"], display: "swap" });
+const body = Figtree({ subsets: ["latin"], variable: "--font-body", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Lar da Bênção",
@@ -8,12 +12,11 @@ export const metadata: Metadata = {
 };
 
 // O visual aprovado é o claro. O tema escuro só entra quando a pessoa escolhe no menu.
-// Menu lateral: a escolha salva no aparelho vale; sem escolha, fica recolhido em telas de 721 a 1199 px (tablet); no celular o menu abre pelo botão Menu.
-const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t);}catch(e){}var s=null;try{s=localStorage.getItem("sidebar-collapsed");}catch(e){}var w=window.innerWidth;d.setAttribute("data-sidebar",w>720&&(s==="1"||(s===null&&w<1200))?"collapsed":"open");})();`;
+const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t);}catch(e){}})();`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>

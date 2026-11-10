@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { navGroups, navTone } from "@/lib/nav-groups";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/sistema", useRouter: () => ({ replace: () => undefined, refresh: () => undefined }) }));
 
@@ -11,83 +12,76 @@ const capabilities = {
     { href: "/sistema/admissoes", label: "Admissões" }
   ]
 };
+const labels = (caps: Parameters<typeof navGroups>[0], key: string) => navGroups(caps).find((group) => group.key === key)?.items.map((item) => item.label) ?? [];
+const all = (caps: Parameters<typeof navGroups>[0]) => navGroups(caps).flatMap((group) => group.items.map((item) => item.label));
 
-describe("menu lateral como no visual", () => {
-  it("a Diretoria lista só Presidência, Secretaria e Tesouraria", async () => {
-    const { Sidebar } = await import("@/components/sidebar");
-    const html = renderToStaticMarkup(<Sidebar actor={{ name: "Ana", role: "administrador", email: "a@x" }} capabilities={{
+describe("menu do alto", () => {
+  it("a Diretoria reúne a gestão da Casa, na ordem certa", () => {
+    const diretoria = labels({
       ...capabilities,
       modules: [
         ...capabilities.modules,
-        { href: "/sistema/presidencia", label: "Presidência" },
-        { href: "/sistema/secretaria", label: "Secretaria" },
         { href: "/sistema/tesouraria", label: "Tesouraria" },
-        { href: "/sistema/conselhofiscal", label: "Conselho Fiscal" }
+        { href: "/sistema/secretaria", label: "Secretaria" },
+        { href: "/sistema/presidencia", label: "Presidência" },
+        { href: "/sistema/conselhofiscal", label: "Conselho Fiscal" },
+        { href: "/sistema/documentos", label: "Estatuto e Regimento" }
       ]
-    }} />);
-    const group = html.slice(html.indexOf("Diretoria"), html.indexOf("Conselho Fiscal"));
-    expect(group).toContain("Presidência");
-    expect(group).toContain("Secretaria");
-    expect(group).toContain("Tesouraria");
-    for (const label of ["Trabalhadores", "Admissões", "Dedo-duro / Histórico", "Sugestões"]) {
-      expect(group).not.toContain(label);
+    }, "diretoria");
+    expect(diretoria).toEqual(["Presidência", "Secretaria", "Tesouraria", "Conselho Fiscal", "Estatuto e Regimento", "Organograma"]);
+  });
+  it("Trabalhadores nunca aparece solto; Admissões some quando a Secretaria está no menu", () => {
+    const withSecretaria = { ...capabilities, modules: [...capabilities.modules, { href: "/sistema/secretaria", label: "Secretaria" }] };
+    expect(all(withSecretaria)).not.toContain("Trabalhadores");
+    expect(all(withSecretaria)).not.toContain("Admissões");
+  });
+  it("sem a Secretaria, quem tem acesso à admissão continua vendo Admissões", () => {
+    expect(labels(capabilities, "departamentos")).toContain("Admissões");
+  });
+  it("departamentos seguem a ordem da Casa, e o atalho da chamada entra para quem só faz chamada", () => {
+    const items = labels({
+      ...capabilities,
+      modules: [
+        { href: "/sistema/juridico", label: "Jurídico" },
+        { href: "/sistema/doutrina", label: "Doutrina" },
+        { href: "/sistema/infancia/frequencia", label: "Chamada · Infância" }
+      ]
+    }, "departamentos");
+    expect(items).toEqual(["Doutrina", "Jurídico", "Chamada · Infância"]);
+  });
+  it("as ferramentas de administração ficam em Ajustes, para quem pode", () => {
+    const ajustes = labels(capabilities, "ajustes");
+    for (const label of ["Controle de Acesso", "Dedo-duro / Histórico", "Anexos no banco", "Usuários e permissões", "Módulos e ondas", "Importação v215", "Sugestões", "Demonstração"]) {
+      expect(ajustes).toContain(label);
     }
-    const after = html.slice(html.indexOf("Dpto de Doutrina"));
-    // Trabalhadores e Admissões são abas da Secretaria: não aparecem soltos no menu.
-    expect(html).not.toContain('data-nav-label="Trabalhadores"');
-    expect(html).not.toContain('data-nav-label="Admissões"');
-    expect(after.indexOf("Dedo-duro / Histórico")).toBeGreaterThan(0);
-    expect(after.indexOf("Sair deste aparelho")).toBeGreaterThan(after.indexOf("Importação v215"));
   });
-  it("sem a Secretaria, quem tem acesso à admissão continua vendo Admissões no menu", async () => {
-    const { Sidebar } = await import("@/components/sidebar");
-    const html = renderToStaticMarkup(<Sidebar actor={{ name: "Ana", role: "coordenador", email: "a@x" }} capabilities={capabilities} />);
-    expect(html).toContain('data-nav-label="Admissões"');
+  it("Ordens de Serviço fica com os departamentos, só para quem tem acesso", () => {
+    expect(labels({ ...capabilities, serviceOrders: true }, "departamentos")).toContain("Ordens de Serviço");
+    expect(all(capabilities)).not.toContain("Ordens de Serviço");
   });
-  it("o grupo Diretoria nasce aberto, como no visual", async () => {
-    const { Sidebar } = await import("@/components/sidebar");
-    const html = renderToStaticMarkup(<Sidebar actor={{ name: "Ana", role: "administrador", email: "a@x" }}
-      capabilities={{ ...capabilities, modules: [...capabilities.modules, { href: "/sistema/presidencia", label: "Presidência" }] }} />);
-    expect(html).toContain("Demonstração");
-    expect(html).toContain("Recolher");
-    expect(html).toContain('<details class="nav-group" open="">');
+  it("quem não administra vê só o que pode abrir, e área vazia não aparece", () => {
+    const caps = { audit: false, attachments: false, users: false, moduleAdmin: false, modules: [] };
+    expect(navGroups(caps).map((group) => group.key)).toEqual(["diretoria", "ajustes"]);
+    expect(all(caps)).toEqual(["Organograma", "Sugestões", "Demonstração"]);
   });
-  it("subtítulo da marca igual ao visual", async () => {
-    const { Sidebar } = await import("@/components/sidebar");
-    const html = renderToStaticMarkup(<Sidebar actor={{ name: "Ana", role: "administrador", email: "a@x" }} capabilities={capabilities} />);
-    expect(html).toContain("Sistema Integrado — Demonstração Funcional com Dados Fictícios");
+  it("a cor acompanha o módulo, inclusive nos atalhos internos", () => {
+    expect(navTone("/sistema/infancia/frequencia")).toBe(navTone("/sistema/infancia"));
   });
 });
 
-describe("topo como no visual", () => {
-  it("o chip mostra só o nome e, para quem administra, abre o Controle de Acesso", async () => {
-    const { SystemBar } = await import("@/components/system-bar");
-    const html = renderToStaticMarkup(<SystemBar actor={{ name: "Administrador do Sistema", role: "administrador" }} roleLabel="Administrador do Sistema" capabilities={capabilities} />);
-    expect(html).toMatch(/<a[^>]*href="\/sistema\/acesso"[^>]*class="session-chip"|<a[^>]*class="session-chip"[^>]*href="\/sistema\/acesso"/);
+describe("topo do sistema", () => {
+  it("mostra a marca, as áreas e as ferramentas, sem menu lateral", async () => {
+    const { TopNav } = await import("@/components/top-nav");
+    const html = renderToStaticMarkup(<TopNav actor={{ name: "Administrador do Sistema", role: "administrador", email: "a@x" }} roleLabel="Administrador" capabilities={capabilities} />);
+    expect(html).toContain("Lar da Bênção");
+    for (const label of ["Início", "Diretoria", "Departamentos", "Ajustes"]) expect(html).toContain(label);
+    expect(html).toContain('aria-label="Encontrar módulo"');
     expect(html).toContain(">AS<");
-    expect(html).not.toContain("<small>");
+    expect(html).not.toContain("Recolher");
   });
-  it("sair e o tema ficam no fim da barra lateral, fora do topo", async () => {
-    const { SystemBar } = await import("@/components/system-bar");
-    const { Sidebar } = await import("@/components/sidebar");
-    const bar = renderToStaticMarkup(<SystemBar actor={{ name: "Ana", role: "administrador" }} roleLabel="Administrador do Sistema" capabilities={capabilities} />);
-    const side = renderToStaticMarkup(<Sidebar actor={{ name: "Ana", role: "administrador", email: "a@x" }} capabilities={capabilities} />);
-    expect(bar).not.toContain("Opções do sistema");
-    expect(bar).not.toContain("Sair deste aparelho");
-    expect(bar).not.toContain("Tema escuro");
-    const session = side.slice(side.indexOf("sidebar-session"));
-    expect(session).toContain("Sair deste aparelho");
-    expect(session).toContain("Sair de todos os aparelhos");
-    expect(session).toContain("Tema escuro");
-  });
-  it("quem não administra vê só o que pode abrir e o chip leva à Minha área", async () => {
-    const { SystemBar } = await import("@/components/system-bar");
-    const { Sidebar } = await import("@/components/sidebar");
-    const caps = { audit: false, attachments: false, users: false, moduleAdmin: false, modules: [] };
-    const bar = renderToStaticMarkup(<SystemBar actor={{ name: "Bia", role: "trabalhador" }} roleLabel="Trabalhador" capabilities={caps} />);
-    const side = renderToStaticMarkup(<Sidebar actor={{ name: "Bia", role: "trabalhador", email: "b@x" }} capabilities={caps} />);
-    expect(bar).toMatch(/href="\/sistema\/conta"[^>]*class="session-chip"|class="session-chip"[^>]*href="\/sistema\/conta"/);
-    expect(side).not.toContain("Dedo-duro");
-    expect(side).toContain("Sugestões");
+  it("a Início marca a tela atual e mantém o gancho da barra de carregamento", async () => {
+    const { TopNav } = await import("@/components/top-nav");
+    const html = renderToStaticMarkup(<TopNav actor={{ name: "Ana", role: "administrador", email: "a@x" }} roleLabel="Administrador" capabilities={capabilities} />);
+    expect(html).toMatch(/class="nav-link tn-tab"[^>]*data-current="true"/);
   });
 });

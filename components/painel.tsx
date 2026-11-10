@@ -6,9 +6,10 @@ import type { DepartmentCard, Painel } from "@/lib/paineis";
 export function PainelView({ painel, departamentos }: { painel: Painel; departamentos?: DepartmentCard[] }) {
   return (
     <div className="pn">
+      {painel.resumo ? <p className="pn-say">Neste mês entraram <mark className="c3">{painel.resumo.entradas}</mark> e saíram <mark className="c2">{painel.resumo.saidas}</mark>. O saldo do caixa está em <mark className="c1">{painel.resumo.saldo}</mark>.</p> : null}
       <div className="pn-kpis">
         {painel.kpis.map((k) => {
-          const body = <><span>{k.label}</span><b>{k.value}</b>{k.hint ? <small>{k.hint}</small> : null}</>;
+          const body = <><span>{k.label}</span><b className={/\d/.test(String(k.value)) || String(k.value).length <= 14 ? undefined : "long"}>{k.value}</b>{k.hint ? <small>{k.hint}</small> : null}</>;
           return k.href ? <Link key={k.label} href={k.href} className="pn-kpi">{body}</Link> : <div key={k.label} className="pn-kpi">{body}</div>;
         })}
       </div>

@@ -25,13 +25,19 @@ function flagsOf(user: User) {
   return flags;
 }
 
+const initialsOf = (name: string) => name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+const avatarTone = (id: string) => `c${(parseInt(id.slice(0, 2), 16) % 8 || 0) + 1}`;
+
 export function UserManager() {
   const [data, setData] = useState<Payload>({ users: [], roles: [], departments: [], bienniums: [], workers: [] });
   const [editing, setEditing] = useState<User | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const term = search.trim().toLocaleLowerCase("pt-BR");
-  const users = data.users.filter((u) => !term || `${u.full_name} ${u.email}`.toLocaleLowerCase("pt-BR").includes(term));
+  // Quem pede atenção vem primeiro; dentro de cada grupo, a ordem da lista continua a mesma.
+  const users = data.users
+    .filter((u) => !term || `${u.full_name} ${u.email}`.toLocaleLowerCase("pt-BR").includes(term))
+    .sort((a, b) => Number(flagsOf(b).length > 0) - Number(flagsOf(a).length > 0));
   const more = useShowMore(users.length, term);
   const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
   const load = useCallback(async () => { const response = await fetch("/api/users", { cache: "no-store" }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setData(body); }, []);
@@ -126,6 +132,7 @@ export function UserManager() {
       <ul className="ul-list">
         {users.map((user, i) => <li key={user.id} {...more.extra(i)}>
           <div className="ul-row">
+            <span className={`ul-av ${avatarTone(user.id)}`} aria-hidden="true">{initialsOf(user.full_name)}</span>
             <div className="ul-person">
               <strong>{user.full_name}</strong>
               <span className="small muted">{data.roles.find((role) => role.key === user.role_key)?.label ?? user.role_key} · {departmentsText(user, data.departments)}</span>

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { NavIcon } from "@/components/nav-icon";
 import { SuggestionsBox } from "@/components/suggestions-box";
 import { api } from "@/lib/client-api";
 import { addDays, filterAgenda, todayInSaoPaulo, type AgendaItem } from "@/lib/home-dashboard";
+import { navTone } from "@/lib/nav-groups";
 import { SYSTEM_VERSION, SYSTEM_VERSION_NOTE, SYSTEM_VERSION_UPDATED } from "@/lib/system-version";
 import { brDate, formatMoney } from "@/lib/resources/types";
 
@@ -25,6 +27,8 @@ type Home = {
 type VisibleModule = { href: string; label: string };
 
 const BADGE_KEYS = new Set(["admissoes", "baixas", "sugestoes"]);
+const BLOCK_TONES = ["c5", "c4", "c3", "c6", "c8", "c2", "c7"];
+const DATE_TONES = ["c3", "c5", "c6", "c4"];
 const SHORTCUTS = [
   { href: "/sistema/tesouraria/contribuicoes", needs: "/sistema/tesouraria", title: "Contribuições" },
   { href: "/sistema/assistencia/atividades", needs: "/sistema/assistencia", title: "Atividades sociais" },
@@ -56,21 +60,39 @@ function longDate(iso: string) {
 const CLEANING = { scheduled: "Escalado", done: "Realizada", fee: "Taxa de serviço", cancelled: "Cancelado" } as Record<string, string>;
 
 function monthShort(date: string) {
-  return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "").toUpperCase();
+  return new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
 }
 
-export function HomeClient({ modules }: { modules: VisibleModule[] }) {
+function greeting() {
+  const hour = Number(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+  if (hour < 12) return "Bom dia";
+  return hour < 18 ? "Boa tarde" : "Boa noite";
+}
+
+const ARROW = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>;
+
+/** No computador a grade tem 4 colunas: os últimos blocos esticam para a fileira final não ficar com buraco. */
+function blockSpan(fromEnd: number, total: number, hasSaldo: boolean) {
+  if (hasSaldo && total === 1) return " big";
+  const rest = ((hasSaldo ? 4 : 0) + total) % 4;
+  const desktop = rest === 1 ? (fromEnd === 0 ? " span4" : "") : rest === 2 ? (fromEnd <= 1 ? " span2" : "") : rest === 3 && fromEnd === 0 ? " span2" : "";
+  // No tablet e no celular são 2 colunas: sobrando um bloco, ele ocupa a fileira inteira.
+  return `${desktop}${total % 2 === 1 && fromEnd === 0 ? " odd-last" : ""}`;
+}
+
+export function HomeClient({ modules, firstName }: { modules: VisibleModule[]; firstName: string }) {
   const [home, setHome] = useState<Home | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [agenda, setAgenda] = useState<AgendaItem[]>([]);
   const [undatedEvents, setUndatedEvents] = useState(0);
   const [period, setPeriod] = useState<0 | 7 | 30>(30);
+  const [loaded, setLoaded] = useState(false);
   const historyRef = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     void api<Home>("/api/home").then(setHome).catch((e: Error) => setError(e.message));
-    void api<{ pending: Pending[] }>("/api/pendencias").then((b) => setPending(b.pending)).catch(() => undefined);
+    void api<{ pending: Pending[] }>("/api/pendencias").then((b) => setPending(b.pending)).catch(() => undefined).finally(() => setLoaded(true));
     void api<{ items: AgendaItem[]; undatedEvents?: number }>("/api/agenda").then((b) => {
       setAgenda(b.items);
       setUndatedEvents(b.undatedEvents ?? 0);
@@ -78,7 +100,7 @@ export function HomeClient({ modules }: { modules: VisibleModule[] }) {
   }, []);
 
   const today = todayInSaoPaulo();
-  const todayLabel = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const todayLabel = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long" });
   const badgePending = pending.filter((item) => BADGE_KEYS.has(item.key));
   const routines = pending.filter((item) => !BADGE_KEYS.has(item.key));
   const allowed = new Set(modules.map((mod) => mod.href));
@@ -92,32 +114,67 @@ export function HomeClient({ modules }: { modules: VisibleModule[] }) {
     ...routines.map((item) => ({ key: item.key, href: item.href, count: item.count, title: capitalize(routineTitle(item).replace(/^\d+ /, "")), hint: undefined })),
     ...(undatedEvents ? [{ key: "eventos-sem-data", href: "/sistema/eventos/agenda", count: undatedEvents, title: "Evento(s) com data a definir", hint: undefined }] : [])
   ];
+  const waiting = attention.reduce((sum, item) => sum + item.count, 0);
   const worker = home?.myArea?.worker;
+  // O saldo só chega aqui para quem tem acesso à Tesouraria.
+  const saldo = home?.departamentos.find((item) => item.label === "Tesouraria");
+  const numbers = home?.departamentos.filter((item) => item !== saldo) ?? [];
+  const stats = (home?.cards ?? []).filter((card) => card.key !== "admissions").slice(0, 3);
 
   return (
-    <div className="grid">
+    <div className="home">
       {error ? <div className="error" role="alert">{error}</div> : null}
-      <p className="home-greeting">{todayLabel} · {home?.institution.motto || "Uma Casa de estudo, acolhimento e caridade."}</p>
+      <div className="home-top">
+        <div>
+          <h1>{greeting()}{firstName ? `, ${firstName}` : ""}</h1>
+          <p className="home-lead">{todayLabel}.{loaded ? ` ${waiting ? `Há ${waiting} ${waiting === 1 ? "item esperando" : "itens esperando"} por você.` : "Tudo em dia por aqui."}` : ""}</p>
+        </div>
+        {stats.length ? (
+          <div className="home-nums">
+            {stats.map((card) => {
+              const body = <><b>{card.value}</b><span>{card.label}</span></>;
+              return card.href ? <Link key={card.key} href={card.href}>{body}</Link> : <div key={card.key}>{body}</div>;
+            })}
+          </div>
+        ) : null}
+      </div>
 
+      <section className="bento" aria-label="Precisa de atenção">
+        {saldo ? (
+          <Link className="bk c1 big" href={saldo.href}>
+            <span className="bk-top"><span>{capitalize(saldo.hint)}</span>{ARROW}</span>
+            <span className="bk-huge">{saldo.value}</span>
+            <span className="bk-text">Tesouraria</span>
+          </Link>
+        ) : null}
+        {attention.map((item, index) => (
+          <Link key={item.key} className={`bk ${BLOCK_TONES[index % BLOCK_TONES.length]}${blockSpan(attention.length - 1 - index, attention.length, Boolean(saldo))}`} href={item.href}>
+            <span className="bk-top"><span className="bk-num">{item.count}</span>{ARROW}</span>
+            <span className="bk-text">{item.title}{item.hint ? <small>{item.hint}</small> : null}</span>
+          </Link>
+        ))}
+        {loaded && !attention.length ? (
+          <div className={`bk ${saldo ? "c3 big" : "c1"}`}>
+            <span className="bk-num">Tudo em dia</span>
+            <span className="bk-text">Nenhuma ficha, pedido ou conferência aguardando nos seus módulos.</span>
+          </div>
+        ) : null}
+      </section>
 
-
-      <div className="op-columns">
-        <section className="op-section">
-          <div className="op-section-head"><h3>Precisa de atenção</h3></div>
-          {attention.length ? (
-            <ul className="op-list">
-              {attention.map((item) => (
-                <li key={item.key}>
-                  <Link href={item.href} className="op-pending-link">
-                    <span className="op-count">{item.count}</span>
-                    <span className="op-line-copy"><strong>{item.title}</strong>{item.hint ? <small>{item.hint}</small> : null}</span>
-                    <span className="op-arrow" aria-hidden="true">›</span>
-                  </Link>
-                </li>
+      <div className="home-cols">
+        {numbers.length ? (
+          <section className="op-section">
+            <div className="op-section-head"><h3>A Casa em números</h3></div>
+            <div className="home-apps">
+              {numbers.map((item) => (
+                <Link key={item.label} href={item.href} className="home-app">
+                  <span className={`tn-dot ${navTone(item.href)}`}><NavIcon href={item.href} /></span>
+                  <span><strong>{item.label}</strong><small>{item.value} {item.hint}</small></span>
+                </Link>
               ))}
-            </ul>
-          ) : <div className="op-empty"><strong>Tudo em dia</strong><p>Nenhuma ficha, pedido ou conferência aguardando nos seus módulos.</p></div>}
-        </section>
+            </div>
+          </section>
+        ) : null}
         <section className="op-section">
           <div className="op-section-head">
             <h3>Agenda</h3>
@@ -128,13 +185,12 @@ export function HomeClient({ modules }: { modules: VisibleModule[] }) {
             </select>
           </div>
           {visibleAgenda.length ? (
-            <ul className="op-list">
+            <ul className="home-list">
               {visibleAgenda.map((item, index) => (
                 <li key={`${item.date}-${index}`}>
-                  <Link href={item.href} className="op-agenda-link">
-                    <span className="op-date"><b>{item.date.slice(8)}</b>{monthShort(item.date)}</span>
-                    <span className="op-line-copy"><strong>{item.label}</strong><small>{item.module}</small></span>
-                    <span className="op-arrow" aria-hidden="true">›</span>
+                  <Link href={item.href} className="home-ev">
+                    <span className={`home-date ${DATE_TONES[index % DATE_TONES.length]}`}><b>{item.date.slice(8)}</b>{monthShort(item.date)}</span>
+                    <span><strong>{item.label}</strong><small>{item.module}</small></span>
                   </Link>
                 </li>
               ))}
@@ -143,17 +199,6 @@ export function HomeClient({ modules }: { modules: VisibleModule[] }) {
           {agendaTotal > 6 ? <p className="op-footnote">Exibindo 6 de {agendaTotal}. A agenda completa fica em cada departamento.</p> : null}
         </section>
       </div>
-
-      {home?.departamentos.length ? (
-        <section className="op-section">
-          <div className="op-section-head"><h3>A Casa em números</h3></div>
-          <div className="home-numbers">
-            {home.departamentos.map((d) => (
-              <Link key={d.label} href={d.href} className="home-number"><span>{d.label}</span><b>{d.value}</b><small>{d.hint}</small></Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {worker && home?.myArea ? (
         <section className="op-section">
@@ -174,14 +219,14 @@ export function HomeClient({ modules }: { modules: VisibleModule[] }) {
         </section>
       ) : null}
 
-      <section className="home-go">
-        <h3>Ir para</h3>
-        {shortcuts.length ? (
+      {shortcuts.length ? (
+        <section className="home-go">
+          <h3>Ir para</h3>
           <div className="op-shortcuts">
             {shortcuts.map((item) => <Link key={item.href} className="button" href={item.href}>{item.title}</Link>)}
           </div>
-        ) : null}
-      </section>
+        </section>
+      ) : null}
 
       <SuggestionsBox />
 
@@ -213,7 +258,6 @@ export function HomeClient({ modules }: { modules: VisibleModule[] }) {
           </ul>
         </article>
       </dialog>
-
     </div>
   );
 }

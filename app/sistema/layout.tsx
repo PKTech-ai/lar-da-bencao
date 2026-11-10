@@ -1,7 +1,6 @@
 import { ResponsiveTables } from "@/components/responsive-tables";
-import { Sidebar } from "@/components/sidebar";
-import { SystemBar } from "@/components/system-bar";
 import { SystemFeedback } from "@/components/system-feedback";
+import { TopNav } from "@/components/top-nav";
 import { runtimeEnvironment } from "@/lib/environment";
 import { loadNavigation } from "@/lib/navigation";
 import { requirePageActor } from "@/lib/page-auth";
@@ -15,9 +14,8 @@ export default async function SystemLayout({ children }: Readonly<{ children: Re
 
   return (
     <div className="app-shell">
-      <Sidebar actor={actor} capabilities={nav.capabilities} />
+      <TopNav actor={actor} roleLabel={nav.roleLabel} capabilities={nav.capabilities} />
       <main className="app-main">
-        <SystemBar actor={actor} roleLabel={nav.roleLabel} capabilities={nav.capabilities} />
         <SystemFeedback />
         <ResponsiveTables />
         {env.production ? null : (

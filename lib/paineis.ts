@@ -24,7 +24,7 @@ export type Grafico = {
   labels: string[];
   series: { name: string; values: (number | null)[] }[];
 };
-export type Painel = { kpis: Kpi[]; alertas: Alerta[]; grafico?: Grafico; acoes: { label: string; href: string }[] };
+export type Painel = { kpis: Kpi[]; alertas: Alerta[]; grafico?: Grafico; acoes: { label: string; href: string }[]; resumo?: { entradas: string; saidas: string; saldo: string } };
 
 const TZ_TODAY = "(now() at time zone 'America/Sao_Paulo')::date";
 const MONTHS_SQL = (n: number) =>
@@ -83,6 +83,7 @@ export async function painelTesouraria(): Promise<Painel> {
       labels: trend.rows.map((r) => monthLabel(r.month)),
       series: [{ name: "Entradas", values: trend.rows.map((r) => int(r.income)) }, { name: "Saídas", values: trend.rows.map((r) => int(r.expense)) }]
     },
+    resumo: { entradas: formatMoney(t.income), saidas: formatMoney(t.expense), saldo: formatMoney(t.closing) },
     acoes: [{ label: "Lançar entrada ou saída", href: "/sistema/tesouraria/lancamentos" }, { label: "Receber contribuição", href: "/sistema/tesouraria/contribuicoes" }]
   };
 }
