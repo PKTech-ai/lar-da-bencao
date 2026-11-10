@@ -127,7 +127,8 @@ export function HomeClient({ modules, firstName }: { modules: VisibleModule[]; f
       <div className="home-top">
         <div>
           <h1>{greeting()}{firstName ? `, ${firstName}` : ""}</h1>
-          <p className="home-lead">{todayLabel}.{loaded ? ` ${waiting ? `Há ${waiting} ${waiting === 1 ? "item esperando" : "itens esperando"} por você.` : "Tudo em dia por aqui."}` : ""}</p>
+          <p className="home-lead">{todayLabel} · {home?.institution.motto || "Uma Casa de estudo, acolhimento e caridade."}</p>
+          {loaded ? <p className="home-lead">{waiting ? `Há ${waiting} ${waiting === 1 ? "item esperando" : "itens esperando"} por você.` : "Tudo em dia por aqui."}</p> : null}
         </div>
         {stats.length ? (
           <div className="home-nums">
