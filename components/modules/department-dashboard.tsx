@@ -4,6 +4,7 @@ import { PainelView } from "@/components/painel";
 import { BookshopSummary } from "@/components/modules/divulgacao-livraria";
 import { PatrimonyOpenOrders } from "@/components/modules/patrimonio-os-resumo";
 import { query } from "@/lib/db";
+import { departmentCoordinators } from "@/lib/department-coordinators";
 import { buildDepartmentDashboard, workerDepartmentKey } from "@/lib/department-dashboard";
 import { departmentInfoFor } from "@/lib/department-info";
 import type { ModulePage } from "@/lib/module-pages";
@@ -46,9 +47,7 @@ export async function DepartmentDashboard({ page, actor }: { page: ModulePage; a
               count(*) filter (where w.status = 'pending')::int as pending,
               count(*) filter (where w.status = 'active' and extract(month from w.birth_date) = extract(month from (now() at time zone 'America/Sao_Paulo')))::int as birthdays
          from app.workers w join app.worker_departments d on d.worker_id = w.id and d.department_key = $1`, [key]),
-    query<{ full_name: string }>(
-      `select u.full_name from app.users u join app.user_departments ud on ud.user_id = u.id and ud.department_key = $1 and ud.access_level = 'coordenacao'
-        where u.status = 'active' and u.role_key = 'coordenador' order by u.full_name`, [key])
+    departmentCoordinators(key)
   ]);
   const c = counts.rows[0] ?? { active: 0, pending: 0, birthdays: 0 };
   const alerts = c.pending ? [`${c.pending} ficha(s) aguardando a Diretoria.`] : [];
@@ -66,14 +65,7 @@ export async function DepartmentDashboard({ page, actor }: { page: ModulePage; a
           <ul>{data.alerts.map((a) => <li key={a}>{a}</li>)}</ul>
         </section>
       ) : null}
-      {info ? <DepartmentAbout info={info} coordinators={coordinators.rows.map((r) => r.full_name)} /> : null}
+      {info ? <DepartmentAbout info={info} coordinators={coordinators} /> : null}
     </>
   );
-}
-
-async function departmentCoordinators(key: string) {
-  const result = await query<{ full_name: string }>(
-    `select u.full_name from app.users u join app.user_departments ud on ud.user_id = u.id and ud.department_key = $1 and ud.access_level = 'coordenacao'
-      where u.status = 'active' and u.role_key = 'coordenador' order by u.full_name`, [key]);
-  return result.rows.map((r) => r.full_name);
 }

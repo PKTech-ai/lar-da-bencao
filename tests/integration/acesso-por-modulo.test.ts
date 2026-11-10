@@ -19,6 +19,8 @@ describe.skipIf(!enabled)("Acesso por módulo (Postgres real)", async () => {
   const { allowedGroups, canOpenAttendance, requireClassWrite } = await import("@/lib/education-data");
   const access = await import("@/app/api/users/[id]/access/route");
   const records = await import("@/app/api/r/[resource]/route");
+  const organograma = await import("@/app/api/organograma/route");
+  const { departmentCoordinators } = await import("@/lib/department-coordinators");
   let admin: Actor;
 
   beforeAll(async () => {
@@ -141,6 +143,73 @@ describe.skipIf(!enabled)("Acesso por módulo (Postgres real)", async () => {
 
     expect((await (await save(target, { doutrina: [] })).json()).status).toBe("updated");
     expect(await summary(target, "doutrina")).toBeNull();
+  });
+
+  describe("nome nas listas de coordenação", () => {
+    const named = async (role: string, departments: string[] = [], level?: "chamada" | "consulta" | "coordenacao") => {
+      const actor = await createActor(role, departments, level);
+      const name = `Coordenação ${actor.id}`;
+      await owner((client) => client.query("update app.users set full_name = $1 where id = $2", [name, actor.id]));
+      return { ...actor, name };
+    };
+    const inOrganogram = async (target: Actor, department: string) => {
+      const body = await (await organograma.GET()).json();
+      return body.departments.find((d: { key: string }) => d.key === department).people.filter((p: { name: string }) => p.name === target.name).length;
+    };
+    const inPanel = async (target: Actor, department: string) => (await departmentCoordinators(department)).filter((name) => name === target.name).length;
+    const allBut = (department: string, removed: string) => DEPARTMENT_MODULES[department].filter((m) => m.key !== removed).map((m) => ({ module: m.key, edit: !m.viewOnly }));
+
+    it("quem coordena e teve item desmarcado continua listado, uma vez só, sem ganhar o item de volta", async () => {
+      const target = await named("coordenador", ["doutrina"]);
+      expect([await inOrganogram(target, "doutrina"), await inPanel(target, "doutrina")]).toEqual([1, 1]);
+      expect((await save(target, { doutrina: allBut("doutrina", "escalas") })).status).toBe(200);
+      expect(await summary(target, "doutrina")).toBe("consulta");
+      expect([await inOrganogram(target, "doutrina"), await inPanel(target, "doutrina")]).toEqual([1, 1]);
+      expect((await departmentModuleAccess(target, "doutrina")).levelOf("escalas")).toBeNull();
+      // Outra mudança parcial mantém; tudo marcado e desmarcado de novo também.
+      expect((await save(target, { doutrina: allBut("doutrina", "trabalhadores") })).status).toBe(200);
+      expect(await inPanel(target, "doutrina")).toBe(1);
+      expect((await save(target, { doutrina: DEPARTMENT_MODULES.doutrina.map((m) => ({ module: m.key, edit: !m.viewOnly })) })).status).toBe(200);
+      expect(await summary(target, "doutrina")).toBe("coordenacao");
+      expect((await save(target, { doutrina: allBut("doutrina", "escalas") })).status).toBe(200);
+      expect(await inPanel(target, "doutrina")).toBe(1);
+    });
+
+    it("subcoordenador continua no Organograma; nas outras listas, como antes, só o Coordenador", async () => {
+      const target = await named("subcoordenador", ["doutrina"]);
+      expect((await save(target, { doutrina: allBut("doutrina", "escalas") })).status).toBe(200);
+      expect([await inOrganogram(target, "doutrina"), await inPanel(target, "doutrina")]).toEqual([1, 0]);
+    });
+
+    it("ajudar em outro departamento não vira coordenação dele", async () => {
+      const target = await named("coordenador", ["doutrina"]);
+      expect((await save(target, { tesouraria: [{ module: "caixa", edit: true }, { module: "extrato", edit: true }] })).status).toBe(200);
+      expect([await inOrganogram(target, "tesouraria"), await inPanel(target, "tesouraria")]).toEqual([0, 0]);
+      expect(await inOrganogram(target, "doutrina")).toBe(1);
+    });
+
+    it("só consultar, só a chamada ou nada marcado tira da lista, e não volta sozinho", async () => {
+      const consult = await named("coordenador", ["doutrina"]);
+      expect((await save(consult, { doutrina: DEPARTMENT_MODULES.doutrina.map((m) => ({ module: m.key, edit: false })) })).status).toBe(200);
+      expect(await inPanel(consult, "doutrina")).toBe(0);
+      expect((await save(consult, { doutrina: [{ module: "escalas", edit: true }] })).status).toBe(200);
+      expect(await inPanel(consult, "doutrina")).toBe(0);
+
+      const call = await named("coordenador", ["infancia"]);
+      expect((await save(call, { infancia: [{ module: "chamada", edit: true }] })).status).toBe(200);
+      expect(await summary(call, "infancia")).toBe("chamada");
+      expect(await inPanel(call, "infancia")).toBe(0);
+
+      const none = await named("coordenador", ["doutrina"]);
+      expect((await save(none, { doutrina: [] })).status).toBe(200);
+      expect(await inPanel(none, "doutrina")).toBe(0);
+    });
+
+    it("quem não é Coordenador nem Subcoordenador não entra na lista", async () => {
+      const target = await named("trabalhador", ["doutrina"], "coordenacao");
+      expect((await save(target, { doutrina: allBut("doutrina", "escalas") })).status).toBe(200);
+      expect([await inOrganogram(target, "doutrina"), await inPanel(target, "doutrina")]).toEqual([0, 0]);
+    });
   });
 
   it("recusa o que não pode: alterar em módulo só de consulta, módulo inventado e quem não é Administrador", async () => {

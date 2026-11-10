@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PrintButton } from "@/components/print-button";
 import { appendAudit } from "@/lib/audit";
 import { query } from "@/lib/db";
+import { departmentCoordinators } from "@/lib/department-coordinators";
 import { loadScale } from "@/lib/doutrina-data";
 import { DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, TEMPLATES, isValidMonth, monthDays, scaleStatusLabel } from "@/lib/doutrina-scale";
 import { requireModulePage } from "@/lib/page-auth";
@@ -20,7 +21,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
   const scale = await loadScale(ym);
   if (!scale.month || scale.month.status === "deleted") notFound();
 
-  const [names, contact] = await Promise.all([
+  const [names, coordinators, contact] = await Promise.all([
     query<{ ref: string; label: string }>(
       `select 'w:' || id as ref, full_name as label from app.workers
         where id in (select worker_id from app.scale_assignments where scale_month_id = $1 and worker_id is not null)
@@ -32,12 +33,8 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
         where id in (select study_id from app.scale_assignments where scale_month_id = $1 and study_id is not null)`,
       [scale.month.id]
     ),
-    query<{ coordinator: string | null; phone: string | null }>(
-      `select (select string_agg(u.full_name, ' / ' order by u.full_name) from app.users u
-                 join app.user_departments ud on ud.user_id = u.id and ud.department_key = 'doutrina' and ud.access_level = 'coordenacao'
-                where u.status = 'active' and u.role_key = 'coordenador') as coordinator,
-              (select phone from app.department_contacts where department_key = 'doutrina') as phone`
-    )
+    departmentCoordinators("doutrina"),
+    query<{ phone: string | null }>("select phone from app.department_contacts where department_key = 'doutrina'")
   ]);
   const label = new Map(names.rows.map((row) => [row.ref, row.label]));
   label.set(FREE_THEME, "TEMA LIVRE");
@@ -82,7 +79,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
                 </table>
               </div>
             ))}
-            <p className="small">Responsável: {contact.rows[0]?.coordinator ?? "Não informado"} · Contato: {contact.rows[0]?.phone || "Não informado"}</p>
+            <p className="small">Responsável: {coordinators.join(" / ") || "Não informado"} · Contato: {contact.rows[0]?.phone || "Não informado"}</p>
             <p className="small muted"><em>“{QUOTE}”</em><br />{QUOTE_SOURCE}</p>
           </section>
         );
