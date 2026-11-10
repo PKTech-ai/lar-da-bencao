@@ -310,6 +310,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .filters > .row-actions { grid-column: span 2; }
 .filters > p { margin: 0 0 11px; }
 .filters > label { min-width: 0; }
+.filters > label:has(input[type="file"]) { grid-column: span 2; }
 .filters input:not([type="checkbox"], [type="radio"]), .filters select { min-width: 0; width: 100%; }
 .table-wrap, .visual-table-scroll { overflow: auto; border: 1px solid var(--line); border-radius: 16px; scrollbar-color: var(--border-input) var(--surface-sunken); }
 table, table.visual-table { width: 100%; border-collapse: collapse; background: var(--surface); }
@@ -358,7 +359,7 @@ table.visual-table .small { font-size: 13px; color: var(--muted); }
   .app-main { padding: 16px; }
   .page-heading { flex-direction: column; }
   .grid.cards, .filters { grid-template-columns: 1fr; }
-  .filters > .row-actions { grid-column: auto; }
+  .filters > .row-actions, .filters > label:has(input[type="file"]) { grid-column: auto; }
   .auth-card { padding: 22px; border-radius: 18px; }
   .card.lar-welcome { align-items: flex-start; }
   input, select, textarea { font-size: 16px; }
@@ -392,7 +393,7 @@ table.visual-table .small { font-size: 13px; color: var(--muted); }
 /* Abas dos módulos — .sub do visual v215 */
 .module-tabs-wrap { display: flex; align-items: flex-end; gap: 22px; margin: 0 0 20px; border-bottom: 1px solid var(--line); position: relative; }
 .module-tabs { display: flex; flex-wrap: wrap; gap: 0 22px; flex: 1 1 auto; min-width: 0; }
-.module-tabs-wrap:has(.module-tabs-more) .module-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.module-tabs-wrap:has(.module-tabs-more) .module-tabs { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding-bottom: 1px; margin-bottom: -1px; scrollbar-width: thin; }
 .module-tabs-wrap:has(.module-tabs-more) .module-tabs a { flex: 0 0 auto; white-space: nowrap; }
 .module-tabs-more { position: relative; flex: 0 0 auto; }
 .module-tabs-more > summary { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: -1px; padding: 0; border-bottom: 2px solid transparent; font-size: 15px; font-weight: 600; color: var(--muted); cursor: pointer; list-style: none; white-space: nowrap; }

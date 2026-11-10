@@ -46,6 +46,6 @@ A cada liberação: uma semana de uso acompanhado, com o Dedo-duro revisado no f
 ## 5. O que o sistema **não** faz (combinado com a Casa)
 
 - Não envia mensagem de WhatsApp sozinho: abre a conversa e registra o envio.
-- Não lê extrato em PDF: só OFX e CSV (o PDF pode ficar anexado).
+- Extrato em PDF: lê só o de conta corrente do Banco do Brasil; de outros bancos, importe em OFX ou CSV.
 - Não gera ata sozinho: a minuta é escrita por quem secretaria; o sistema guarda áudio e transcrição.
 - Não guarda dado de negócio no navegador: tudo fica no PostgreSQL, com auditoria.

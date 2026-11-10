@@ -5,6 +5,7 @@ import type { Actor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
 import { dbPool, query, transaction } from "@/lib/db";
 import { AppError } from "@/lib/errors";
+import { parsePdfStatement, readPdfItems } from "@/lib/extrato-pdf";
 import { todayInSaoPaulo } from "@/lib/workers";
 import { requireFlag } from "@/lib/feature-flags";
 import { assertModule, hasModule, type PermissionAction } from "@/lib/permissions";
@@ -292,7 +293,7 @@ const isoFrom = (value: string) => {
   throw new AppError("Data inválida no extrato.");
 };
 
-/** Lê um extrato OFX (tags STMTTRN) ou CSV com data, descrição e valor. */
+/** Lê um extrato OFX (tags STMTTRN) ou CSV com data, descrição e valor. O PDF fica em lib/extrato-pdf. */
 export function parseStatement(text: string, format: "OFX" | "CSV"): StatementLine[] {
   if (format === "OFX") {
     return [...text.matchAll(/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi)].map((match) => {
@@ -330,7 +331,7 @@ export function parseStatement(text: string, format: "OFX" | "CSV"): StatementLi
 export const importSchema = z.object({
   reference_month: monthSchema,
   filename: z.string().trim().min(1).max(240),
-  format: z.enum(["OFX", "CSV"]),
+  format: z.enum(["OFX", "CSV", "PDF"]),
   content: z.string().min(1).max(4_000_000)
 });
 
@@ -341,11 +342,17 @@ export function lineFingerprint(month: string, line: StatementLine) {
 /** Importa o extrato do mês; linhas repetidas (mesmo dia, valor e histórico) não entram duas vezes. */
 export async function importStatement(actor: Actor, body: unknown) {
   const input = importSchema.parse(body);
-  const lines = parseStatement(input.content, input.format);
+  const lines = input.format === "PDF" ? parsePdfStatement(await readPdfItems(input.content)) : parseStatement(input.content, input.format);
   if (!lines.length) throw new AppError("Nenhum lançamento foi encontrado no arquivo.");
   const outside = lines.filter((line) => !line.line_date.startsWith(input.reference_month));
   if (outside.length === lines.length) throw new AppError("As datas do arquivo não pertencem ao mês selecionado.");
   return transaction(async (client) => {
+    // O histórico do PDF é escrito diferente do OFX: as mesmas linhas não seriam reconhecidas como repetidas.
+    const otherFormat = await client.query(
+      "select 1 from app.bank_statements where reference_month = $1 and (format = 'PDF') <> ($2::text = 'PDF') limit 1",
+      [input.reference_month, input.format]
+    );
+    if (otherFormat.rowCount) throw new AppError("Este mês já tem extrato importado em outro formato. Importar de novo duplicaria as linhas.");
     const statement = await client.query<{ id: string }>(
       "insert into app.bank_statements (reference_month, filename, format, line_count, imported_by) values ($1,$2,$3,$4,$5) returning id",
       [input.reference_month, input.filename, input.format, lines.length, actor.id]

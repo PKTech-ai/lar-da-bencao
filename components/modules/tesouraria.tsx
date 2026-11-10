@@ -22,6 +22,14 @@ type Account = { code: string; name: string; nature: string; account_group: stri
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 const monthLabel = (month: string) => month.split("-").reverse().join("/");
+/** Em base64 o PDF cresce um terço: 3 MB viram os 4 MB que o servidor aceita. */
+const PDF_LIMIT_BYTES = 3_000_000;
+const fileToBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+  reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+  reader.readAsDataURL(file);
+});
 
 /** Caixa mensal: totais, fechamento e envio ao Conselho Fiscal. */
 export function TreasuryMonthPanel() {
@@ -138,16 +146,17 @@ export function TreasuryStatementPanel() {
     if (!file) return;
     setBusy(true); setError(""); setMessage("");
     try {
-      const format = /\.ofx$/i.test(file.name) ? "OFX" : "CSV";
-      const content = await file.text();
+      const format = /\.ofx$/i.test(file.name) ? "OFX" : /\.pdf$/i.test(file.name) ? "PDF" : "CSV";
+      if (format === "PDF" && file.size > PDF_LIMIT_BYTES) throw new Error("O PDF passa de 3 MB. Importe este mês em OFX ou CSV.");
+      const content = format === "PDF" ? await fileToBase64(file) : await file.text();
       const result = await postJson<{ id: string; imported: number; repeated: number; outside: number }>("/api/tesouraria/extrato", {
         reference_month: month, filename: file.name, format, content
       });
       // O arquivo original fica guardado como anexo do extrato importado.
-      const kept = await uploadAttachment(
-        new File([content], file.name, { type: format === "OFX" ? "application/x-ofx" : "text/csv" }),
-        "bank_statement", result.id, undefined, "statement"
-      ).then(() => true).catch(() => false);
+      const original = format === "PDF"
+        ? new File([file], file.name, { type: "application/pdf" })
+        : new File([content], file.name, { type: format === "OFX" ? "application/x-ofx" : "text/csv" });
+      const kept = await uploadAttachment(original, "bank_statement", result.id, undefined, "statement").then(() => true).catch(() => false);
       await load();
       setMessage(`${result.imported} linha(s) importada(s); ${result.repeated} repetida(s) foram ignoradas${result.outside ? `; ${result.outside} fora do mês` : ""}.${kept ? "" : " O arquivo original não pôde ser anexado."}`);
     } catch (caught) {
@@ -176,7 +185,7 @@ export function TreasuryStatementPanel() {
       <section className="card no-print">
         <div className="filters">
           <label>Mês<input type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></label>
-          <label>Importar extrato (OFX ou CSV)<input type="file" accept=".ofx,.csv,text/csv" onChange={(e) => void importFile(e)} disabled={busy} /></label>
+          <label>Importar extrato (OFX, CSV ou PDF)<input type="file" accept=".ofx,.csv,.pdf,text/csv,application/pdf" onChange={(e) => void importFile(e)} disabled={busy} /></label>
           <button type="button" className="button" onClick={() => window.print()}>⎙ Imprimir</button>
         </div>
         <p className="small muted">Linhas repetidas (mesmo dia, valor e histórico) não entram duas vezes. A conciliação sugere lançamentos do banco com o mesmo valor, até cinco dias de diferença.</p>
