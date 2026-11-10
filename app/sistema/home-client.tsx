@@ -161,6 +161,19 @@ export function HomeClient({ modules, firstName }: { modules: VisibleModule[]; f
         ) : null}
       </section>
 
+      {memory ? (
+        <section className="home-memory-strip c7" aria-label={`Memória institucional — ${home?.institution.name || "Lar da Bênção"}`}>
+          <div><span>Data de constituição</span><strong>{longDate(memory.foundedOn)}</strong></div>
+          <div><span>Idade da Casa</span><strong>{memory.age} anos</strong></div>
+          <div>
+            <span>Próximo aniversário</span>
+            <strong>{longDate(memory.nextAnniversary)}</strong>
+            <small>{memory.daysToAnniversary === 0 ? "É hoje!" : `Faltam ${memory.daysToAnniversary} dia(s)`}</small>
+          </div>
+          <div><span>Próxima idade</span><strong>{memory.age + 1} anos</strong></div>
+        </section>
+      ) : null}
+
       <div className="home-cols">
         {numbers.length ? (
           <section className="op-section">
@@ -229,12 +242,6 @@ export function HomeClient({ modules, firstName }: { modules: VisibleModule[]; f
       ) : null}
 
       <SuggestionsBox />
-
-      {memory ? (
-        <p className="home-memory-line">
-          {home?.institution.name || "Lar da Bênção"} · {memory.age} anos, fundada em {longDate(memory.foundedOn)} · {memory.daysToAnniversary === 0 ? "hoje é o aniversário da Casa!" : `próximo aniversário em ${memory.daysToAnniversary} dia(s)`}
-        </p>
-      ) : null}
 
       <footer className="lar-system-footer">
         <p>Desenvolvido por <strong>PK Instituto</strong>, inspirada pela Espiritualidade Amiga.</p>
