@@ -130,7 +130,7 @@ export function WorkersClient({ departments, originOptions, updateScope, canEdit
   const editNotice = editing?.status === "pending" || editing?.status === "rejected"
     ? "Esta ficha ainda não está aprovada. Ao salvar, ela é aprovada e o trabalhador fica ativo."
     : editing?.status === "active" || editing?.status === "inactive"
-      ? "Ficha aprovada: você pode corrigir os dados. Se alterar departamentos ou funções, a ficha volta para PENDENTE — AGUARDANDO DIRETORIA."
+      ? "Ficha aprovada: você pode corrigir os dados. Ao salvar, ela continua aprovada."
       : undefined;
 
   return (

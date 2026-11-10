@@ -17,7 +17,7 @@ Executar **em ambiente local com dados sintéticos** (ou importação de demonst
 - [ ] Coordenador cadastra ficha → fica PENDENTE; não aparece nas escalas
 - [ ] Coordenador não aprova; Presidente aprova com data e ata; histórico mostra a decisão
 - [ ] Reprovar exige motivo; salvar ficha reprovada reenvia para análise
-- [ ] Mudar departamentos/funções de ficha aprovada volta para PENDENTE
+- [ ] Mudar departamentos/funções de ficha aprovada, pela edição do Administrador, mantém a ficha aprovada
 - [ ] Afastar/reativar; impressão da ficha só para aprovado
 - [ ] Trabalhador de outro departamento não vê a ficha
 

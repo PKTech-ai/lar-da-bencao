@@ -218,7 +218,7 @@ export function AdmissionsClient({ departments, canDecide, canEditFicha }: { dep
           <WorkerFichaForm key={editing.id} departments={departments} initial={editing} busy={busy}
             notice={editing.status === "pending" || editing.status === "rejected"
               ? "Esta ficha ainda não está aprovada. Ao salvar, ela é aprovada e o trabalhador fica ativo."
-              : "Ficha aprovada: você pode corrigir os dados. Se alterar departamentos ou funções, a ficha volta para PENDENTE — AGUARDANDO DIRETORIA."}
+              : "Ficha aprovada: você pode corrigir os dados. Ao salvar, ela continua aprovada."}
             submitLabel="Salvar ficha" onSubmit={saveEdit} onCancel={() => setEditing(null)} />
         </section>
       ) : null}
