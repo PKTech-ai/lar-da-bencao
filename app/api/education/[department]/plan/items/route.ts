@@ -45,7 +45,7 @@ export async function POST(request: Request, context: Params) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "update");
+    const department = await requireEducation(actor, (await context.params).department, "update", "planejamento");
     const input = postSchema.parse(await request.json());
     const id = await transaction(async (client) => {
       const plan = await planFor(client, department, "where p.year=$1", input.year);
@@ -71,7 +71,7 @@ export async function PATCH(request: Request, context: Params) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "update");
+    const department = await requireEducation(actor, (await context.params).department, "update", "planejamento");
     const input = patchSchema.parse(await request.json());
     await transaction(async (client) => {
       const plan = await planFor(client, department, "join app.education_plan_items i on i.plan_id = p.id where i.id=$1", input.id);
@@ -96,7 +96,7 @@ export async function DELETE(request: Request, context: Params) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "update");
+    const department = await requireEducation(actor, (await context.params).department, "update", "planejamento");
     const input = deleteSchema.parse(await request.json());
     await transaction(async (client) => {
       await planFor(client, department, "join app.education_plan_items i on i.plan_id = p.id where i.id=$1", input.id);

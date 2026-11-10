@@ -100,7 +100,14 @@ vi.mock("@/lib/permissions", () => ({
     state.grants.has(`${resource}:${action}`) || (department ? state.grants.has(`${resource}:${action}:${department}`) : false),
   assertPermission: async () => undefined,
   departmentsWithPermission: async (_: unknown, action: string) =>
-    ["doutrina", "infancia", "juventude"].filter((d) => state.grants.has(`department:${action}:${d}`))
+    ["doutrina", "infancia", "juventude"].filter((d) => state.grants.has(`department:${action}:${d}`)),
+  hasModule: async (_: unknown, department: string, __: unknown, action: string) => {
+    const resource = department === "diretoria" ? "presidencia" : department === "secretaria" ? "secretaria" : "department";
+    return state.grants.has(`${resource}:${action}`) || state.grants.has(`department:${action}:${department}`);
+  },
+  departmentsWithModule: async (_: unknown, __: unknown, action: string) =>
+    ["doutrina", "infancia", "juventude"].filter((d) => state.grants.has(`department:${action}:${d}`)),
+  departmentModuleAccess: async () => ({ marked: () => false })
 }));
 
 const { statusAfterEdit, normalizeFicha, validateDecision, fichaSchema, decisionSchema, assertSchedulableWorker } = await import("@/lib/workers");

@@ -4,7 +4,7 @@ import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
-import { assertPermission, hasPermission } from "@/lib/permissions";
+import { assertModule, hasModule } from "@/lib/permissions";
 import {
   findConflicts, parseSlotKey, roleOf, slotDate, validateSlotValue,
   type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
@@ -13,13 +13,13 @@ import {
 type Db = Pick<PoolClient, "query">;
 const pool: Db = { query: ((text: string, values?: unknown[]) => query(text, values)) as Db["query"] };
 
-export async function requireDoutrina(actor: Actor, action: "read" | "update") {
+export async function requireDoutrina(actor: Actor, action: "read" | "update", module: string) {
   await requireFlag("module_doutrina");
-  await assertPermission(actor, "department", action, "doutrina");
+  await assertModule(actor, "doutrina", module, action);
 }
 
-export async function canEditDoutrina(actor: Actor) {
-  return hasPermission(actor, "department", "update", "doutrina");
+export async function canEditDoutrina(actor: Actor, module: string) {
+  return hasModule(actor, "doutrina", module, "update");
 }
 
 export async function loadScaleOptions(db: Db = pool) {

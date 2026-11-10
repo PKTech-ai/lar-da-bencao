@@ -3,8 +3,8 @@ import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { listEnabledFlags } from "@/lib/feature-flags";
 import { moduleCatalog } from "@/lib/modules";
-import { hasAnyDepartmentPermission, hasPermission } from "@/lib/permissions";
-import { canSeeAdmissions } from "@/lib/workers";
+import { departmentsWithModule, hasPermission } from "@/lib/permissions";
+import { canSeeAdmissions, departmentsWith } from "@/lib/workers";
 
 export type VisibleModule = { href: string; label: string };
 
@@ -40,7 +40,7 @@ export const loadNavigation = cache(async (actor: Actor) => {
     const allowed = mod.department
       ? await hasPermission(actor, mod.permissionResource, "read", mod.department)
       : mod.permissionResource === "department"
-        ? await hasAnyDepartmentPermission(actor, "read")
+        ? await departmentsWith(actor, "read").then((scope) => scope === null || scope.length > 0)
         : await hasPermission(actor, mod.permissionResource, "read");
     if (allowed) modules.push({ href: mod.href, label: mod.label });
   }
@@ -54,7 +54,7 @@ export const loadNavigation = cache(async (actor: Actor) => {
     if (!mod || !flags.get(mod.flagKey) || modules.some((item) => item.href === mod.href)) continue;
     modules.push({ href: `${mod.href}/frequencia`, label: `Chamada · ${mod.label}` });
   }
-  const serviceOrders = Boolean(flags.get("module_patrimonio")) && await hasAnyDepartmentPermission(actor, "read");
+  const serviceOrders = Boolean(flags.get("module_patrimonio")) && (await departmentsWithModule(actor, "os", "read")).length > 0;
   return {
     modules,
     roleLabel: role.rows[0]?.label ?? actor.role,

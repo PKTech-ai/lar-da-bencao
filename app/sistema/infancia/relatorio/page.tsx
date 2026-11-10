@@ -7,7 +7,7 @@ import { requireModulePage } from "@/lib/page-auth";
 import { todayInSaoPaulo } from "@/lib/workers";
 
 export default async function InfanciaRelatorioPage({ searchParams }: { searchParams: Promise<{ ano?: string }> }) {
-  const actor = await requireModulePage("module_infancia", { department: "infancia" });
+  const actor = await requireModulePage("module_infancia", { department: "infancia", module: "relatorio" });
   const requested = Number((await searchParams).ano);
   const year = requested >= 2020 && requested <= 2100 ? requested : Number(todayInSaoPaulo().slice(0, 4));
   await appendAudit(actor, { category: "Acesso", action: "Consulta do relatório anual", module: "Infância", section: "Relatório Anual", entityType: "report", entityId: String(year) });
@@ -22,7 +22,7 @@ export default async function InfanciaRelatorioPage({ searchParams }: { searchPa
         </form>
       </header>
       <EducationNav department="infancia" current="relatorio" />
-      <AnnualReport department="infancia" year={year} groups={await allowedGroups(actor, "infancia")} />
+      <AnnualReport department="infancia" year={year} groups={await allowedGroups(actor, "infancia", "relatorio")} />
     </>
   );
 }

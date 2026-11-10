@@ -8,13 +8,13 @@ import { canEditDoutrina, requireDoutrina, speakerSchema } from "@/lib/doutrina-
 export async function GET() {
   try {
     const actor = await requireActor();
-    await requireDoutrina(actor, "read");
+    await requireDoutrina(actor, "read", "palestrantes");
     const result = await query(
       `select id, full_name, house, city, themes, phone, notes, active, version,
               (select count(*)::int from app.scale_assignments a where a.speaker_id = s.id) as scheduled
          from app.speakers s order by active desc, full_name`
     );
-    return Response.json({ speakers: result.rows, canEdit: await canEditDoutrina(actor) }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ speakers: result.rows, canEdit: await canEditDoutrina(actor, "palestrantes") }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "palestrantes");
     const input = speakerSchema.parse(await request.json());
     const inserted = await query<{ id: string }>(
       `insert into app.speakers (full_name, house, city, themes, phone, notes, created_by, updated_by)

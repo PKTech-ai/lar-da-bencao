@@ -11,7 +11,7 @@ const QUOTE = "Trabalhemos juntos e unamos os nossos esforços, a fim de que o S
 const QUOTE_SOURCE = "O Evangelho Segundo o Espiritismo — Cap. XX, item 5 — O Espírito de Verdade (Paris, 1862)";
 
 export default async function PrintScalePage({ searchParams }: { searchParams: Promise<{ month?: string; dow?: string }> }) {
-  const actor = await requireModulePage("module_doutrina", { department: "doutrina" });
+  const actor = await requireModulePage("module_doutrina", { department: "doutrina", module: "escalas" });
   const params = await searchParams;
   const ym = params.month ?? "";
   if (!isValidMonth(ym)) notFound();

@@ -10,7 +10,7 @@ const METHODS = ["PIX", "Dinheiro", "Transferência", "Cartão"];
 
 type Row = {
   id: string; clean_date: string; worker_id: string; worker_snapshot: { id: string; name: string; departments: string[] };
-  phone: string; status: keyof typeof STATUS; fee_cents: number; payment_status: "pending" | "paid" | null;
+  status: keyof typeof STATUS; fee_cents: number; payment_status: "pending" | "paid" | null;
   payment_date: string | null; payment_method: string | null; payment_reference: string; notes: string; cancel_reason: string; version: number;
 };
 type Conflict = { year: number; worker_id: string; name: string; ids: string[]; dates: string[]; decided: boolean };

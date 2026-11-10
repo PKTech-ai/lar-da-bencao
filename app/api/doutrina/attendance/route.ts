@@ -31,10 +31,10 @@ async function monthValues(ym: string) {
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
-    await requireDoutrina(actor, "read");
+    await requireDoutrina(actor, "read", "frequencia");
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
     const values = await monthValues(ym);
-    return Response.json({ values, stats: attendanceStats(values), canEdit: await canEditDoutrina(actor) }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ values, stats: attendanceStats(values), canEdit: await canEditDoutrina(actor, "frequencia") }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }
@@ -44,7 +44,7 @@ export async function PUT(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "frequencia");
     const input = saveSchema.parse(await request.json());
     const invalid = input.entries.find((entry) => !isValidAttendanceCell(input.month, entry.date, entry.row_id));
     if (invalid) throw new AppError(`Atividade ${invalid.row_id} não ocorre em ${invalid.date.split("-").reverse().join("/")}.`);

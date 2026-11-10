@@ -5,10 +5,11 @@ import { SuggestionsBox } from "@/components/suggestions-box";
 import { DepartmentDashboard } from "@/components/modules/department-dashboard";
 import { ModulePanel } from "@/components/modules/panels";
 import { ResourceManager } from "@/components/resources/resource-manager";
+import { PAGE_DEPARTMENT } from "@/lib/department-modules";
 import { isFlagEnabled } from "@/lib/feature-flags";
 import { findModulePage, SECTOR_ROLE_RESOURCE, type ModuleSection, type SectionAccess } from "@/lib/module-pages";
 import { requireModulePage } from "@/lib/page-auth";
-import { hasAnyDepartmentPermission, hasPermission } from "@/lib/permissions";
+import { departmentModuleAccess, hasAnyDepartmentPermission, hasPermission } from "@/lib/permissions";
 import { canSeeAdmissions } from "@/lib/workers";
 import { workerPageContext } from "@/lib/worker-page";
 import { RESOURCES } from "@/lib/resources/registry";
@@ -25,9 +26,13 @@ export default async function ModuleSectionPage({ params }: Params) {
   const can = (access: SectionAccess | undefined) =>
     access ? hasPermission(actor, access.resource, "read", access.department) : Promise.resolve(true);
   const sectorResource = SECTOR_ROLE_RESOURCE[actor.role];
+  const department = PAGE_DEPARTMENT[page.slug];
+  const moduleAccess = department ? await departmentModuleAccess(actor, department) : null;
   const visible: ModuleSection[] = [];
   for (const section of page.sections) {
     if (sectorResource && section.access?.resource !== sectorResource) continue;
+    // Só as abas marcadas para a pessoa em Usuários › Acesso (o perfil de setor segue a regra do setor).
+    if (!sectorResource && moduleAccess && !moduleAccess.can(section.slug || "painel", "read")) continue;
     if (section.panel === "admissoes-atalho" && !(await canSeeAdmissions(actor))) continue;
     if (section.flag && !(await isFlagEnabled(section.flag))) continue;
     // Cadastro de trabalhadores: mesma regra da tela /sistema/trabalhadores (algum departamento do usuário).

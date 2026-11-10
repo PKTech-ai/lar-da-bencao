@@ -7,16 +7,16 @@ import { dbPool, query, transaction } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { todayInSaoPaulo } from "@/lib/workers";
 import { requireFlag } from "@/lib/feature-flags";
-import { assertPermission, hasPermission, type PermissionAction } from "@/lib/permissions";
+import { assertModule, hasModule, type PermissionAction } from "@/lib/permissions";
 import { PAYMENT_METHODS as PAYMENT_METHOD_VALUES } from "@/lib/resources/defs/tesouraria";
 
 export const TREASURY_FLAG = "module_tesouraria";
 const MODULE = "Tesouraria";
 export const monthSchema = z.string().regex(/^(19|20|21)\d{2}-(0[1-9]|1[0-2])$/, "Mês inválido.");
 
-export async function requireTreasury(actor: Actor, action: PermissionAction) {
+export async function requireTreasury(actor: Actor, action: PermissionAction, module: string | readonly string[]) {
   await requireFlag(TREASURY_FLAG);
-  await assertPermission(actor, "tesouraria", action);
+  await assertModule(actor, "tesouraria", module, action);
 }
 
 /** Situação do mês: o caixa fechado não aceita lançamento novo nem alteração. */
@@ -463,5 +463,5 @@ export async function treasuryReport(year: number) {
 }
 
 export async function canCloseMonth(actor: Actor) {
-  return hasPermission(actor, "tesouraria", "update");
+  return hasModule(actor, "tesouraria", "caixa", "update");
 }

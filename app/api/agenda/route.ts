@@ -2,7 +2,7 @@ import { requireActor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { errorResponse } from "@/lib/errors";
 import { listEnabledFlags } from "@/lib/feature-flags";
-import { hasPermission } from "@/lib/permissions";
+import { hasModule } from "@/lib/permissions";
 
 type Item = { date: string; label: string; module: string; href: string };
 
@@ -18,24 +18,24 @@ export async function GET() {
       for (const row of result.rows) items.push(build(row));
     };
 
-    await add("module_patrimonio", hasPermission(actor, "department", "read", "patrimonio"),
+    await add("module_patrimonio", hasModule(actor, "patrimonio", "limpeza", "read"),
       `select to_char(clean_date,'YYYY-MM-DD') as date, count(*)::text as people
          from app.cleaning_roster where status = 'scheduled' and clean_date between current_date and current_date + 45
          group by 1 order by 1`,
       (row) => ({ date: row.date, label: `Limpeza da Casa · ${row.people} pessoa(s)`, module: "Patrimônio", href: "/sistema/patrimonio/limpeza" }));
 
-    await add("module_eventos", hasPermission(actor, "department", "read", "eventos"),
+    await add("module_eventos", hasModule(actor, "eventos", "agenda", "read"),
       `select to_char(event_date,'YYYY-MM-DD') as date, name
          from app.events where archived_at is null and status in ('A definir','Planejado','Em preparação')
            and event_date between current_date and current_date + 45 order by event_date`,
       (row) => ({ date: row.date, label: row.name, module: "Eventos", href: "/sistema/eventos/agenda" }));
 
-    await add("module_secretaria", hasPermission(actor, "secretaria", "read"),
+    await add("module_secretaria", hasModule(actor, "secretaria", "reunioes", "read"),
       `select to_char(meeting_date,'YYYY-MM-DD') as date, title
          from app.meetings where archived_at is null and meeting_date between current_date and current_date + 45 order by meeting_date`,
       (row) => ({ date: row.date, label: row.title, module: "Secretaria", href: "/sistema/secretaria/reunioes" }));
 
-    await add("module_assistencia", hasPermission(actor, "department", "read", "assistencia_social"),
+    await add("module_assistencia", hasModule(actor, "assistencia_social", "kits", "read"),
       `select to_char(planned_date,'YYYY-MM-DD') as date, responsible
          from app.social_hygiene_kits where archived_at is null and status = 'Programada'
            and planned_date between current_date and current_date + 45 order by planned_date`,
@@ -43,7 +43,7 @@ export async function GET() {
 
     items.sort((a, b) => a.date.localeCompare(b.date));
     let undatedEvents = 0;
-    if (flags.get("module_eventos") && await hasPermission(actor, "department", "read", "eventos")) {
+    if (flags.get("module_eventos") && await hasModule(actor, "eventos", "agenda", "read")) {
       const undated = await query<{ count: string }>(
         `select count(*)::text as count from app.events
           where archived_at is null and event_date is null

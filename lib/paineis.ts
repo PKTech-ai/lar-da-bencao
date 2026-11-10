@@ -4,10 +4,10 @@ import { loadScale, loadScaleOptions, reviewScale } from "@/lib/doutrina-data";
 import { scaleStatusLabel } from "@/lib/doutrina-scale";
 import { isFlagEnabled } from "@/lib/feature-flags";
 import { cashboxData } from "@/lib/ingressos/caixa";
-import { roleAllows, userRoleFor } from "@/lib/ingressos/acesso";
+import { roleAllows, ticketRole } from "@/lib/ingressos/acesso";
 import { activeEvent } from "@/lib/ingressos/dados";
 import { pendingFor } from "@/lib/pendencias";
-import { hasPermission, pageLevel } from "@/lib/permissions";
+import { hasModule } from "@/lib/permissions";
 import { formatMoney } from "@/lib/resources/types";
 import { monthSummary } from "@/lib/treasury";
 
@@ -383,11 +383,11 @@ export async function painelEventos(actor: Actor): Promise<Painel> {
                          and to_char(e.event_date, 'YYYY-MM') = m.month) as total
          from m order by m.month`),
     isFlagEnabled("module_eventos"),
-    pageLevel(actor, "eventos")
+    ticketRole(actor)
   ]);
   const ev = next.rows[0];
   // Ingressos: caixa do evento ativo, só para quem tem papel no módulo (Coordenação, Equipe ou Consulta).
-  const role = ticketsOn ? userRoleFor(level, actor.departments) : null;
+  const role = ticketsOn ? level : null;
   const ticketEvent = role ? await activeEvent() : null;
   const tickets = ticketEvent ? (await cashboxData(ticketEvent.id)).totals : null;
   const href = "/sistema/eventos/evento";
@@ -459,10 +459,9 @@ export type DepartmentCard = { label: string; value: string; hint: string; href:
 
 /** Um número principal por departamento, só dos que a pessoa pode abrir. */
 export async function departmentCards(actor: Actor): Promise<DepartmentCard[]> {
-  const can = (resource: string, department?: string) => hasPermission(actor, resource, "read", department);
+  const can = (department: string) => hasModule(actor, department, "painel", "read");
   const [tes, dou, inf, juv, ass, pat] = await Promise.all([
-    can("tesouraria"), can("department", "doutrina"), can("department", "infancia"), can("department", "juventude"),
-    can("department", "assistencia_social"), can("department", "patrimonio")
+    can("tesouraria"), can("doutrina"), can("infancia"), can("juventude"), can("assistencia_social"), can("patrimonio")
   ]);
   const cards: Promise<DepartmentCard | null>[] = [
     tes ? monthSummary(currentMonth()).then((s) => ({ label: "Tesouraria", value: formatMoney(s.totals.closing), hint: "saldo do caixa", href: "/sistema/tesouraria" })) : Promise.resolve(null),
@@ -476,7 +475,7 @@ export async function departmentCards(actor: Actor): Promise<DepartmentCard[]> {
 }
 
 export async function painelPresidencia(actor: Actor): Promise<Painel & { departamentos: DepartmentCard[] }> {
-  const [pending, departamentos, tes] = await Promise.all([pendingFor(actor), departmentCards(actor), hasPermission(actor, "tesouraria", "read")]);
+  const [pending, departamentos, tes] = await Promise.all([pendingFor(actor), departmentCards(actor), hasModule(actor, "tesouraria", "painel", "read")]);
   const decisions = pending.filter((p) => ["admissoes", "baixas", "sugestoes"].includes(p.key)).reduce((s, p) => s + p.count, 0);
   const treasury = tes ? await painelTesouraria() : null;
   const pick = (label: string) => departamentos.find((d) => d.label === label);

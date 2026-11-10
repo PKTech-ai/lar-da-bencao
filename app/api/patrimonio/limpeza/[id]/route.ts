@@ -8,7 +8,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requirePatrimony(actor, "update");
+    await requirePatrimony(actor, "update", "limpeza");
     await updateCleaning(actor, z.string().uuid().parse((await context.params).id), await request.json());
     return Response.json({ ok: true });
   } catch (error) {

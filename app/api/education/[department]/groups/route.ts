@@ -14,7 +14,7 @@ type Params = { params: Promise<{ department: string }> };
 export async function GET(_request: Request, context: Params) {
   try {
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "read");
+    const department = await requireEducation(actor, (await context.params).department, "read", ["painel", "evangelizadores"]);
     const [links, workers, students] = await Promise.all([
       query<{ class_group: string; position: number; worker_id: string; full_name: string }>(
         `select g.class_group, g.position, g.worker_id, w.full_name from app.education_group_evangelizers g
@@ -40,8 +40,8 @@ export async function GET(_request: Request, context: Params) {
     return Response.json({
       groups,
       workers: workers.rows,
-      canEdit: await canEditEducation(actor, department),
-      scopedGroups: await allowedGroups(actor, department)
+      canEdit: await canEditEducation(actor, department, "evangelizadores"),
+      scopedGroups: await allowedGroups(actor, department, "evangelizadores")
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
@@ -52,7 +52,7 @@ export async function PUT(request: Request, context: Params) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "update");
+    const department = await requireEducation(actor, (await context.params).department, "update", "evangelizadores");
     const input = putSchema.parse(await request.json());
     if (!groupNames(department).includes(input.group)) throw new AppError("Turma inválida.");
     await transaction(async (client) => {

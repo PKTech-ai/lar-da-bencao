@@ -2,7 +2,7 @@ import { requireModulePage } from "@/lib/page-auth";
 import { ScalesClient } from "./scales-client";
 
 export default async function EscalasPage() {
-  await requireModulePage("module_doutrina", { department: "doutrina" });
+  await requireModulePage("module_doutrina", { department: "doutrina", module: "escalas" });
   return (
     <>
       <header className="module-section-head">

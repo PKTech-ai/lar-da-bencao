@@ -2,8 +2,7 @@ import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { AuthorizationError, errorResponse } from "@/lib/errors";
-import { hasPermission } from "@/lib/permissions";
-import { departmentsWithPermission } from "@/lib/permissions";
+import { departmentsWithModule, hasModule } from "@/lib/permissions";
 
 const schema = z.object({ department: z.string().regex(/^[a-z_]+$/).optional(), month: z.coerce.number().int().min(1).max(12).optional() });
 
@@ -13,9 +12,9 @@ export async function GET(request: Request) {
     const actor = await requireActor();
     const { department, month } = schema.parse(Object.fromEntries(new URL(request.url).searchParams));
     // A Secretaria e a Presidência veem todos; os demais, só os departamentos que podem ler.
-    const all = (await hasPermission(actor, "secretaria", "read")) || (await hasPermission(actor, "presidencia", "read"));
-    const allowed = department ? [department] : all ? null : await departmentsWithPermission(actor, "read");
-    if (department && !(await hasPermission(actor, "department", "read", department))) throw new AuthorizationError();
+    const all = (await hasModule(actor, "secretaria", "aniversariantes", "read")) || (await hasModule(actor, "diretoria", "aniversariantes", "read"));
+    const allowed = department ? [department] : all ? null : await departmentsWithModule(actor, "aniversariantes", "read");
+    if (department && !(await hasModule(actor, department, "aniversariantes", "read"))) throw new AuthorizationError();
     if (!all && allowed && !allowed.length) throw new AuthorizationError();
     const result = await query<{ id: string; full_name: string; birth_date: string; day: number; month: number; departments: string[] }>(
       `select w.id, w.full_name, to_char(w.birth_date, 'YYYY-MM-DD') as birth_date,

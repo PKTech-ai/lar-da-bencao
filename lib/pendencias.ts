@@ -1,7 +1,7 @@
 import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { listEnabledFlags } from "@/lib/feature-flags";
-import { hasPermission } from "@/lib/permissions";
+import { hasModule } from "@/lib/permissions";
 
 export type Pending = { key: string; label: string; count: number; href: string; hint: string };
 
@@ -16,43 +16,43 @@ export async function pendingFor(actor: Actor): Promise<Pending[]> {
     if (count) pending.push({ key, label, count, href, hint });
   };
   await add("admissoes", "Fichas aguardando a Diretoria", "/sistema/admissoes", "module_workers",
-    hasPermission(actor, "presidencia", "approve"), "select count(*)::text as count from app.workers where status = 'pending'",
+    hasModule(actor, "diretoria", "admissoes", "approve"), "select count(*)::text as count from app.workers where status = 'pending'",
     "Consultar fichas encaminhadas à Diretoria");
   await add("baixas", "Baixas patrimoniais aguardando decisão", "/sistema/presidencia/baixas", "module_patrimonio",
-    hasPermission(actor, "presidencia", "approve"), "select count(*)::text as count from app.patrimony_disposals where status = 'pending'",
+    hasModule(actor, "diretoria", "baixas", "approve"), "select count(*)::text as count from app.patrimony_disposals where status = 'pending'",
     "Acompanhar pedidos de autorização");
   await add("limpeza", "Taxas de limpeza pendentes de recebimento", "/sistema/patrimonio/limpeza", "module_patrimonio",
-    hasPermission(actor, "department", "update", "patrimonio"),
+    hasModule(actor, "patrimonio", "limpeza", "update"),
     "select count(*)::text as count from app.cleaning_roster where payment_status = 'pending'",
     "Conferir taxas ainda sem recebimento");
   await add("os", "Ordens de serviço em aberto", "/sistema/patrimonio/os", "module_patrimonio",
-    hasPermission(actor, "department", "update", "patrimonio"),
+    hasModule(actor, "patrimonio", "os", "update"),
     "select count(*)::text as count from app.service_orders where status in ('open','in_progress')",
     "Atender os pedidos dos departamentos");
   await add("sugestoes", "Sugestões sem resposta", "/sistema/sugestoes", "business_modules",
-    hasPermission(actor, "presidencia", "update"),
+    hasModule(actor, "diretoria", "sugestoes", "update"),
     "select count(*)::text as count from app.suggestions where status in ('Recebida','Em análise')",
     "Consultar a central de melhorias");
   await add("conciliacao", "Linhas do extrato a conciliar", "/sistema/tesouraria/extrato", "module_tesouraria",
-    hasPermission(actor, "tesouraria", "update"),
+    hasModule(actor, "tesouraria", "extrato", "update"),
     "select count(*)::text as count from app.bank_statement_lines where status = 'pending'",
     "Conciliar as linhas do extrato");
   await add("caixa", "Meses do caixa ainda abertos", "/sistema/tesouraria/caixa", "module_tesouraria",
-    hasPermission(actor, "tesouraria", "update"),
+    hasModule(actor, "tesouraria", "caixa", "update"),
     `select count(*)::text as count from (
        select distinct to_char(e.entry_date, 'YYYY-MM') as month from app.treasury_entries e where e.archived_at is null
         and e.entry_date < date_trunc('month', current_date)) meses
       where not exists (select 1 from app.treasury_months m where m.reference_month = meses.month and m.status <> 'Aberto')`,
     "Fechar os meses ainda abertos");
   await add("parecer", "Meses aguardando parecer do Conselho Fiscal", "/sistema/conselhofiscal/analises", "module_conselho_fiscal",
-    hasPermission(actor, "conselho_fiscal", "update"),
+    hasModule(actor, "conselho_fiscal", "analises", "update"),
     `select count(*)::text as count from app.treasury_months m
       where m.status = 'Fechado'
         and not exists (select 1 from app.fiscal_reviews r where r.reference_month = m.reference_month
                          and r.archived_at is null and r.status in ('Deferido', 'Indeferido'))`,
     "Emitir o parecer do Conselho Fiscal");
   await add("emprestimos", "Empréstimos de livros atrasados", "/sistema/divulgacao/emprestimos", "module_divulgacao",
-    hasPermission(actor, "department", "update", "divulgacao"),
+    hasModule(actor, "divulgacao", "emprestimos", "update"),
     `select count(*)::text as count from app.book_loans l
       where l.archived_at is null and l.due_date < current_date
         and l.quantity > coalesce((select sum(r.quantity) from app.book_loan_returns r where r.loan_id = l.id), 0)`,

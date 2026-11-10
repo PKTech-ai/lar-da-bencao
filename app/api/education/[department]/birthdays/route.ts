@@ -16,10 +16,10 @@ const querySchema = z.object({
 export async function GET(request: Request, context: Params) {
   try {
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "read");
+    const department = await requireEducation(actor, (await context.params).department, "read", "aniversariantes");
     const params = Object.fromEntries(new URL(request.url).searchParams);
     const input = querySchema.parse(params);
-    const groups = await allowedGroups(actor, department);
+    const groups = await allowedGroups(actor, department, "aniversariantes");
     const people = [];
     if (input.audience !== "evangelizadores") {
       const students = await activeForYear(department, input.year);

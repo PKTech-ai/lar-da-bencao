@@ -1,12 +1,12 @@
 import { PainelView } from "@/components/painel";
 import { query } from "@/lib/db";
 import { canEditDoutrina } from "@/lib/doutrina-data";
-import { requireModulePage } from "@/lib/page-auth";
+import { requireDepartmentHome } from "@/lib/page-auth";
 import { painelDoutrina } from "@/lib/paineis";
 import { DoctrineContactForm } from "./contact-form";
 
 export default async function DoutrinaPage() {
-  const actor = await requireModulePage("module_doutrina", { department: "doutrina" });
+  const actor = await requireDepartmentHome("module_doutrina", "doutrina");
   const [painel, contact, canEdit] = await Promise.all([
     painelDoutrina(),
     query<{ coordinator: string | null; phone: string | null }>(
@@ -15,7 +15,7 @@ export default async function DoutrinaPage() {
                 where u.status = 'active' and u.role_key = 'coordenador') as coordinator,
               (select phone from app.department_contacts where department_key = 'doutrina') as phone`
     ),
-    canEditDoutrina(actor)
+    canEditDoutrina(actor, "escalas")
   ]);
 
   return (

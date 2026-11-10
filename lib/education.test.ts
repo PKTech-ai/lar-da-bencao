@@ -137,9 +137,14 @@ vi.mock("@/lib/permissions", async () => {
   const { AuthorizationError } = await import("@/lib/errors");
   const allowed = (resource: string, action: string) =>
     state.role === "coordenador" || (state.role === "evangelizador" && (action === "read" || resource === "education_class"));
+  // A chamada da própria turma corresponde ao antigo education_class; os demais módulos, ao departamento.
+  const moduleAllowed = (module: string | string[], action: string) => allowed([module].flat().includes("chamada") ? "education_class" : "department", action);
   return {
     hasPermission: async (_: unknown, resource: string, action: string) => allowed(resource, action),
-    assertPermission: async (_: unknown, resource: string, action: string) => { if (!allowed(resource, action)) throw new AuthorizationError(); }
+    assertPermission: async (_: unknown, resource: string, action: string) => { if (!allowed(resource, action)) throw new AuthorizationError(); },
+    hasModule: async (_: unknown, __: string, module: string | string[], action: string) => moduleAllowed(module, action),
+    assertModule: async (_: unknown, __: string, module: string | string[], action: string) => { if (!moduleAllowed(module, action)) throw new AuthorizationError(); },
+    departmentModuleAccess: async () => ({ can: (module: string | string[], action: string) => moduleAllowed(module, action) })
   };
 });
 

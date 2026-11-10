@@ -4,7 +4,7 @@ import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { query, transaction } from "@/lib/db";
 import { errorResponse } from "@/lib/errors";
-import { hasPermission } from "@/lib/permissions";
+import { hasModule } from "@/lib/permissions";
 
 const schema = z.object({
   subject: z.string().trim().min(3).max(160),
@@ -17,7 +17,7 @@ const schema = z.object({
 export async function GET() {
   try {
     const actor = await requireActor();
-    const manage = await hasPermission(actor, "presidencia", "read");
+    const manage = await hasModule(actor, "diretoria", "sugestoes", "read");
     const result = await query(
       `select s.id, s.subject, s.body, s.area, s.status, s.answer, s.created_at, s.answered_at, s.version,
               case when s.anonymous then null else u.full_name end as author,

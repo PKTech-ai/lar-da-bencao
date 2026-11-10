@@ -16,15 +16,15 @@ const createSchema = evangelizandoSchema.extend({ department_key: educationDepar
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
-    const department = await requireEducation(actor, new URL(request.url).searchParams.get("department") ?? "", "read");
-    const groups = await allowedGroups(actor, department);
+    const department = await requireEducation(actor, new URL(request.url).searchParams.get("department") ?? "", "read", "evangelizandos");
+    const groups = await allowedGroups(actor, department, "evangelizandos");
     const result = await query<EvangelizandoRow>(
       `select ${EVANGELIZANDO_COLUMNS} from app.evangelizandos e where e.department_key = $1 order by e.full_name`,
       [department]
     );
     const rows = result.rows.map((row) => withEffectiveStatus(row)).filter((row) => !groups || groups.includes(row.current_group ?? ""));
     return Response.json(
-      { evangelizandos: rows, canEdit: await canEditEducation(actor, department), scopedGroups: groups },
+      { evangelizandos: rows, canEdit: await canEditEducation(actor, department, "evangelizandos"), scopedGroups: groups },
       { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch (error) {
@@ -37,12 +37,12 @@ export async function POST(request: Request) {
     assertSameOrigin(request);
     const actor = await requireActor();
     const input = createSchema.parse(await request.json());
-    const department = await requireEducation(actor, input.department_key, "create");
+    const department = await requireEducation(actor, input.department_key, "create", "evangelizandos");
     const today = todayInSaoPaulo();
     const filled = input.filled_date || today;
     const year = Number(filled.slice(0, 4));
     const c = validateEvangelizando(input, department, today, year);
-    assertGroupAllowed(await allowedGroups(actor, department), c.group);
+    assertGroupAllowed(await allowedGroups(actor, department, "evangelizandos"), c.group);
     const id = await transaction(async (client) => {
       const inserted = await client.query<{ id: string }>(
         `insert into app.evangelizandos (full_name, birth_date, guardian_name, guardian_relation, guardian_phone, whatsapp, address,

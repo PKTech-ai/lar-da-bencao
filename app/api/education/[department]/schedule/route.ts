@@ -27,11 +27,11 @@ const putSchema = z.object({
 export async function GET(request: Request, context: Params) {
   try {
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "read");
+    const department = await requireEducation(actor, (await context.params).department, "read", "cronograma");
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
-    const groups = await allowedGroups(actor, department);
+    const groups = await allowedGroups(actor, department, "cronograma");
     const last = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).toISOString().slice(0, 10);
-    return Response.json({ rows: await scheduleRows(department, `${ym}-01`, last, groups), canEdit: await canWriteClasses(actor, department) }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ rows: await scheduleRows(department, `${ym}-01`, last, groups), canEdit: await canWriteClasses(actor, department, {}) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }

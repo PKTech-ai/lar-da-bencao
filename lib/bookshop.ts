@@ -5,7 +5,7 @@ import { appendAudit } from "@/lib/audit";
 import { query, transaction } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
-import { assertPermission } from "@/lib/permissions";
+import { assertModule } from "@/lib/permissions";
 import { todayInSaoPaulo } from "@/lib/workers";
 
 export const BOOKSHOP_FLAG = "module_divulgacao";
@@ -37,7 +37,7 @@ export const returnSchema = z.object({
 /** Devolução de exemplares emprestados; libera o inventário de empréstimos. */
 export async function registerReturn(actor: Actor, loanId: string, body: unknown) {
   await requireFlag(BOOKSHOP_FLAG);
-  await assertPermission(actor, "department", "update", "divulgacao");
+  await assertModule(actor, "divulgacao", "emprestimos", "update");
   const input = returnSchema.parse(body);
   const today = todayInSaoPaulo();
   return transaction(async (client) => {

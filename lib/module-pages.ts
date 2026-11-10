@@ -3,6 +3,8 @@
  * ou um painel próprio (`panel`, ver components/modules/panels.tsx). Módulo puro.
  */
 
+import { PAGE_DEPARTMENT } from "@/lib/department-modules";
+
 export type SectionAccess = { resource: string; department?: string };
 
 export type ModuleSection = {
@@ -187,6 +189,42 @@ export const MODULE_PAGES: readonly ModulePage[] = [
 export function findModulePage(slug: string) {
   return MODULE_PAGES.find((m) => m.slug === slug);
 }
+
+/** Cadastros que não têm aba própria: vivem dentro de um painel (página, aba). */
+const NESTED_RESOURCES: Readonly<Record<string, readonly [string, string]>> = {
+  "conselho-analises": ["conselhofiscal", "analises"],
+  "divulgacao-emprestimos": ["divulgacao", "emprestimos"],
+  "divulgacao-vendas": ["divulgacao", "vendas"],
+  "eventos-avaliacao": ["eventos", "evento"],
+  "eventos-escala": ["eventos", "evento"],
+  "eventos-itens": ["eventos", "evento"]
+};
+
+export type ModuleTarget = { department: string; module: string };
+
+/** Departamento e módulo que liberam um cadastro em Usuários › Acesso. */
+export function moduleOfResource(key: string): ModuleTarget | null {
+  const nested = NESTED_RESOURCES[key];
+  if (nested) return { department: PAGE_DEPARTMENT[nested[0]], module: nested[1] };
+  for (const page of MODULE_PAGES) {
+    const section = page.sections.find((s) => s.resource === key);
+    if (section && PAGE_DEPARTMENT[page.slug]) return { department: PAGE_DEPARTMENT[page.slug], module: section.slug || "painel" };
+  }
+  return null;
+}
+
+/**
+ * Cadastros usados por outro módulo do mesmo departamento (lista de escolha, ou o gravador que grava na ata).
+ * `labelsOnly`: quem chega só por este caminho recebe o nome, sem o restante da ficha.
+ */
+export const SHARED_RESOURCES: Readonly<Record<string, { modules: readonly string[]; write?: boolean; labelsOnly?: boolean }>> = {
+  "assistencia-familias": { modules: ["rancho"], labelsOnly: true },
+  "clube-maes-pessoas": { modules: ["clube-maes-entregas"], labelsOnly: true },
+  "divulgacao-obras": { modules: ["estoque", "emprestimos", "vendas"] },
+  "eventos-agenda": { modules: ["evento"] },
+  "secretaria-reunioes": { modules: ["gravador"], write: true },
+  "tesouraria-mantenedores": { modules: ["doacoes"], labelsOnly: true }
+};
 
 /** Perfis de setor social só enxergam as abas do próprio setor (regra do mock). */
 export const SECTOR_ROLE_RESOURCE: Record<string, string> = { brecho: "social_brecho", clube_maes: "social_clube_maes" };

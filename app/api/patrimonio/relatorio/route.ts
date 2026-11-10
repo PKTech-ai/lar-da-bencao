@@ -6,7 +6,7 @@ import { patrimonyReport, requirePatrimony } from "@/lib/patrimonio";
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
-    await requirePatrimony(actor, "read");
+    await requirePatrimony(actor, "read", "relatorio");
     const year = z.coerce.number().int().min(1900).max(2199).parse(new URL(request.url).searchParams.get("year") ?? new Date().getFullYear());
     return Response.json(await patrimonyReport(year), { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {

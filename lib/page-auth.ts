@@ -4,9 +4,10 @@ import { requireActor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { AuthenticationError } from "@/lib/errors";
 import { isFlagEnabled } from "@/lib/feature-flags";
-import { hasAnyDepartmentPermission, hasPermission, type PermissionAction } from "@/lib/permissions";
+import { departmentModuleAccess, departmentsWithModule, hasModule, hasPermission, type PermissionAction } from "@/lib/permissions";
 import type { EducationDepartment } from "@/lib/education";
-import { hasCallAccess } from "@/lib/education-data";
+import { canOpenAttendance } from "@/lib/education-data";
+import { departmentsWith } from "@/lib/workers";
 import { CURRENT_TERMS_VERSION } from "@/lib/terms";
 
 export async function requirePageActor() {
@@ -40,6 +41,8 @@ type ModuleAccess = {
   action?: PermissionAction;
   /** Departamento fixo; `"any"` aceita qualquer departamento do ator. */
   department?: string;
+  /** Módulo de Usuários › Acesso que abre a página. */
+  module?: string;
 };
 
 /**
@@ -53,18 +56,53 @@ type ModuleAccess = {
 export async function requireAttendancePage(flag: string, department: EducationDepartment) {
   const actor = await requirePageActor();
   if (!(await isFlagEnabled(flag))) notFound();
+  if (!(await canOpenAttendance(actor, department))) notFound();
   const seesDepartment = await hasPermission(actor, "department", "read", department);
-  if (!seesDepartment && !(await hasCallAccess(actor, department))) notFound();
   return { actor, seesDepartment };
 }
 
 export async function requireModulePage(flag: string, access: ModuleAccess = {}): Promise<Actor> {
   const actor = await requirePageActor();
-  const { resource = "department", action = "read", department } = access;
+  const { resource = "department", action = "read", department, module } = access;
   if (!(await isFlagEnabled(flag))) notFound();
-  const allowed = department === "any"
-    ? await hasAnyDepartmentPermission(actor, action)
-    : await hasPermission(actor, resource, action, department);
+  let allowed: boolean;
+  if (department === "any") {
+    // Telas da Casa inteira: Ordens de Serviço ou as fichas de trabalhadores.
+    if (module) allowed = (await departmentsWithModule(actor, module, action)).length > 0;
+    else {
+      const scope = await departmentsWith(actor, "read");
+      allowed = scope === null || scope.length > 0;
+    }
+  } else if (module && department) {
+    allowed = await hasModule(actor, department, module, action);
+  } else {
+    allowed = await hasPermission(actor, resource, action, department);
+  }
   if (!allowed) notFound();
   return actor;
+}
+
+const EDUCATION_ROUTES: readonly (readonly [string, string])[] = [
+  ["evangelizandos", "evangelizandos"], ["aniversariantes", "aniversariantes"], ["estudos", "estudos"],
+  ["frequencia", "frequencia"], ["chamada", "frequencia"], ["cronograma", "cronograma"], ["planejamento", "planejamento"],
+  ["relatorio", "relatorio"], ["os", "ordens-servico"], ["evangelizadores", "/sistema/trabalhadores"]
+];
+
+const HOME_ROUTES: Readonly<Record<string, readonly (readonly [string, string])[]>> = {
+  infancia: EDUCATION_ROUTES,
+  juventude: EDUCATION_ROUTES,
+  doutrina: [
+    ["trabalhadores", "trabalhadores"], ["palestrantes", "palestrantes"], ["estudos", "estudos"], ["escalas", "escalas"],
+    ["frequencia", "frequencia"], ["culto-lar", "culto-lar"], ["os", "ordens-servico"]
+  ]
+};
+
+/** Painel do departamento; sem o Painel marcado, leva ao primeiro módulo que a pessoa tem. */
+export async function requireDepartmentHome(flag: string, department: string): Promise<Actor> {
+  const actor = await requireModulePage(flag, { department });
+  const access = await departmentModuleAccess(actor, department);
+  if (access.can("painel", "read")) return actor;
+  const next = HOME_ROUTES[department]?.find(([module]) => access.can(module, "read"));
+  if (!next) notFound();
+  redirect(next[1].startsWith("/") ? next[1] : `/sistema/${department}/${next[1]}`);
 }

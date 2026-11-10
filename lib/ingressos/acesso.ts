@@ -8,7 +8,7 @@ import { query } from "@/lib/db";
 import { AppError, AuthenticationError, AuthorizationError } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
 import { clientIp } from "@/lib/login-throttle";
-import { pageLevel } from "@/lib/permissions";
+import { departmentModuleAccess } from "@/lib/permissions";
 
 /**
  * Quem está operando o módulo de Ingressos e o que pode fazer.
@@ -58,9 +58,16 @@ export function userRoleFor(level: "full" | "read" | null, departments: string[]
   return null;
 }
 
+/** Papel em Ingressos: quem recebeu o módulo só para consulta não vende. */
+export async function ticketRole(actor: Actor): Promise<UserRole | null> {
+  const access = await departmentModuleAccess(actor, "eventos");
+  const level = access.levelOf("ingressos");
+  return access.fine && level === "read" ? "consulta" : userRoleFor(level, actor.departments);
+}
+
 export async function userOperator(actor: Actor): Promise<UserOperator> {
   await requireFlag(FLAG);
-  const role = userRoleFor(await pageLevel(actor, "eventos"), actor.departments);
+  const role = await ticketRole(actor);
   if (!role) throw new AuthorizationError();
   return { kind: "user", actor, role };
 }

@@ -3,7 +3,8 @@ import { ORPHAN_RULES, discard, sweepAttachments } from "@/lib/attachment-mainte
 
 const checks = vi.hoisted(() => ({ calls: [] as Array<[string, string, string?]> }));
 vi.mock("@/lib/permissions", () => ({
-  assertPermission: async (_: unknown, resource: string, action: string, department?: string) => { checks.calls.push([resource, action, department]); }
+  assertPermission: async (_: unknown, resource: string, action: string, department?: string) => { checks.calls.push([resource, action, department]); },
+  assertModule: async (_: unknown, department: string, modules: string[], action: string) => { checks.calls.push([department, action, modules.join()]); }
 }));
 
 const { attachmentPermission, authorizeAttachment } = await import("@/lib/attachments");
@@ -18,9 +19,9 @@ describe("vínculos de anexos da onda 1", () => {
     await authorizeAttachment({} as never, "study_material_infancia", "create");
     await authorizeAttachment({} as never, "bank_statement", "download");
     expect(checks.calls).toEqual([
-      ["department", "read", "infancia"],
-      ["department", "create", "infancia"],
-      ["tesouraria", "read", undefined]
+      ["infancia", "read", "estudos"],
+      ["infancia", "create", "estudos"],
+      ["tesouraria", "read", "extrato"]
     ]);
   });
 });

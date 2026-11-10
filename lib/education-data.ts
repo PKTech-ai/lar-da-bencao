@@ -3,21 +3,22 @@ import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { AppError, AuthorizationError } from "@/lib/errors";
 import { flagForDepartment, requireFlag } from "@/lib/feature-flags";
-import { assertPermission, hasPermission } from "@/lib/permissions";
+import { ATTENDANCE_MODULE, CALL_MODULE } from "@/lib/department-modules";
+import { assertModule, departmentModuleAccess, hasModule, hasPermission } from "@/lib/permissions";
 import { classify, enrollmentStatus, isEducationDepartment, type EducationDepartment } from "@/lib/education";
 import { todayInSaoPaulo } from "@/lib/workers";
 
 export const educationDepartment = z.custom<EducationDepartment>(isEducationDepartment, "Departamento inválido.");
 
-export async function requireEducation(actor: Actor, department: string, action: "read" | "create" | "update" | "delete") {
+export async function requireEducation(actor: Actor, department: string, action: "read" | "create" | "update" | "delete", module: string | readonly string[]) {
   if (!isEducationDepartment(department)) throw new AppError("Departamento não encontrado.", 404, "NOT_FOUND");
   await requireFlag(flagForDepartment(department));
-  await assertPermission(actor, "department", action, department);
+  await assertModule(actor, department, module, action);
   return department;
 }
 
-export async function canEditEducation(actor: Actor, department: EducationDepartment) {
-  return hasPermission(actor, "department", "update", department);
+export async function canEditEducation(actor: Actor, department: EducationDepartment, module: string) {
+  return hasModule(actor, department, module, "update");
 }
 
 /**
@@ -25,9 +26,16 @@ export async function canEditEducation(actor: Actor, department: EducationDepart
  * Evangelizador. O perfil Evangelizador e quem tem só a Chamada enxergam as turmas em que estão vinculados:
  * pela ficha ligada à conta (contas por CPF têm e-mail técnico) ou, nas contas antigas, pelo e-mail da ficha.
  */
-export async function allowedGroups(actor: Actor, department: EducationDepartment): Promise<string[] | null> {
+export async function allowedGroups(actor: Actor, department: EducationDepartment, module: string | readonly string[]): Promise<string[] | null> {
   if (await hasPermission(actor, "department", "update", department)) return null;
-  if (actor.role !== "evangelizador" && await hasPermission(actor, "department", "read", department)) return null;
+  const access = await departmentModuleAccess(actor, department);
+  if (access.can(module, "update")) return null;
+  if (actor.role !== "evangelizador" && access.can(module, "read")) return null;
+  return ownGroups(actor, department);
+}
+
+/** Turmas em que a pessoa está vinculada como evangelizadora. */
+async function ownGroups(actor: Actor, department: EducationDepartment) {
   const result = await query<{ class_group: string }>(
     `select distinct g.class_group from app.education_group_evangelizers g
        join app.workers w on w.id = g.worker_id and w.status = 'active'
@@ -50,16 +58,7 @@ export async function requireAttendance(actor: Actor, department: string) {
 }
 
 export async function canOpenAttendance(actor: Actor, department: EducationDepartment) {
-  return (await hasPermission(actor, "department", "read", department)) || (await hasCallAccess(actor, department));
-}
-
-/** Acesso "Chamada" da pessoa no departamento (escolhido em Usuários › Acesso). */
-export async function hasCallAccess(actor: Actor, department: string) {
-  const result = await query(
-    "select 1 from app.user_departments where user_id = $1 and department_key = $2 and access_level = 'chamada'",
-    [actor.id, department]
-  );
-  return Boolean(result.rowCount);
+  return hasModule(actor, department, [CALL_MODULE, ATTENDANCE_MODULE], "read");
 }
 
 export function assertGroupAllowed(groups: string[] | null, group: string) {
@@ -115,13 +114,16 @@ export async function activeForYear(department: EducationDepartment, year: numbe
 export async function requireClassWrite(actor: Actor, department: string, options: { attendance?: boolean } = {}) {
   if (!isEducationDepartment(department)) throw new AppError("Departamento não encontrado.", 404, "NOT_FOUND");
   await requireFlag(flagForDepartment(department));
-  if (!(await hasPermission(actor, "education_class", "update", department)) && !(await hasPermission(actor, "department", "update", department))) {
-    throw new AuthorizationError();
+  if (!(await canWriteClasses(actor, department, options))) throw new AuthorizationError();
+  if (options.attendance) {
+    // Quem altera só a chamada da própria turma nunca grava nas demais.
+    const all = await hasModule(actor, department, ATTENDANCE_MODULE, "update");
+    return { department, groups: all ? null : await ownGroups(actor, department) };
   }
-  if (!options.attendance && !(await hasPermission(actor, "department", "read", department))) throw new AuthorizationError();
-  return { department, groups: await allowedGroups(actor, department) };
+  return { department, groups: await allowedGroups(actor, department, ["cronograma", "planejamento"]) };
 }
 
-export async function canWriteClasses(actor: Actor, department: EducationDepartment) {
-  return (await hasPermission(actor, "education_class", "update", department)) || (await hasPermission(actor, "department", "update", department));
+export async function canWriteClasses(actor: Actor, department: EducationDepartment, options: { attendance?: boolean }) {
+  // O Planejamento Anual também grava o cronograma das aulas.
+  return hasModule(actor, department, options.attendance ? [CALL_MODULE, ATTENDANCE_MODULE] : ["cronograma", "planejamento"], "update");
 }

@@ -1,7 +1,7 @@
 import { requireActor } from "@/lib/auth";
 import { assertSameOrigin } from "@/lib/csrf";
 import { errorResponse } from "@/lib/errors";
-import { createRecord, listRecords, requireResource, resolveResource, resourceCapabilities } from "@/lib/resources/server";
+import { createRecord, labelsOnlyRecords, listRecords, requireResource, resolveResource, resourceCapabilities } from "@/lib/resources/server";
 
 type Params = { params: Promise<{ resource: string }> };
 
@@ -9,9 +9,9 @@ export async function GET(request: Request, context: Params) {
   try {
     const actor = await requireActor();
     const def = resolveResource((await context.params).resource);
-    await requireResource(actor, def, "read");
+    const { labelsOnly } = await requireResource(actor, def, "read", { labels: true });
     const [records, capabilities] = await Promise.all([listRecords(def, new URL(request.url).searchParams), resourceCapabilities(actor, def)]);
-    return Response.json({ records, capabilities }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ records: labelsOnly ? labelsOnlyRecords(def, records) : records, capabilities }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }

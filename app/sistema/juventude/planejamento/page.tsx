@@ -3,7 +3,7 @@ import { EducationNav } from "@/components/education/education-nav";
 import { requireModulePage } from "@/lib/page-auth";
 
 export default async function JuventudePlanejamentoPage() {
-  await requireModulePage("module_juventude", { department: "juventude" });
+  await requireModulePage("module_juventude", { department: "juventude", module: "planejamento" });
   return (
     <>
       <header className="page-heading"><div><h1>Planejamento Anual — Juventude</h1><p>Conteúdos, atividades especiais e acompanhamento do departamento.</p></div></header>

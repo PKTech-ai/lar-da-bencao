@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { AuthorizationError, errorResponse } from "@/lib/errors";
-import { departmentsWithPermission, hasPermission } from "@/lib/permissions";
+import { departmentsWithPermission, hasModule, hasPermission } from "@/lib/permissions";
 
 const schema = z.object({ department: z.string().regex(/^[a-z_]+$/).optional() });
 
@@ -21,9 +21,9 @@ export async function GET(request: Request) {
     if (department) {
       scope = [department];
     } else {
-      const houseWide = (await hasPermission(actor, "department", "update", "patrimonio"))
-        || (await hasPermission(actor, "secretaria", "read"))
-        || (await hasPermission(actor, "presidencia", "read"));
+      const houseWide = (await hasModule(actor, "patrimonio", "limpeza", "update"))
+        || (await hasModule(actor, "secretaria", "trabalhadores", "read"))
+        || (await hasModule(actor, "diretoria", "trabalhadores", "read"));
       if (!houseWide) {
         scope = await departmentsWithPermission(actor, "read");
         if (!scope.length) throw new AuthorizationError();

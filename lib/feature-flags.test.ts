@@ -39,7 +39,7 @@ vi.mock("@/lib/audit", () => ({ appendAudit: async (_: unknown, input: { action:
 vi.mock("@/lib/permissions", async () => {
   const { AuthorizationError } = await import("@/lib/errors");
   const check = async () => { if (!state.allowed) throw new AuthorizationError(); };
-  return { assertPermission: check, assertAnyDepartmentPermission: check, hasPermission: async () => state.allowed, hasAnyDepartmentPermission: async () => state.allowed };
+  return { assertPermission: check, assertAnyDepartmentPermission: check, hasPermission: async () => state.allowed, hasAnyDepartmentPermission: async () => state.allowed, assertModule: check, hasModule: async () => state.allowed, departmentsWithModule: async () => (state.allowed ? ["doutrina"] : []), departmentModuleAccess: async () => ({ can: () => state.allowed, marked: () => false }) };
 });
 
 const { effectiveFlag, flagForDepartment, isFlagEnabled } = await import("@/lib/feature-flags");

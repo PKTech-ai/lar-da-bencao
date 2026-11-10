@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireTreasury(actor, "update");
+    await requireTreasury(actor, "update", "extrato");
     await reconcileLine(actor, await request.json());
     return Response.json({ ok: true });
   } catch (error) {

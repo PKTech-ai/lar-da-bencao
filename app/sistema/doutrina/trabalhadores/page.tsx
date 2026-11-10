@@ -6,7 +6,7 @@ import { canSeeContact, contactScope } from "@/lib/workers";
 import { WEEKDAYS, workerStatusLabel, workerStatusTone, type WorkerStatus } from "@/lib/worker-constants";
 
 export default async function DoutrinaWorkersPage() {
-  const actor = await requireModulePage("module_doutrina", { department: "doutrina" });
+  const actor = await requireModulePage("module_doutrina", { department: "doutrina", module: "trabalhadores" });
   // Quem só consulta a Doutrina não vê o WhatsApp dos colegas.
   const showPhone = canSeeContact(await contactScope(actor), ["doutrina"]);
   const rows = await query<{ id: string; full_name: string; phone: string | null; functions: string[]; available_days: number[]; status: WorkerStatus }>(

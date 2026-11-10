@@ -22,7 +22,7 @@ const putSchema = z.object({
 export async function GET(request: Request, context: Params) {
   try {
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "read");
+    const department = await requireEducation(actor, (await context.params).department, "read", "planejamento");
     const year = yearSchema.parse(new URL(request.url).searchParams.get("year"));
     const plan = await query<{ id: string; objective: string; priorities: string; expected: string; notes: string; version: number; updated_at: string }>(
       "select id, objective, priorities, expected, notes, version, updated_at from app.education_plans where department_key=$1 and year=$2",
@@ -36,7 +36,7 @@ export async function GET(request: Request, context: Params) {
         [saved.id, year]
       )).rows
       : defaultPlan(department).management.map((m, i) => ({ id: `default-${i}`, kind: "management", item_date: null, month: m.month, title: m.action, item_type: "", purpose: "", audience: "", location: "", responsible: m.responsible, requirements: m.goal, status: "Planejado" }));
-    const lessons = await scheduleRows(department, `${year}-03-01`, `${year}-12-31`, await allowedGroups(actor, department));
+    const lessons = await scheduleRows(department, `${year}-03-01`, `${year}-12-31`, await allowedGroups(actor, department, "planejamento"));
     const base = saved ?? { ...defaultPlan(department), id: null, version: 0, updated_at: null };
     return Response.json({
       plan: { id: base.id, objective: base.objective, priorities: base.priorities, expected: base.expected, notes: base.notes, version: base.version, updated_at: base.updated_at },
@@ -44,7 +44,7 @@ export async function GET(request: Request, context: Params) {
       items,
       lessons,
       returnDate: firstSundayOfMarch(year),
-      canEdit: await canEditEducation(actor, department)
+      canEdit: await canEditEducation(actor, department, "planejamento")
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
@@ -56,7 +56,7 @@ export async function PUT(request: Request, context: Params) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    const department = await requireEducation(actor, (await context.params).department, "update");
+    const department = await requireEducation(actor, (await context.params).department, "update", "planejamento");
     const input = putSchema.parse(await request.json());
     const result = await transaction(async (client) => {
       const current = await client.query<{ id: string; version: number }>(

@@ -12,7 +12,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "palestrantes");
     const id = z.string().uuid().parse((await context.params).id);
     const input = patchSchema.parse(await request.json());
     await transaction(async (client) => {

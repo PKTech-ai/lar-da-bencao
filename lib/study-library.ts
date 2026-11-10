@@ -1,7 +1,7 @@
 import type { Actor } from "@/lib/auth";
 import { z } from "zod";
 import { requireFlag, flagForDepartment } from "@/lib/feature-flags";
-import { assertPermission, hasPermission } from "@/lib/permissions";
+import { assertModule, hasModule } from "@/lib/permissions";
 
 export const libraryDepartment = z.enum(["doutrina", "infancia", "juventude"]);
 export type LibraryDepartment = z.infer<typeof libraryDepartment>;
@@ -9,11 +9,11 @@ export const STUDY_TYPES = ["ESE", "ESDE", "MEP", "OBRA", "PALESTRA", "TREINAMEN
 
 export async function requireLibrary(actor: Actor, department: LibraryDepartment, action: "read" | "create" | "update" | "delete") {
   await requireFlag(flagForDepartment(department));
-  await assertPermission(actor, "department", action, department);
+  await assertModule(actor, department, "estudos", action);
 }
 
 export async function canEditLibrary(actor: Actor, department: LibraryDepartment) {
-  return hasPermission(actor, "department", "update", department);
+  return hasModule(actor, department, "estudos", "update");
 }
 
 export const attachmentOwnerType = (department: LibraryDepartment) => `study_material_${department}`;

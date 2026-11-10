@@ -16,7 +16,7 @@ export default async function PersonAccessPage({ params }: { params: Promise<{ i
       <header className="page-heading">
         <div>
           <h1>Acesso por departamento</h1>
-          <p>Escolha o que a pessoa vê em cada departamento. Vale na hora e fica registrado no Dedo-duro.</p>
+          <p>Marque o departamento inteiro ou abra para escolher módulo por módulo. Vale ao salvar e fica registrado no Dedo-duro.</p>
         </div>
         <Link className="button" href="/sistema/usuarios">Voltar para Usuários</Link>
       </header>

@@ -28,12 +28,12 @@ export const moduleCatalog: ModuleDef[] = [
 ];
 
 export const doutrinaSubnav = [
-  { href: "/sistema/doutrina", label: "Painel" },
-  { href: "/sistema/doutrina/trabalhadores", label: "Trabalhadores" },
-  { href: "/sistema/doutrina/palestrantes", label: "Palestrantes Externos" },
-  { href: "/sistema/doutrina/estudos", label: "Biblioteca de Estudos" },
-  { href: "/sistema/doutrina/escalas", label: "Escala Mensal" },
-  { href: "/sistema/doutrina/frequencia", label: "Frequência" },
-  { href: "/sistema/doutrina/culto-lar", label: "Culto no Lar" },
-  { href: "/sistema/doutrina/ordens-servico", label: "Ordens de Serviço" }
+  { href: "/sistema/doutrina", label: "Painel", module: "painel" },
+  { href: "/sistema/doutrina/trabalhadores", label: "Trabalhadores", module: "trabalhadores" },
+  { href: "/sistema/doutrina/palestrantes", label: "Palestrantes Externos", module: "palestrantes" },
+  { href: "/sistema/doutrina/estudos", label: "Biblioteca de Estudos", module: "estudos" },
+  { href: "/sistema/doutrina/escalas", label: "Escala Mensal", module: "escalas" },
+  { href: "/sistema/doutrina/frequencia", label: "Frequência", module: "frequencia" },
+  { href: "/sistema/doutrina/culto-lar", label: "Culto no Lar", module: "culto-lar" },
+  { href: "/sistema/doutrina/ordens-servico", label: "Ordens de Serviço", module: "os" }
 ] as const;

@@ -6,6 +6,7 @@ import { query, transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import { isValidMonth } from "@/lib/doutrina-scale";
 import { EDUCATION_LABEL, classSundays, isClassSunday } from "@/lib/education";
+import { ATTENDANCE_MODULE } from "@/lib/department-modules";
 import { activeForYear, allowedGroups, canWriteClasses, requireAttendance, requireClassWrite } from "@/lib/education-data";
 
 type Params = { params: Promise<{ department: string }> };
@@ -38,8 +39,8 @@ export async function GET(request: Request, context: Params) {
     const actor = await requireActor();
     const department = await requireAttendance(actor, (await context.params).department);
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
-    const groups = await allowedGroups(actor, department);
-    return Response.json({ ...(await sheet(department, ym, groups)), canEdit: await canWriteClasses(actor, department) }, { headers: { "Cache-Control": "private, no-store" } });
+    const groups = await allowedGroups(actor, department, ATTENDANCE_MODULE);
+    return Response.json({ ...(await sheet(department, ym, groups)), canEdit: await canWriteClasses(actor, department, { attendance: true }) }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }

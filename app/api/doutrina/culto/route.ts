@@ -47,7 +47,7 @@ async function eligibleWorkers(db: { query: typeof query } = { query }) {
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
-    await requireDoutrina(actor, "read");
+    await requireDoutrina(actor, "read", "culto-lar");
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
     const [row, workers] = await Promise.all([load(ym), eligibleWorkers()]);
     const culto = row ?? { id: null, culto_date: penultimateSaturday(ym), requester_id: null, house: "", leader_id: null, speaker_id: null, deleted_at: null, version: 0 };
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     return Response.json({
       culto: { ...culto, culto_date: penultimateSaturday(ym), status: cultoStatus(culto), saved: Boolean(row) },
       options: { requester: options("requester"), leader: options("leader"), speaker: options("speaker") },
-      canEdit: await canEditDoutrina(actor)
+      canEdit: await canEditDoutrina(actor, "culto-lar")
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
@@ -67,7 +67,7 @@ export async function PUT(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "culto-lar");
     const input = putSchema.parse(await request.json());
     const [year, month] = input.month.split("-").map(Number);
     const result = await transaction(async (client) => {
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "culto-lar");
     const input = postSchema.parse(await request.json());
     const [year, month] = input.month.split("-").map(Number);
     await transaction(async (client) => {

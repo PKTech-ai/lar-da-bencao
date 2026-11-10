@@ -6,7 +6,7 @@ import { canCloseMonth, changeMonthStatus, monthSchema, monthSummary, requireTre
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
-    await requireTreasury(actor, "read");
+    await requireTreasury(actor, "read", "caixa");
     const month = new URL(request.url).searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
     const [summary, canClose] = await Promise.all([monthSummary(monthSchema.parse(month)), canCloseMonth(actor)]);
     return Response.json({ ...summary, capabilities: { close: canClose } }, { headers: { "Cache-Control": "private, no-store" } });
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireTreasury(actor, "update");
+    await requireTreasury(actor, "update", "caixa");
     return Response.json(await changeMonthStatus(actor, await request.json()));
   } catch (error) {
     return errorResponse(error);

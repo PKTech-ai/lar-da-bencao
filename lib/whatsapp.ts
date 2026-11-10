@@ -4,14 +4,14 @@ import { appendAudit } from "@/lib/audit";
 import { query, transaction } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
-import { assertPermission } from "@/lib/permissions";
+import { assertModule } from "@/lib/permissions";
 
 export const WHATSAPP_FLAG = "module_whatsapp";
 
 /** Módulos que podem usar a fila, com o recurso de permissão de cada um. */
-export const WHATSAPP_SCOPES: Record<string, { resource: string; department?: string; label: string }> = {
-  tesouraria: { resource: "tesouraria", label: "Tesouraria" },
-  doutrina: { resource: "department", department: "doutrina", label: "Doutrina" }
+export const WHATSAPP_SCOPES: Record<string, { department: string; module: string; label: string }> = {
+  tesouraria: { department: "tesouraria", module: "whatsapp", label: "Tesouraria" },
+  doutrina: { department: "doutrina", module: "escalas", label: "Doutrina" }
 };
 
 export const onlyDigits = (phone: string) => phone.replace(/\D/g, "");
@@ -37,7 +37,7 @@ export async function requireWhatsapp(actor: Actor, scope: string, action: "read
   const config = WHATSAPP_SCOPES[scope];
   if (!config) throw new AppError("Módulo sem fila de mensagens.", 404, "NOT_FOUND");
   await requireFlag(WHATSAPP_FLAG);
-  await assertPermission(actor, config.resource, action, config.department);
+  await assertModule(actor, config.department, config.module, action);
   return config;
 }
 

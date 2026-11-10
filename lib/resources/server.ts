@@ -2,9 +2,10 @@ import type { PoolClient } from "pg";
 import type { Actor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
 import { dbPool, query, transaction } from "@/lib/db";
-import { AppError } from "@/lib/errors";
+import { AppError, AuthorizationError } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
-import { assertPermission, hasPermission, type PermissionAction } from "@/lib/permissions";
+import { moduleOfResource, SECTOR_ROLE_RESOURCE, SHARED_RESOURCES } from "@/lib/module-pages";
+import { departmentModuleAccess, hasPermission, type PermissionAction } from "@/lib/permissions";
 import { RESOURCES } from "@/lib/resources/registry";
 import { RULES, type RuleContext } from "@/lib/resources/rules";
 import { inputSchema, selectList, toDbValue } from "@/lib/resources/schema";
@@ -17,16 +18,40 @@ export function resolveResource(key: string): ResourceDef {
   return def;
 }
 
-export async function requireResource(actor: Actor, def: ResourceDef, action: PermissionAction) {
+/** Vale o módulo do cadastro; o perfil de setor (Brechó, Clube de Mães) segue a regra do próprio setor. */
+async function canUseResource(actor: Actor, def: ResourceDef, action: PermissionAction) {
+  const target = moduleOfResource(def.key);
+  if (!target || SECTOR_ROLE_RESOURCE[actor.role] === def.scope.resource) {
+    return hasPermission(actor, def.scope.resource, action, def.scope.department);
+  }
+  return (await departmentModuleAccess(actor, target.department)).can(target.module, action);
+}
+
+/**
+ * Libera o cadastro para a ação. `labels` aceita também quem só usa o cadastro como lista de escolha de outro módulo
+ * e devolve se a resposta deve trazer apenas o nome.
+ */
+export async function requireResource(actor: Actor, def: ResourceDef, action: PermissionAction, options: { labels?: boolean } = {}) {
   await requireFlag(def.flag);
-  await assertPermission(actor, def.scope.resource, action, def.scope.department);
+  if (await canUseResource(actor, def, action)) return { labelsOnly: false };
+  const shared = SHARED_RESOURCES[def.key];
+  const target = moduleOfResource(def.key);
+  if (shared && target && (shared.write || action === "read") && (options.labels || !shared.labelsOnly)) {
+    const access = await departmentModuleAccess(actor, target.department);
+    if (shared.modules.some((module) => access.can(module, action))) return { labelsOnly: Boolean(shared.labelsOnly) };
+  }
+  throw new AuthorizationError();
 }
 
 export async function resourceCapabilities(actor: Actor, def: ResourceDef) {
-  const [create, update, remove] = await Promise.all(
-    (["create", "update", "delete"] as const).map((a) => hasPermission(actor, def.scope.resource, a, def.scope.department))
-  );
+  const [create, update, remove] = await Promise.all((["create", "update", "delete"] as const).map((a) => canUseResource(actor, def, a)));
   return { create, update, delete: remove };
+}
+
+/** Só o suficiente para a lista de escolha: identificador e os campos que formam o nome. */
+export function labelsOnlyRecords(def: ResourceDef, records: Record<string, unknown>[]) {
+  const names = ["id", ...def.fields.slice(0, 2).map((f) => f.name)];
+  return records.map((row) => Object.fromEntries(names.map((name) => [name, row[name]])));
 }
 
 const normalize = (v: unknown) => String(v ?? "").trim().toLocaleUpperCase("pt-BR").replace(/\s+/g, "");

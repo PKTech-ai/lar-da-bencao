@@ -6,7 +6,7 @@ import { query, transaction } from "@/lib/db";
 import { AppError, AuthorizationError } from "@/lib/errors";
 import { PATRIMONY_FLAG } from "@/lib/patrimonio";
 import { requireFlag } from "@/lib/feature-flags";
-import { departmentsWithPermission, hasPermission } from "@/lib/permissions";
+import { departmentsWithModule, hasModule } from "@/lib/permissions";
 import { todayInSaoPaulo } from "@/lib/workers";
 
 /** Ordens de Serviço: qualquer departamento abre, o Patrimônio executa e dá a posição. */
@@ -57,10 +57,10 @@ export function validateServiceOrderAction(current: OsStatus, input: ServiceOrde
 export async function serviceOrderAccess(actor: Actor) {
   await requireFlag(PATRIMONY_FLAG);
   const [read, create, executor, patrimonyRead] = await Promise.all([
-    departmentsWithPermission(actor, "read"),
-    departmentsWithPermission(actor, "create"),
-    hasPermission(actor, "department", "update", "patrimonio"),
-    hasPermission(actor, "department", "read", "patrimonio")
+    departmentsWithModule(actor, "os", "read"),
+    departmentsWithModule(actor, "os", "create"),
+    hasModule(actor, "patrimonio", "os", "update"),
+    hasModule(actor, "patrimonio", "os", "read")
   ]);
   return { read, create, executor, seesAll: patrimonyRead };
 }

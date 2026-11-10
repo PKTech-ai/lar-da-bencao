@@ -40,9 +40,9 @@ const audit = (section: string) => ({ module: "Doutrina", section, entityType: "
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
-    await requireDoutrina(actor, "read");
+    await requireDoutrina(actor, "read", "escalas");
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
-    const [scale, options, canEdit, fixed] = await Promise.all([loadScale(ym), loadScaleOptions(), canEditDoutrina(actor), loadFixed()]);
+    const [scale, options, canEdit, fixed] = await Promise.all([loadScale(ym), loadScaleOptions(), canEditDoutrina(actor, "escalas"), loadFixed()]);
     const review = scale.month?.reviewed ? reviewScale(scale.assignments, options) : null;
     return Response.json({
       month: scale.month ? { ...scale.month, statusLabel: scaleStatusLabel[scale.month.status] } : null,
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "escalas");
     const input = actionSchema.parse(await request.json());
     const author = actor;
     const result = await transaction(async (client) => {
@@ -176,7 +176,7 @@ export async function PATCH(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "escalas");
     const input = slotSchema.parse(await request.json());
     const slot = parseSlotKey(input.key);
     if (!slot) throw new AppError("Posição inválida.");
@@ -243,7 +243,7 @@ export async function PUT(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "escalas");
     const input = extraSchema.parse(await request.json());
     const result = await transaction(async (client) => {
       const scale = await loadScale(input.month, client, true);

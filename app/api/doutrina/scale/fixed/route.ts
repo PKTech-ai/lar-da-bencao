@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "escalas");
     const input = markSchema.parse(await request.json());
     const pattern = parseFixedKey(input.key);
     if (!pattern) throw new AppError("Posição inválida.");
@@ -109,7 +109,7 @@ export async function DELETE(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "escalas");
     const input = unmarkSchema.parse(await request.json());
     const pattern = parseFixedKey(input.key);
     if (!pattern) throw new AppError("Posição inválida.");

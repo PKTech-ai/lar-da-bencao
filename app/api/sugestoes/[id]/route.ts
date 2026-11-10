@@ -4,7 +4,7 @@ import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
-import { assertPermission } from "@/lib/permissions";
+import { assertModule } from "@/lib/permissions";
 
 const schema = z.object({
   status: z.enum(["Recebida", "Em análise", "Respondida", "Arquivada"]),
@@ -17,7 +17,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await assertPermission(actor, "presidencia", "update");
+    await assertModule(actor, "diretoria", "sugestoes", "update");
     const id = z.string().uuid().parse((await context.params).id);
     const input = schema.parse(await request.json());
     if (input.status === "Respondida" && input.answer.length < 3) throw new AppError("Escreva a resposta antes de marcar como respondida.");

@@ -18,7 +18,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       await requireFlag(PATRIMONY_FLAG);
       await decideDisposal(actor, id, body);
     } else {
-      await requirePatrimony(actor, "update");
+      await requirePatrimony(actor, "update", "baixas");
       await cancelDisposal(actor, id, body);
     }
     return Response.json({ ok: true });

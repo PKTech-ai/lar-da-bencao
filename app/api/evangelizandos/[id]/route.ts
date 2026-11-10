@@ -36,8 +36,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const currentYear = Number(today.slice(0, 4));
     const result = await transaction(async (client) => {
       const before = await lockEvangelizando(client, id);
-      const department = await requireEducation(actor, before.department_key, "update");
-      const groups = await allowedGroups(actor, department);
+      const department = await requireEducation(actor, before.department_key, "update", "evangelizandos");
+      const groups = await allowedGroups(actor, department, "evangelizandos");
       assertGroupAllowed(groups, withEffectiveStatus(before, currentYear).current_group ?? "");
       if (before.version !== input.version) throw new AppError("Cadastro alterado por outra sessão. Recarregue a página.", 409, "VERSION_CONFLICT");
       const label = EDUCATION_LABEL[department];
@@ -114,8 +114,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const id = z.string().uuid().parse((await context.params).id);
     await transaction(async (client) => {
       const before = await lockEvangelizando(client, id);
-      const department = await requireEducation(actor, before.department_key, "delete");
-      assertGroupAllowed(await allowedGroups(actor, department), withEffectiveStatus(before).current_group ?? "");
+      const department = await requireEducation(actor, before.department_key, "delete", "evangelizandos");
+      assertGroupAllowed(await allowedGroups(actor, department, "evangelizandos"), withEffectiveStatus(before).current_group ?? "");
       const marks = await client.query("delete from app.evangelizando_attendance where evangelizando_id=$1", [id]);
       await client.query("delete from app.evangelizandos where id=$1", [id]);
       await appendAudit(actor, {

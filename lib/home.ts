@@ -1,7 +1,8 @@
 import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { listEnabledFlags } from "@/lib/feature-flags";
-import { hasAnyDepartmentPermission, hasPermission } from "@/lib/permissions";
+import { hasModule } from "@/lib/permissions";
+import { departmentsWith } from "@/lib/workers";
 
 export type HomeCard = { key: string; label: string; value: string; href?: string; hint?: string };
 
@@ -38,41 +39,41 @@ export async function homeCards(actor: Actor): Promise<HomeCard[]> {
     return result.rows[0]?.count ?? "0";
   };
 
-  await add("module_workers", hasAnyDepartmentPermission(actor, "read"), async () => ({
+  await add("module_workers", departmentsWith(actor, "read").then((scope) => scope === null || scope.length > 0), async () => ({
     key: "workers", label: "Trabalhadores ativos", href: "/sistema/trabalhadores",
     value: await count("select count(*)::text as count from app.workers where status = 'active'")
   }));
-  await add("module_workers", hasPermission(actor, "presidencia", "approve"), async () => ({
+  await add("module_workers", hasModule(actor, "diretoria", "admissoes", "approve"), async () => ({
     key: "admissions", label: "Fichas aguardando a Diretoria", href: "/sistema/admissoes",
     value: await count("select count(*)::text as count from app.workers where status = 'pending'")
   }));
   for (const department of ["infancia", "juventude"]) {
-    await add(`module_${department}`, hasPermission(actor, "department", "read", department), async () => ({
+    await add(`module_${department}`, hasModule(actor, department, "evangelizandos", "read"), async () => ({
       key: `evangelizandos-${department}`, label: `Evangelizandos · ${department === "infancia" ? "Infância" : "Juventude"}`,
       href: `/sistema/${department}/evangelizandos`,
       value: await count("select count(*)::text as count from app.evangelizandos where status = 'active' and department_key = $1", [department])
     }));
   }
-  await add("module_patrimonio", hasPermission(actor, "department", "read", "patrimonio"), async () => ({
+  await add("module_patrimonio", hasModule(actor, "patrimonio", "bens", "read"), async () => ({
     key: "assets", label: "Bens no patrimônio", href: "/sistema/patrimonio/bens",
     value: await count("select count(*)::text as count from app.patrimony_assets where disposal_date is null and archived_at is null")
   }));
-  await add("module_assistencia", hasPermission(actor, "department", "read", "assistencia_social"), async () => ({
+  await add("module_assistencia", hasModule(actor, "assistencia_social", "familias", "read"), async () => ({
     key: "families", label: "Famílias em acompanhamento", href: "/sistema/assistencia/familias",
     value: await count("select count(*)::text as count from app.social_families where status = 'Em acompanhamento' and archived_at is null")
   }));
-  await add("module_eventos", hasPermission(actor, "department", "read", "eventos"), async () => ({
+  await add("module_eventos", hasModule(actor, "eventos", "agenda", "read"), async () => ({
     key: "events", label: "Eventos programados", href: "/sistema/eventos/agenda",
     value: await count("select count(*)::text as count from app.events where archived_at is null and status in ('A definir','Planejado','Em preparação')")
   }));
-  await add("module_divulgacao", hasPermission(actor, "department", "read", "divulgacao"), async () => ({
+  await add("module_divulgacao", hasModule(actor, "divulgacao", "emprestimos", "read"), async () => ({
     key: "loans", label: "Livros emprestados", href: "/sistema/divulgacao",
     value: await count(
       `select coalesce(sum(l.quantity - coalesce((select sum(r.quantity) from app.book_loan_returns r where r.loan_id = l.id), 0)), 0)::text as count
          from app.book_loans l where l.archived_at is null`
     )
   }));
-  await add("module_tesouraria", hasPermission(actor, "tesouraria", "read"), async () => {
+  await add("module_tesouraria", hasModule(actor, "tesouraria", "caixa", "read"), async () => {
     const result = await query<{ balance: string }>(
       `select coalesce(sum(case when a.nature = 'Receita' then e.amount_cents when a.nature = 'Despesa' then -e.amount_cents else 0 end), 0)::text as balance
          from app.treasury_entries e join app.financial_accounts a on a.code = e.account_code
@@ -83,7 +84,7 @@ export async function homeCards(actor: Actor): Promise<HomeCard[]> {
       value: (Number(result.rows[0].balance) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
     };
   });
-  await add("module_secretaria", hasPermission(actor, "secretaria", "read"), async () => ({
+  await add("module_secretaria", hasModule(actor, "secretaria", "reunioes", "read"), async () => ({
     key: "meetings", label: "Atas em rascunho", href: "/sistema/secretaria/reunioes",
     value: await count("select count(*)::text as count from app.meetings where archived_at is null and status = 'Rascunho'")
   }));

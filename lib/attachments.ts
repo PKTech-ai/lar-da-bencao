@@ -2,7 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Actor } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
 import { authorizeServiceOrderFiles } from "@/lib/ordens-servico";
-import { assertPermission } from "@/lib/permissions";
+import { SECTOR_ROLE_RESOURCE } from "@/lib/module-pages";
+import { assertModule, assertPermission } from "@/lib/permissions";
 
 export const CHUNK_SIZE = 3 * 1024 * 1024;
 export const COMMON_FILE_LIMIT = 15 * 1024 * 1024;
@@ -78,6 +79,27 @@ export function attachmentPermission(ownerType: string) {
   return mapping;
 }
 
+/** Módulos de Usuários › Acesso que abrem cada tipo de anexo. */
+const ATTACHMENT_MODULES: Readonly<Record<string, { department: string; modules: readonly string[] }>> = {
+  treasury_proof: { department: "tesouraria", modules: ["lancamentos", "doacoes"] },
+  bank_statement: { department: "tesouraria", modules: ["extrato"] },
+  patrimony_asset: { department: "patrimonio", modules: ["bens"] },
+  social_record: { department: "assistencia_social", modules: ["rancho"] },
+  social_brecho_proof: { department: "assistencia_social", modules: ["brecho"] },
+  social_clube_maes_proof: { department: "assistencia_social", modules: ["clube-maes"] },
+  meeting_audio: { department: "secretaria", modules: ["gravador"] },
+  meeting_document: { department: "secretaria", modules: ["reunioes"] },
+  legal_document: { department: "juridico", modules: ["eleicoes"] },
+  event_record: { department: "eventos", modules: ["agenda"] },
+  bookshop_proof: { department: "divulgacao", modules: ["vendas"] },
+  fiscal_council_document: { department: "conselho_fiscal", modules: ["analises"] },
+  study_material_doutrina: { department: "doutrina", modules: ["estudos"] },
+  study_material_infancia: { department: "infancia", modules: ["estudos"] },
+  study_material_juventude: { department: "juventude", modules: ["estudos"] },
+  evangelizando_photo_infancia: { department: "infancia", modules: ["evangelizandos"] },
+  evangelizando_photo_juventude: { department: "juventude", modules: ["evangelizandos"] }
+};
+
 export async function authorizeAttachment(actor: Actor, ownerType: string, action: "read" | "create" | "update" | "delete" | "download", ownerId?: string) {
   const permission = attachmentPermission(ownerType);
   if (ownerType === "service_order") {
@@ -86,6 +108,11 @@ export async function authorizeAttachment(actor: Actor, ownerType: string, actio
   }
   // Vínculos de negócio usam a permissão do próprio recurso: baixar = ler.
   const effective = permission.resource !== "attachments" && action === "download" ? "read" : action;
+  const home = ATTACHMENT_MODULES[ownerType];
+  if (home && SECTOR_ROLE_RESOURCE[actor.role] !== permission.resource) {
+    await assertModule(actor, home.department, home.modules, effective);
+    return permission;
+  }
   await assertPermission(actor, permission.resource, effective, permission.department);
   return permission;
 }

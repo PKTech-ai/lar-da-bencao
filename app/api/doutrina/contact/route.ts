@@ -13,7 +13,7 @@ export async function PUT(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requireDoutrina(actor, "update");
+    await requireDoutrina(actor, "update", "escalas");
     const input = schema.parse(await request.json());
     await query(
       `insert into app.department_contacts (department_key, phone, updated_by) values ('doutrina', $1, $2)

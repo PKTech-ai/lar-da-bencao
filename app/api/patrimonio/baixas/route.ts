@@ -3,7 +3,7 @@ import { assertSameOrigin } from "@/lib/csrf";
 import { AuthorizationError, errorResponse } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
 import { canDecideDisposals, canReadDisposals, eligibleAssets, listDisposals, PATRIMONY_FLAG, requestDisposal, requirePatrimony } from "@/lib/patrimonio";
-import { hasPermission } from "@/lib/permissions";
+import { hasModule } from "@/lib/permissions";
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const status = params.get("status") ?? "";
     const [requests, canRequest, canDecide] = await Promise.all([
       listDisposals({ status: ["pending", "approved", "rejected", "cancelled"].includes(status) ? status : undefined, q: params.get("q")?.trim().slice(0, 100) || undefined }),
-      hasPermission(actor, "department", "update", "patrimonio"),
+      hasModule(actor, "patrimonio", "baixas", "update"),
       canDecideDisposals(actor)
     ]);
     const assets = canRequest ? await eligibleAssets() : [];
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requirePatrimony(actor, "update");
+    await requirePatrimony(actor, "update", "baixas");
     return Response.json(await requestDisposal(actor, await request.json()), { status: 201 });
   } catch (error) {
     return errorResponse(error);

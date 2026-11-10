@@ -5,27 +5,27 @@ import { appendAudit } from "@/lib/audit";
 import { dbPool, query, transaction } from "@/lib/db";
 import { AppError, AuthorizationError } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
-import { assertPermission, hasPermission, type PermissionAction } from "@/lib/permissions";
+import { assertModule, hasModule, type PermissionAction } from "@/lib/permissions";
 import { todayInSaoPaulo } from "@/lib/workers";
 
 export const PATRIMONY_FLAG = "module_patrimonio";
 const MODULE = "Patrimônio";
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.");
 
-export async function requirePatrimony(actor: Actor, action: PermissionAction) {
+export async function requirePatrimony(actor: Actor, action: PermissionAction, module: string) {
   await requireFlag(PATRIMONY_FLAG);
-  await assertPermission(actor, "department", action, "patrimonio");
+  await assertModule(actor, "patrimonio", module, action);
 }
 
 /** Leitura dos memorandos: aba do Patrimônio ou aba da Diretoria. */
 export async function canReadDisposals(actor: Actor) {
-  return (await hasPermission(actor, "department", "read", "patrimonio")) || (await hasPermission(actor, "presidencia", "read"));
+  return (await hasModule(actor, "patrimonio", "baixas", "read")) || (await hasModule(actor, "diretoria", "baixas", "read"));
 }
 
 /** Decisão: Administrador ou Presidente com acesso completo à Diretoria (regra do mock). */
 export async function canDecideDisposals(actor: Actor) {
   if (!["administrador", "presidente"].includes(actor.role)) return false;
-  return hasPermission(actor, "presidencia", "approve");
+  return hasModule(actor, "diretoria", "baixas", "approve");
 }
 
 // ---------------------------------------------------------------- Baixas
@@ -409,7 +409,7 @@ export async function listCleaning(start: string, end: string) {
                  then jsonb_build_object('id', w.id, 'name', w.full_name, 'departments',
                         coalesce((select jsonb_agg(d.department_key order by d.department_key) from app.worker_departments d where d.worker_id = w.id), '[]'::jsonb))
                  else r.worker_snapshot end as worker_snapshot,
-            coalesce(w.phone, '') as phone, r.status, r.fee_cents, r.payment_status, to_char(r.payment_date,'YYYY-MM-DD') as payment_date,
+            r.status, r.fee_cents, r.payment_status, to_char(r.payment_date,'YYYY-MM-DD') as payment_date,
             r.payment_method, r.payment_reference, r.notes, r.cancel_reason, r.version, r.created_at, r.updated_at
        from app.cleaning_roster r left join app.workers w on w.id = r.worker_id and w.status = 'active'
       where r.clean_date >= $1::date and r.clean_date < ($2::date + interval '1 month')

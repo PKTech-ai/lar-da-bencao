@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
-    await requirePatrimony(actor, "update");
+    await requirePatrimony(actor, "update", "limpeza");
     return Response.json({ kept: await keepCleaningConflict(actor, await request.json()) });
   } catch (error) {
     return errorResponse(error);

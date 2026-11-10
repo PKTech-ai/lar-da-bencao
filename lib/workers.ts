@@ -3,7 +3,8 @@ import type { Actor } from "@/lib/auth";
 import { cpfDigits, cpfSchemaMessage, isValidCpf } from "@/lib/cpf";
 import { AppError, AuthorizationError } from "@/lib/errors";
 import { query } from "@/lib/db";
-import { departmentsWithPermission, hasPermission } from "@/lib/permissions";
+import { workerModuleOf } from "@/lib/department-modules";
+import { departmentModuleAccess, departmentsWithModule, hasModule, hasPermission } from "@/lib/permissions";
 import { DOCTRINE_FUNCTIONS, type WorkerStatus } from "@/lib/worker-constants";
 import { formatPersonName } from "@/lib/person-name";
 
@@ -107,15 +108,18 @@ export async function canSeeAdmissions(actor: Actor) {
     "select admissions_access from app.users where id = $1",
     [actor.id]
   );
-  return found.rows[0]?.admissions_access === true;
+  if (found.rows[0]?.admissions_access === true) return true;
+  // Quem recebeu o módulo Admissões em Usuários › Acesso também entra.
+  const [secretaria, diretoria] = await Promise.all([departmentModuleAccess(actor, "secretaria"), departmentModuleAccess(actor, "diretoria")]);
+  return secretaria.marked("admissoes") || diretoria.marked("admissoes");
 }
 
 /** Departamentos do ator em que ele tem a ação; `null` quando vale para todos. */
 export async function departmentsWith(actor: Actor, action: "read" | "create" | "update"): Promise<string[] | null> {
   // Secretaria e Presidência acompanham as fichas de todos os departamentos.
-  if (await hasPermission(actor, "secretaria", action)) return null;
-  if (action === "read" && (await hasPermission(actor, "presidencia", "read"))) return null;
-  const allowed = await departmentsWithPermission(actor, action);
+  if (await hasModule(actor, "secretaria", "trabalhadores", action)) return null;
+  if (action === "read" && (await hasModule(actor, "diretoria", "trabalhadores", "read"))) return null;
+  const allowed = await departmentsWithModule(actor, workerModuleOf, action);
   const total = await query<{ count: number }>("select count(*)::int as count from app.departments where active");
   return allowed.length === total.rows[0].count ? null : allowed;
 }
@@ -197,7 +201,7 @@ export async function updateWorkerFicha(
  * Secretaria e Presidência. Quem tem só Consulta vê nome, funções e situação.
  */
 export async function contactScope(actor: Actor): Promise<string[] | null> {
-  if (await hasPermission(actor, "presidencia", "read")) return null;
+  if (await hasModule(actor, "diretoria", "trabalhadores", "read")) return null;
   return departmentsWith(actor, "update");
 }
 
