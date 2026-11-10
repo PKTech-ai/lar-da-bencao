@@ -88,7 +88,6 @@ export function TopNav({ actor, roleLabel, capabilities }: { actor: { name: stri
 
   const accountActions = (
     <div className="tn-acts">
-      <ThemeToggle />
       <button className="button" type="button" onClick={() => void logout("local")}>
         <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 7V4h10v16H10v-3M4 12h11m0 0-3-3m3 3-3 3" /></svg></span>
         <span className="nav-label">Sair deste aparelho</span>
@@ -125,6 +124,7 @@ export function TopNav({ actor, roleLabel, capabilities }: { actor: { name: stri
         </nav>
         <div className="tn-tools">
           <button type="button" className="tn-ib" aria-label="Encontrar módulo" aria-expanded={panel === "busca"} onClick={() => toggle("busca")}>{SEARCH_ICON}</button>
+          <ThemeToggle />
           <button type="button" className="tn-av" title={roleLabel} aria-label={`${actor.name}, opções da conta`} aria-expanded={panel === "conta"} onClick={() => toggle("conta")}>{sessionInitials(actor.name) || "LB"}</button>
           <button type="button" className="tn-ib tn-burger" aria-label={panel === "menu" ? "Fechar menu" : "Menu"} aria-expanded={panel === "menu"} aria-controls="tn-painel" onClick={() => toggle("menu")}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d={panel === "menu" ? "M18 6 6 18M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /></svg>
