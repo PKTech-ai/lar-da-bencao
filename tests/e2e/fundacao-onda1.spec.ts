@@ -166,11 +166,11 @@ test("todas as telas da fundação e da onda 1 abrem sem erro", async () => {
     ["/sistema/importacao", /Importação do backup v215/], ["/sistema/documentos", /Estatuto e Regimento/],
     ["/sistema/trabalhadores", /Trabalhadores/], ["/sistema/admissoes", /Aprovação de Trabalhadores/],
     ["/sistema/doutrina", /Doutrina/],
-    ["/sistema/infancia", /Infância/], ["/sistema/infancia/evangelizandos", /Evangelizandos/],
+    ["/sistema/infancia", /Infância/], ["/sistema/infancia/turmas", /Turmas — Infância/], ["/sistema/infancia/evangelizandos", /Evangelizandos/],
     ["/sistema/infancia/aniversariantes", /Aniversariantes/], ["/sistema/infancia/estudos", /Biblioteca/],
     ["/sistema/infancia/frequencia", /Chamada/], ["/sistema/infancia/cronograma", /Cronograma/],
     ["/sistema/infancia/planejamento", /Planejamento/], ["/sistema/infancia/relatorio", /Relatório Anual/],
-    ["/sistema/juventude", /Juventude/], ["/sistema/juventude/evangelizandos", /Evangelizandos/]
+    ["/sistema/juventude", /Juventude/], ["/sistema/juventude/turmas", /Grupos — Juventude/], ["/sistema/juventude/evangelizandos", /Evangelizandos/]
   ];
   for (const [path, heading] of pages) await expectHealthyPage(admin, path, heading);
   // As abas da Doutrina dividem o título do módulo (layout); o nome da aba vem no h2.

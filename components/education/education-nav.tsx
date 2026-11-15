@@ -5,7 +5,7 @@ import { requirePageActor } from "@/lib/page-auth";
 import { departmentModuleAccess } from "@/lib/permissions";
 
 const tabs: readonly (readonly [string, string, readonly string[]])[] = [
-  ["", "Painel", ["painel"]], ["evangelizandos", "Evangelizandos", ["evangelizandos"]], ["aniversariantes", "Aniversariantes", ["aniversariantes"]],
+  ["", "Painel", ["painel"]], ["turmas", "Turmas", ["painel", "evangelizadores"]], ["evangelizandos", "Evangelizandos", ["evangelizandos"]], ["aniversariantes", "Aniversariantes", ["aniversariantes"]],
   ["estudos", "Biblioteca de Estudos", ["estudos"]], ["frequencia", "Frequência", [CALL_MODULE, ATTENDANCE_MODULE]], ["cronograma", "Cronograma", ["cronograma"]],
   ["planejamento", "Planejamento Anual", ["planejamento"]], ["relatorio", "Relatório Anual", ["relatorio"]], ["ordens-servico", "Ordens de Serviço", ["os"]]
 ];
@@ -17,7 +17,10 @@ export async function EducationNav({ department, current }: { department: Educat
   return (
     <>
       <ModuleTabs label="Seções do departamento" current={`/sistema/${department}${current ? `/${current}` : ""}`}
-        tabs={[...allowed.map(([path, label]) => ({ href: `/sistema/${department}${path ? `/${path}` : ""}`, label })),
+        tabs={[...allowed.map(([path, label]) => ({
+          href: `/sistema/${department}${path ? `/${path}` : ""}`,
+          label: path === "turmas" && department === "juventude" ? "Grupos" : label
+        })),
           ...(access.can("evangelizadores", "read") ? [{ href: "/sistema/trabalhadores", label: "Evangelizadores (fichas)" }] : [])]} />
     </>
   );
