@@ -376,7 +376,7 @@ table.visual-table .small { font-size: 13px; color: var(--muted); }
 }
 
 @media print {
-  .tn-root, .no-print, .ops-save, .lar-demo-note, .lar-toast { display: none !important; }
+  .tn-root, .no-print, .ops-save, .lar-demo-note, .lar-toast, .route-progress { display: none !important; }
   .app-shell { display: block; }
   .app-main { padding: 0; }
   .card { box-shadow: none; border: 0; }

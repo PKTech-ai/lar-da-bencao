@@ -167,6 +167,7 @@ test("todas as telas da fundação e da onda 1 abrem sem erro", async () => {
     ["/sistema/trabalhadores", /Trabalhadores/], ["/sistema/admissoes", /Aprovação de Trabalhadores/],
     ["/sistema/doutrina", /Doutrina/],
     ["/sistema/infancia", /Infância/], ["/sistema/infancia/turmas", /Turmas — Infância/], ["/sistema/infancia/evangelizandos", /Evangelizandos/],
+    ["/sistema/infancia/evangelizandos/tratamento", /LAR DA BÊNÇÃO/],
     ["/sistema/infancia/aniversariantes", /Aniversariantes/], ["/sistema/infancia/estudos", /Biblioteca/],
     ["/sistema/infancia/frequencia", /Chamada/], ["/sistema/infancia/cronograma", /Cronograma/],
     ["/sistema/infancia/planejamento", /Planejamento/], ["/sistema/infancia/relatorio", /Relatório Anual/],

@@ -106,6 +106,7 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
     void run(async () => { await send(`/api/evangelizandos/${row.id}`, "DELETE"); setEditing(null); return "Ficha excluída."; });
   }
 
+  const treatmentHref = (id?: string) => `/sistema/${department}/evangelizandos/tratamento${id ? `?id=${id}` : ""}`;
   const form = editing === "new" ? null : editing;
   const referenceYear = form ? Math.min(Number(today().slice(0, 4)), form.valid_through_year) : Number(today().slice(0, 4));
   const preview = useMemo(() => (birth ? classify(birth, department, referenceYear) : null), [birth, department, referenceYear]);
@@ -150,6 +151,7 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
             </fieldset>
             <div className="row-actions">
               {canEdit ? <button className="button primary" disabled={busy || Boolean(preview && !preview.valid)}>Salvar matrícula</button> : null}
+              {form ? <a className="button" href={treatmentHref(form.id)} target="_blank" rel="noreferrer">⎙ Ficha de tratamento</a> : null}
               {canEdit && form ? <button type="button" className="button danger" disabled={busy} onClick={() => remove(form)}>Excluir ficha</button> : null}
               <button type="button" className="button" onClick={() => setEditing(null)}>Fechar</button>
             </div>
@@ -161,6 +163,7 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
           <div><h2 style={{ marginBottom: 2 }}>Evangelizandos</h2><span className="small muted">Turma calculada pela idade em 30 de junho. Matrícula anual: vence em 31/12 e pode ser renovada.</span></div>
           <div className="row-actions">
             <button className="button no-print" onClick={() => window.print()}>⎙ Imprimir</button>
+            <a className="button no-print" href={treatmentHref()} target="_blank" rel="noreferrer">⎙ Ficha de tratamento em branco</a>
             {canEdit ? <button className="button primary no-print" onClick={() => open("new")}>+ Matricular</button> : null}
           </div>
         </div>
@@ -186,7 +189,12 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
                   <td>{r.guardian_name ?? "—"}{r.guardian_relation ? <><br /><span className="small muted">{r.guardian_relation}</span></> : null}</td>
                   <td>{[r.guardian_phone, r.whatsapp].filter(Boolean).join(" · ") || "—"}</td>
                   <td><span className={`status ${r.active ? "ready" : ""}`}>{r.active ? "Ativa" : "Inativa"}</span><br /><span className="small muted">até {r.valid_through_year}</span></td>
-                  <td className="no-print"><button className="button" onClick={() => open(r)}>{canEdit ? "Abrir" : "Consultar"}</button></td>
+                  <td className="no-print">
+                    <div className="row-actions">
+                      <button className="button" onClick={() => open(r)}>{canEdit ? "Abrir" : "Consultar"}</button>
+                      <a className="button" href={treatmentHref(r.id)} target="_blank" rel="noreferrer">⎙ Tratamento</a>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {!visible.length ? <tr><td colSpan={7}>Nenhum evangelizando neste filtro.</td></tr> : null}
