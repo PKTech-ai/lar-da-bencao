@@ -23,6 +23,18 @@ export function contributionStatus(expected: number | null | undefined, paid: nu
   return "Pendente";
 }
 
+/**
+ * Aniversariantes do mês de `today` (AAAA-MM-DD): só nome, dia e departamentos, sem ano nem idade.
+ * Vale para todo trabalhador com ficha, independente do acesso aos departamentos.
+ */
+export function birthdaysOfMonth<T extends { birth_date: string }>(people: readonly T[], today: string) {
+  const month = today.slice(5, 7);
+  return people
+    .filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.birth_date) && p.birth_date.slice(5, 7) === month)
+    .map(({ birth_date, ...rest }) => ({ ...rest, day: Number(birth_date.slice(8, 10)), today: birth_date.slice(5) === today.slice(5) }))
+    .sort((a, b) => a.day - b.day);
+}
+
 const CLEANING: Record<string, string> = {
   scheduled: "Programada",
   done: "Realizada",
@@ -52,6 +64,9 @@ export type MyAreaWorker = {
   status: string;
 };
 
+/** Aniversariante do mês: só o que dá para mostrar a todos (sem ano de nascimento, idade ou telefone). */
+export type MyAreaBirthday = { name: string; day: number; today: boolean; departments: string[] };
+
 /** Turma da Evangelização em que a pessoa é evangelizadora; `callHref` leva à chamada quando ela pode abrir. */
 export type MyAreaClass = { department: string; group: string; callHref: string | null };
 
@@ -61,9 +76,15 @@ export type MyArea = {
   contributions: MyAreaContribution[];
   scales: MyAreaScale[];
   classes: MyAreaClass[];
+  /** Mês dos aniversariantes (AAAA-MM), no horário de Brasília. */
+  birthdayMonth: string;
+  birthdays: MyAreaBirthday[];
 };
 
-/** Dados da Minha área: só a ficha, as contribuições e as escalas da própria pessoa. */
+/**
+ * Dados da Minha área, padrão de todo trabalhador com ficha: a própria ficha, as próprias contribuições, as próprias
+ * escalas e os aniversariantes do mês. Tudo filtrado aqui no servidor pela ficha vinculada à conta de quem pediu.
+ */
 export async function loadMyArea(actor: Actor): Promise<MyArea> {
   const [role, linked] = await Promise.all([
     query<{ label: string }>("select label from app.roles where key = $1", [actor.role]),
@@ -71,10 +92,11 @@ export async function loadMyArea(actor: Actor): Promise<MyArea> {
   ]);
   const profile = { name: actor.name, roleLabel: role.rows[0]?.label ?? actor.role };
   const workerId = linked.rows[0]?.worker_id;
-  if (!workerId) return { profile, worker: null, contributions: [], scales: [], classes: [] };
-
   const today = todayInSaoPaulo();
-  const [worker, departments, contributions, cleaning, events, doctrine, culto, groups] = await Promise.all([
+  const birthdayMonth = today.slice(0, 7);
+  if (!workerId) return { profile, worker: null, contributions: [], scales: [], classes: [], birthdayMonth, birthdays: [] };
+
+  const [worker, departments, contributions, cleaning, events, doctrine, culto, groups, birthdays] = await Promise.all([
     query<{ full_name: string; phone: string | null; status: WorkerStatus }>(
       "select full_name, phone, status from app.workers where id = $1",
       [workerId]
@@ -128,6 +150,17 @@ export async function loadMyArea(actor: Actor): Promise<MyArea> {
          join app.departments d on d.key = g.department_key
         where g.worker_id = $1 order by d.label, g.class_group`,
       [workerId]
+    ),
+    query<{ name: string; birth_date: string; departments: string[] }>(
+      `select w.full_name as name, to_char(w.birth_date, 'YYYY-MM-DD') as birth_date,
+              coalesce(array_agg(d.label order by d.label) filter (where d.label is not null), '{}') as departments
+         from app.workers w
+         left join app.worker_departments wd on wd.worker_id = w.id
+         left join app.departments d on d.key = wd.department_key
+        where w.status = 'active' and w.birth_date is not null
+          and extract(month from w.birth_date) = extract(month from $1::date)
+        group by w.id order by extract(day from w.birth_date), w.full_name`,
+      [today]
     )
   ]);
   const classes: MyAreaClass[] = await Promise.all(groups.rows.map(async (g) => ({
@@ -178,6 +211,8 @@ export async function loadMyArea(actor: Actor): Promise<MyArea> {
       };
     }),
     scales: upcoming(scales, today),
-    classes
+    classes,
+    birthdayMonth,
+    birthdays: birthdaysOfMonth(birthdays.rows, today)
   };
 }

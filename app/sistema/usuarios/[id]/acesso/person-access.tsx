@@ -148,7 +148,7 @@ export function PersonAccess({ userId }: { userId: string }) {
     }
   }
 
-  const menu = ["Minha área"];
+  const menu = [data.worker ? "Minha área (escala, contribuições e aniversariantes)" : "Minha área (sem ficha vinculada)"];
   for (const department of departments) {
     const modules = DEPARTMENT_MODULES[department.key];
     const marks = state[department.key] ?? {};

@@ -7,6 +7,7 @@ import { serverEnv } from "@/lib/env";
 import { AppError, errorResponse } from "@/lib/errors";
 import { assertPermission } from "@/lib/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { CPF_ACCESS_DOMAIN } from "@/lib/user-access-status";
 
 /** Reenvia o convite de quem ainda não definiu a senha (BL-057). */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -21,6 +22,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const user = found.rows[0];
     if (!user) throw new AppError("Usuário não encontrado.", 404, "USER_NOT_FOUND");
     if (user.status === "suspended") throw new AppError("Usuário suspenso não recebe convite.", 409, "USER_SUSPENDED");
+    // O e-mail das contas que entram com o CPF não existe: o convite não chegaria a ninguém.
+    if (user.email.endsWith(CPF_ACCESS_DOMAIN)) throw new AppError("Esta pessoa entra com o CPF. Use Recadastrar senha.", 409, "CPF_LOGIN_ACCOUNT");
     const admin = createAdminClient();
     const auth = await admin.auth.admin.getUserById(user.auth_user_id);
     if (auth.error) throw auth.error;

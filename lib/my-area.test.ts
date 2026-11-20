@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contributionStatus, upcoming } from "@/lib/my-area";
+import { birthdaysOfMonth, contributionStatus, upcoming } from "@/lib/my-area";
 
 describe("Minha área", () => {
   it("mostra só as próximas escalas, em ordem, até 10", () => {
@@ -16,5 +16,20 @@ describe("Minha área", () => {
     expect(contributionStatus(5000, 5000)).toBe("Pago");
     expect(contributionStatus(5000, 2000)).toBe("Parcial");
     expect(contributionStatus(5000, 0)).toBe("Pendente");
+  });
+
+  it("lista os aniversariantes do mês sem o ano de nascimento", () => {
+    const people = [
+      { name: "Bia", birth_date: "1980-11-25", departments: [] },
+      { name: "Ana", birth_date: "1990-11-03", departments: ["Doutrina"] },
+      { name: "Caio", birth_date: "1975-12-03", departments: [] },
+      { name: "Sem data", birth_date: "", departments: [] }
+    ];
+    const list = birthdaysOfMonth(people, "2026-11-25");
+    expect(list).toEqual([
+      { name: "Ana", day: 3, today: false, departments: ["Doutrina"] },
+      { name: "Bia", day: 25, today: true, departments: [] }
+    ]);
+    expect(JSON.stringify(list)).not.toContain("1980");
   });
 });

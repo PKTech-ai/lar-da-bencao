@@ -12,6 +12,8 @@ type Account = {
   events: { occurred_at: string; action: string; result: string; masked_ip: string | null; by_me: boolean }[];
 };
 
+const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
 function monthLabel(month: string) {
   return month.split("-").reverse().join("/");
 }
@@ -133,6 +135,18 @@ export function AccountClient() {
               </li>
             ))}
             {!area.scales.length ? <li>Nenhuma escala futura registrada para você.</li> : null}
+          </ul>
+
+          <h3 id="aniversariantes">Aniversariantes de {MONTHS[Number(area.birthdayMonth.slice(5, 7)) - 1]?.toLowerCase()}</h3>
+          <ul className="mb-own-list">
+            {area.birthdays.map((item, index) => (
+              <li key={`${item.name}-${index}`}>
+                <strong>{item.name}{item.today ? " · hoje" : ""}</strong>
+                {String(item.day).padStart(2, "0")}/{area.birthdayMonth.slice(5, 7)}
+                {item.departments.length ? <small>{item.departments.join(" · ")}</small> : null}
+              </li>
+            ))}
+            {!area.birthdays.length ? <li>Nenhum aniversariante neste mês.</li> : null}
           </ul>
         </>
       ) : (

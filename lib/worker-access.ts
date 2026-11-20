@@ -1,5 +1,6 @@
 import { cpfDigits, isValidCpf } from "@/lib/cpf";
 import { AppError } from "@/lib/errors";
+import { CPF_ACCESS_DOMAIN } from "@/lib/user-access-status";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: unknown[] }> };
 
@@ -11,7 +12,7 @@ export type CreateAuthUser = (input: CreateAuthUserInput) => Promise<{
 }>;
 
 export function accessEmailForCpf(cpf: string) {
-  return `${cpfDigits(cpf)}@acesso.lardabencao.org`;
+  return `${cpfDigits(cpf)}${CPF_ACCESS_DOMAIN}`;
 }
 
 export function initialPasswordForCpf(cpf: string) {

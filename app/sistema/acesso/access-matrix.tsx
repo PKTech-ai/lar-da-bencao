@@ -124,6 +124,10 @@ export function AccessMatrix({ canSimulate }: { canSimulate: boolean }) {
             Nas páginas de departamento, cada pessoa ainda recebe o próprio acesso (Nenhum, Chamada, Consulta ou Coordenação)
             em Usuários, no botão Acesso. Esse acesso vale por cima das exceções do perfil.
           </p>
+          <p className="small muted no-print">
+            Padrão de todo trabalhador, em qualquer perfil: na Minha área, a própria escala, as próprias contribuições e os
+            aniversariantes do mês. Vale assim que a ficha é vinculada à conta, e cada um vê só os próprios dados.
+          </p>
           {selectedRole ? (
             <div className="access-layout no-print">
               <nav className="folder-tree access-roles" aria-label="Perfis">
