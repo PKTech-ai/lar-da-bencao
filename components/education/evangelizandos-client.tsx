@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { classify, EDUCATION_LABEL, guardianRequired, renewalTargetYear, type EducationDepartment } from "@/lib/education";
+import { compressPhoto } from "@/lib/photo-client";
 import { uploadAttachment } from "@/lib/upload-client";
 
 type Row = {
@@ -32,6 +33,11 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const photoPreview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+  /** Depois da operação, reabre esta ficha já com a versão nova (evita matrícula repetida e conflito de versão). */
+  const reopen = useRef<string | null>(null);
   const label = EDUCATION_LABEL[department];
 
   const load = useCallback(async () => {
@@ -40,6 +46,7 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
     if (!response.ok) throw new Error(body.error);
     setRows(body.evangelizandos);
     setCanEdit(body.canEdit);
+    return body.evangelizandos as Row[];
   }, [department]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
@@ -51,25 +58,38 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
     return body;
   }
   async function run(work: () => Promise<string>) {
-    setBusy(true); setError(""); setMessage("");
-    try { setMessage(await work()); await load(); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Falha na operação."); await load().catch(() => undefined); }
-    finally { setBusy(false); }
+    setBusy(true); setError(""); setMessage(""); reopen.current = null;
+    const fresh = await work()
+      .then(async (text) => { setMessage(text); return load(); })
+      .catch(async (caught) => { setError(caught instanceof Error ? caught.message : "Falha na operação."); return load().catch(() => [] as Row[]); });
+    const row = reopen.current ? fresh.find((r) => r.id === reopen.current) : undefined;
+    if (row) { setEditing(row); setBirth(row.birth_date); }
+    setBusy(false);
   }
 
   function open(row: Row | "new") {
     setEditing(row);
     setBirth(row === "new" ? "" : row.birth_date);
+    setPhoto(null);
     setError(""); setMessage("");
+  }
+
+  function close() { setEditing(null); setPhoto(null); }
+
+  function removePhoto(row: Row) {
+    if (!window.confirm(`Remover a foto de “${row.full_name}”?`)) return;
+    void run(async () => {
+      await send(`/api/evangelizandos/${row.id}`, "PATCH", { op: "photo", attachment_id: null, version: row.version });
+      reopen.current = row.id;
+      return "Foto removida.";
+    });
   }
 
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const values = new FormData(form);
+    const values = new FormData(event.currentTarget);
     const payload: Record<string, unknown> = Object.fromEntries(["full_name", "birth_date", "filled_date", "guardian_name", "notes", ...FIELDS.map(([k]) => k)].map((k) => [k, String(values.get(k) ?? "")]));
     payload.rancho_requested = values.get("rancho_requested") === "on";
-    const photo = (form.elements.namedItem("photo") as HTMLInputElement | null)?.files?.[0];
     void run(async () => {
       let id: string;
       let version: number;
@@ -83,10 +103,17 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
         id = row.id; version = row.version + 1; msg = `Matrícula atualizada — ${body.group}.`;
       }
       if (photo) {
-        const attachmentId = await uploadAttachment(photo, `evangelizando_photo_${department}`, id);
-        await send(`/api/evangelizandos/${id}`, "PATCH", { op: "photo", attachment_id: attachmentId, version });
+        try {
+          const file = await compressPhoto(photo, `foto-${id.slice(0, 8)}.jpg`, 1200);
+          const attachmentId = await uploadAttachment(file, `evangelizando_photo_${department}`, id);
+          await send(`/api/evangelizandos/${id}`, "PATCH", { op: "photo", attachment_id: attachmentId, version });
+        } catch (caught) {
+          // Os dados já estão salvos: a ficha continua aberta como edição para tentar só a foto de novo.
+          reopen.current = id;
+          throw new Error(`${msg} Mas a foto não foi enviada: ${caught instanceof Error ? caught.message.replace(/\.$/, "") : "falha no envio"}. A ficha continua aberta: salve de novo para tentar outra vez.`);
+        }
       }
-      setEditing(null);
+      close();
       return payload.rancho_requested ? `${msg} A solicitação de rancho fica registrada para análise do Dpto de Assistência Social.` : msg;
     });
   }
@@ -96,14 +123,14 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
     if (!window.confirm(`Renovar a matrícula de ${row.full_name} até ${target}?`)) return;
     void run(async () => {
       const body = await send(`/api/evangelizandos/${row.id}`, "PATCH", { op: "renew", version: row.version });
-      setEditing(null);
+      close();
       return `Matrícula renovada até ${body.valid_through_year} — ${body.group}.`;
     });
   }
 
   function remove(row: Row) {
     if (!window.confirm(`Excluir definitivamente a ficha de “${row.full_name}”?\n\nAs marcações de frequência vinculadas também serão excluídas.`)) return;
-    void run(async () => { await send(`/api/evangelizandos/${row.id}`, "DELETE"); setEditing(null); return "Ficha excluída."; });
+    void run(async () => { await send(`/api/evangelizandos/${row.id}`, "DELETE"); close(); return "Ficha excluída."; });
   }
 
   const treatmentHref = (id?: string) => `/sistema/${department}/evangelizandos/tratamento${id ? `?id=${id}` : ""}`;
@@ -143,7 +170,39 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
               {FIELDS.slice(3).map(([key, text, max]) => <label key={key}>{text}<input name={key} maxLength={max} defaultValue={(form?.[key] as string) ?? ""} /></label>)}
             </div>
             <label>Observações<textarea name="notes" rows={2} maxLength={2000} defaultValue={form?.notes ?? ""} /></label>
-            <label>Foto (JPG ou PNG){form?.photo_attachment_id ? " — já cadastrada" : ""}<input name="photo" type="file" accept=".jpg,.jpeg,.png" /></label>
+            <fieldset className="os-photo-picker">
+              <legend>Foto</legend>
+              {photoPreview || form?.photo_attachment_id ? (
+                <ul className="os-photo-grid" style={{ maxWidth: 140 }}>
+                  <li>
+                    {photoPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- prévia local (blob:) antes do envio
+                      <img src={photoPreview} alt="Nova foto (ainda não salva)" />
+                    ) : (
+                      <a href={`/api/attachments/${form!.photo_attachment_id}/download?inline=1`} target="_blank" rel="noreferrer" title="Abrir a foto">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- imagem protegida servida pela API de anexos */}
+                        <img src={`/api/attachments/${form!.photo_attachment_id}/download?inline=1`} alt={`Foto de ${form!.full_name}`} />
+                      </a>
+                    )}
+                  </li>
+                </ul>
+              ) : <p className="small muted">Sem foto.</p>}
+              {photoPreview ? <p className="small muted">A nova foto será enviada ao salvar a matrícula.</p> : null}
+              {canEdit ? (
+                <div className="os-photo-buttons">
+                  <label className="button">
+                    📷 Tirar foto
+                    <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { setPhoto(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                  </label>
+                  <label className="button">
+                    🖼 Escolher da galeria
+                    <input type="file" accept="image/*" hidden onChange={(e) => { setPhoto(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                  </label>
+                  {photoPreview ? <button type="button" className="button" onClick={() => setPhoto(null)}>Desfazer</button> : null}
+                  {!photoPreview && form?.photo_attachment_id ? <button type="button" className="button danger" disabled={busy} onClick={() => removePhoto(form)}>Remover foto</button> : null}
+                </div>
+              ) : null}
+            </fieldset>
             <fieldset className="check-grid">
               <legend>Opções</legend>
               <label><input type="checkbox" name="rancho_requested" defaultChecked={form?.rancho_requested} />Solicitar rancho familiar (análise do Dpto Social)</label>
@@ -153,7 +212,7 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
               {canEdit ? <button className="button primary" disabled={busy || Boolean(preview && !preview.valid)}>Salvar matrícula</button> : null}
               {form ? <a className="button" href={treatmentHref(form.id)} target="_blank" rel="noreferrer">⎙ Ficha de tratamento</a> : null}
               {canEdit && form ? <button type="button" className="button danger" disabled={busy} onClick={() => remove(form)}>Excluir ficha</button> : null}
-              <button type="button" className="button" onClick={() => setEditing(null)}>Fechar</button>
+              <button type="button" className="button" onClick={close}>Fechar</button>
             </div>
           </form>
         </section>
@@ -182,7 +241,7 @@ export function EvangelizandosClient({ department }: { department: EducationDepa
               {visible.map((r) => (
                 <tr key={r.id}>
                   <td>{r.photo_attachment_id
-                    ? <a className="link-button" href={`/api/attachments/${r.photo_attachment_id}/download`} target="_blank" rel="noreferrer">Ver foto</a>
+                    ? <a className="link-button" href={`/api/attachments/${r.photo_attachment_id}/download?inline=1`} target="_blank" rel="noreferrer">Ver foto</a>
                     : <span className="small muted">Sem foto</span>}</td>
                   <td><strong>{r.full_name}</strong><br /><span className="small">{r.current_group ?? "—"}{r.current_age !== null ? ` · ${r.current_age} anos em 30/06` : ""}</span></td>
                   <td>{br(r.birth_date)}</td>

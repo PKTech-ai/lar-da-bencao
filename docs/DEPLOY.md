@@ -28,6 +28,16 @@ de backup, que é decisão da Diretoria, não do código.
 - Domínio `lardabencao.org` (DNS sob seu controle)
 - Scanner antimalware HTTP compatível **ou** política temporária documentada
 
+### Política temporária enquanto não houver antivírus contratado
+
+Se o `ANTIMALWARE_API_URL` não responder (fora do ar, endereço inválido, demora ou resposta inválida):
+
+- **Fotos JPG/PNG** passam pela conferência interna (`verifyImageStructure`: começo e fim de imagem completa) e
+  ficam ativas com `scan_engine = 'conferencia-interna'`. O Dedo-duro registra "conferência interna (antivírus indisponível)".
+  Quando houver antivírus, essas fotos podem ser reinspecionadas filtrando por esse `scan_engine`.
+- **Demais tipos** (PDF, áudio, extrato, Word) não são anexados: a tela avisa que o antivírus não respondeu.
+- Se o antivírus responder "não limpo", o arquivo vai para a quarentena; a conferência interna nunca é usada nesse caso.
+
 ## 1. Banco e Auth (Supabase)
 
 1. Migrações, com a credencial de migração (owner), de uma máquina com `psql`:

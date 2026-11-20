@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
-import { authorizeAttachment, uploadTokenHash } from "@/lib/attachments";
+import { INTERNAL_CHECK_ENGINE, INTERNAL_CHECK_MIME_TYPES, authorizeAttachment, uploadTokenHash, verifyImageStructure } from "@/lib/attachments";
 import { transaction } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { AppError, errorResponse } from "@/lib/errors";
@@ -12,6 +12,40 @@ export const runtime = "nodejs";
 
 type Attachment = { id: string; owner_type: string; owner_id: string; filename: string; mime_type: string; size_bytes: string; sha256: string; chunk_count: number; status: string; token_valid: boolean };
 type Chunk = { part_no: number; data: Buffer; size_bytes: number };
+type Verdict = { clean: boolean; engine?: string; reason?: string };
+
+const verdictSchema = z.object({ clean: z.boolean(), engine: z.string().max(100).optional(), reason: z.string().max(500).optional() });
+
+/**
+ * Antivírus externo primeiro. Se ele não responder (fora do ar, endereço inválido, demora ou resposta estranha),
+ * fotos JPG/PNG passam pela conferência interna; os demais tipos ficam sem anexar. Quando o antivírus responde
+ * "não limpo", o arquivo vai para a quarentena (nunca cai na conferência interna).
+ */
+async function inspect(attachment: Attachment, body: Buffer<ArrayBuffer>): Promise<Verdict> {
+  let failure = "";
+  try {
+    const env = serverEnv();
+    const scan = await fetch(env.ANTIMALWARE_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.ANTIMALWARE_API_TOKEN}`, "Content-Type": attachment.mime_type, "X-File-SHA256": attachment.sha256 },
+      body,
+      signal: AbortSignal.timeout(45_000)
+    });
+    if (scan.ok) {
+      const parsed = verdictSchema.safeParse(await scan.json().catch(() => null));
+      if (parsed.success) return parsed.data;
+      failure = "resposta inválida";
+    } else failure = `HTTP ${scan.status}`;
+  } catch (error) {
+    failure = error instanceof Error ? `${error.message}${error.cause instanceof Error ? ` (${error.cause.message})` : ""}` : "erro desconhecido";
+  }
+  console.warn(`Antivírus indisponível para o anexo ${attachment.id}: ${failure}`);
+  if ((INTERNAL_CHECK_MIME_TYPES as readonly string[]).includes(attachment.mime_type)) {
+    verifyImageStructure(attachment.mime_type, body);
+    return { clean: true, engine: INTERNAL_CHECK_ENGINE };
+  }
+  throw new AppError("O antivírus não respondeu, por isso este arquivo não foi anexado. Fotos em JPG ou PNG continuam sendo aceitas.", 503, "MALWARE_SCAN_UNAVAILABLE");
+}
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   let actor = null;
@@ -45,26 +79,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     attachment = verified.file;
     if (verified.already) return Response.json({ id, status: "active" });
 
-    const env = serverEnv();
     const body = Buffer.concat(verified.chunks.map((chunk) => chunk.data));
-    const scan = await fetch(env.ANTIMALWARE_API_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${env.ANTIMALWARE_API_TOKEN}`, "Content-Type": attachment.mime_type, "X-File-SHA256": attachment.sha256 },
-      body,
-      signal: AbortSignal.timeout(45_000)
-    });
-    if (!scan.ok) throw new AppError("O serviço de inspeção não concluiu a análise.", 503, "MALWARE_SCAN_UNAVAILABLE");
-    const scanBody = z.object({ clean: z.boolean(), engine: z.string().max(100).optional(), reason: z.string().max(500).optional() })
-      .safeParse(await scan.json().catch(() => null));
-    if (!scanBody.success) throw new AppError("Resposta inválida do serviço de inspeção.", 503, "MALWARE_SCAN_UNAVAILABLE");
-    const verdict = scanBody.data;
+    const verdict = await inspect(attachment, body);
+    const internal = verdict.engine === INTERNAL_CHECK_ENGINE;
     const status = verdict.clean ? "active" : "quarantined";
     await transaction(async (client) => {
       await client.query(
         `update app.attachments set status=$2,scan_result=$3,scan_engine=$4,activated_at=case when $2='active' then now() else null end where id=$1`,
         [id, status, verdict.clean ? "clean" : verdict.reason ?? "blocked", verdict.engine ?? "external"]
       );
-      await appendAudit(actor!, { category: verdict.clean ? "Inclusão" : "Segurança", action: verdict.clean ? "Anexo ativado" : "Anexo bloqueado pela inspeção", module: "Anexos", section: attachment!.owner_type, entityType: "attachment", entityId: id, result: verdict.clean ? "success" : "denied", details: attachment!.filename }, client);
+      await appendAudit(actor!, { category: verdict.clean ? "Inclusão" : "Segurança", action: verdict.clean ? "Anexo ativado" : "Anexo bloqueado pela inspeção", module: "Anexos", section: attachment!.owner_type, entityType: "attachment", entityId: id, result: verdict.clean ? "success" : "denied", details: internal ? `${attachment!.filename} · conferência interna (antivírus indisponível)` : attachment!.filename }, client);
     });
     return Response.json({ id, status }, { status: verdict.clean ? 200 : 422 });
   } catch (error) {

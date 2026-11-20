@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, postJson } from "@/lib/client-api";
+import { compressPhoto } from "@/lib/photo-client";
 import { uploadAttachment } from "@/lib/upload-client";
 
 type Status = "open" | "in_progress" | "done" | "rejected" | "cancelled";
@@ -37,21 +38,8 @@ function updateLabel(u: Update) {
 }
 
 /** Foto do celular vira JPEG de até 1600 px: sobe rápido no 4G e cabe no limite do anexo. */
-async function compressPhoto(file: File, index: number) {
-  const name = `foto-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}-${index + 1}.jpg`;
-  try {
-    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
-    if (blob) return new File([blob], name, { type: "image/jpeg" });
-  } catch { /* navegador sem suporte: tenta o arquivo original abaixo */ }
-  if (["image/jpeg", "image/png"].includes(file.type)) return file;
-  throw new Error("Não foi possível ler esta foto. Tire outra ou escolha uma imagem JPG ou PNG.");
+function osPhoto(file: File, index: number) {
+  return compressPhoto(file, `foto-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}-${index + 1}.jpg`);
 }
 
 /** Botões de câmera e galeria com miniaturas; no celular, "Tirar foto" abre a câmera traseira. */
@@ -157,7 +145,7 @@ export function ServiceOrdersPanel({ area, department }: { area?: "patrimonio"; 
     let failed = 0;
     for (const [i, file] of files.entries()) {
       setBusy(`Enviando foto ${i + 1} de ${files.length}…`);
-      try { await uploadAttachment(await compressPhoto(file, i), "service_order", orderId, undefined, "photo"); }
+      try { await uploadAttachment(await osPhoto(file, i), "service_order", orderId, undefined, "photo"); }
       catch { failed += 1; }
     }
     return failed;

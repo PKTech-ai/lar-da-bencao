@@ -49,6 +49,25 @@ export function validateSignature(mime: string, bytes: Uint8Array) {
   if (!valid) throw new AppError("O conteúdo não corresponde ao tipo de arquivo informado.", 415, "INVALID_FILE_SIGNATURE");
 }
 
+/** Tipos que o próprio sistema confere quando o antivírus externo não responde (política temporária, docs/DEPLOY.md). */
+export const INTERNAL_CHECK_MIME_TYPES = ["image/jpeg", "image/png"] as const;
+export const INTERNAL_CHECK_ENGINE = "conferencia-interna";
+
+/**
+ * Conferência interna de foto: início e fim do arquivo precisam ser de uma imagem JPG/PNG completa.
+ * A imagem só é servida com o próprio tipo e `nosniff`, então não roda como página nem como programa.
+ */
+export function verifyImageStructure(mime: string, bytes: Uint8Array) {
+  validateSignature(mime, bytes);
+  let end = bytes.length;
+  while (end > 0 && bytes[end - 1] === 0x00) end -= 1; // algumas câmeras completam o arquivo com zeros
+  const tail = (...values: number[]) => end >= values.length && values.every((value, index) => bytes[end - values.length + index] === value);
+  const complete = mime === "image/jpeg" ? tail(0xff, 0xd9)
+    : mime === "image/png" ? tail(0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82)
+    : false;
+  if (!complete) throw new AppError("Esta imagem está incompleta ou não é uma foto JPG/PNG. Tire outra foto ou escolha outra imagem.", 415, "INVALID_FILE_SIGNATURE");
+}
+
 export function attachmentPermission(ownerType: string) {
   // Vínculos de negócio seguem a permissão da página dona (baixar = ler). `attachments` fica para testes técnicos.
   const mappings: Record<string, { resource: string; department?: string }> = {
