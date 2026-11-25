@@ -249,6 +249,69 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     wednesdays.forEach((day, i) => expect(studyOn.get(day)).toBe(byCode.get(`ROT. 07${i}`)));
   });
 
+  it("RN-ESC-001: psicofônico só numa reunião (quarta ou sexta) da semana, mesmo virando o ano", async () => {
+    const scale = await import("@/app/api/doutrina/scale/route");
+    const { monthDays } = await import("@/lib/doutrina-scale");
+    // Ano em que a quarta cai em dezembro e a sexta da mesma semana em janeiro (1º de janeiro numa quinta ou sexta).
+    let year = 2040 + Math.floor(Math.random() * 40);
+    while (![4, 5].includes(new Date(Date.UTC(year + 1, 0, 1)).getUTCDay())) year += 1;
+    const dec = `${year}-12`;
+    const jan = `${year + 1}-01`;
+    const fri = monthDays(jan, 5)[0];
+    const wed = new Date(Date.UTC(year + 1, 0, fri - 2)).getUTCDate();
+    await owner((client) => client.query(
+      "delete from app.scale_months where department_key = 'doutrina' and ((year = $1 and month = 12) or (year = $2 and month = 1))", [year, year + 1]));
+    current.actor = coordinator;
+
+    // Geração nas duas ordens: janeiro primeiro, depois dezembro (que precisa olhar a sexta de janeiro).
+    expect((await scale.POST(json("POST", { month: jan, action: "generate" }))).status).toBe(200);
+    expect((await scale.POST(json("POST", { month: dec, action: "generate" }))).status).toBe(200);
+    const clashes = await query<{ n: number }>(
+      `select count(*)::int as n from (
+         select a.worker_id from app.scale_assignments a join app.scale_months m on m.id = a.scale_month_id
+          where m.status <> 'deleted' and a.worker_id is not null and a.role_label ~ ' PSICOF\\.$'
+            and extract(isodow from a.work_date) in (3, 5) and a.work_date between $1::date and $2::date
+          group by a.worker_id, date_trunc('week', a.work_date) having count(distinct a.work_date) > 1) t`,
+      [`${year}-12-01`, `${year + 1}-01-31`]);
+    expect(clashes.rows[0].n).toBe(0);
+
+    // Troca manual na sexta de janeiro com quem é psicofônico na quarta de dezembro: recusada pela rota.
+    const slot = (ym: string, key: string) => query<{ slot_value: string; worker_id: string | null }>(
+      `select a.slot_value, a.worker_id from app.scale_assignments a join app.scale_months m on m.id = a.scale_month_id
+        where m.department_key = 'doutrina' and m.year = $1 and m.month = $2 and a.slot_key = $3`,
+      [Number(ym.slice(0, 4)), Number(ym.slice(5)), key]);
+    const onWed = (await slot(dec, `3|7|2|${wed}|0`)).rows[0].worker_id!;
+    const version = async (ym: string) => (await query<{ version: number }>(
+      "select version from app.scale_months where department_key = 'doutrina' and year = $1 and month = $2", [Number(ym.slice(0, 4)), Number(ym.slice(5))])).rows[0].version;
+    // Tira a pessoa da sexta (qualquer função), para olhar só a regra da semana.
+    await owner((client) => client.query(
+      `update app.scale_assignments a set slot_value = '', worker_id = null from app.scale_months m
+        where m.id = a.scale_month_id and m.year = $1 and m.month = 1 and a.work_date = $2::date and a.worker_id = $3`,
+      [year + 1, `${year + 1}-01-${String(fri).padStart(2, "0")}`, onWed]));
+    const denied = await scale.PATCH(json("PATCH", { month: jan, key: `5|3|2|${fri}|0`, value: `w:${onWed}`, version: await version(jan) }));
+    expect(denied.status).toBe(409);
+    expect((await denied.json()).error).toMatch(/^Este médium já está escalado como psicofônico na quarta-feira desta semana\. Sua inclusão na outra reunião mediúnica não será permitida/);
+    // GET informa a quarta de dezembro como semana vizinha (para as cores da tela).
+    const state = await (await scale.GET(json("GET", undefined, `https://app.test/x?month=${jan}`))).json();
+    expect(state.outside).toContainEqual({ date: `${year}-12-${String(wed).padStart(2, "0")}`, workerId: onWed });
+
+    // Barreira do banco: nem por acesso direto.
+    const setSlot = (ym: string, key: string, value: string) => owner((client) => client.query(
+      `update app.scale_assignments a set slot_value = $4, worker_id = nullif(substr($4, 3), '')::uuid
+         from app.scale_months m where m.id = a.scale_month_id and m.department_key = 'doutrina' and m.year = $1 and m.month = $2 and a.slot_key = $3`,
+      [Number(ym.slice(0, 4)), Number(ym.slice(5)), key, value]));
+    await expect(setSlot(jan, `5|3|2|${fri}|0`, `w:${onWed}`)).rejects.toMatchObject({ code: "LB409", message: expect.stringMatching(/quarta-feira desta semana/) });
+    // Outra função na sexta: permitido (a exclusividade é só da psicofonia).
+    await setSlot(jan, `5|3|1|${fri}|0`, `w:${onWed}`);
+    // Duas funções na mesma data: barrado.
+    await expect(setSlot(jan, `5|0|0|${fri}|0`, `w:${onWed}`)).rejects.toMatchObject({ code: "LB409", message: expect.stringMatching(/nesta data/) });
+    await setSlot(jan, `5|3|1|${fri}|0`, "");
+    // Excluir a escala de dezembro libera a sexta de janeiro (a disponibilidade é recalculada).
+    expect((await scale.POST(json("POST", { month: dec, action: "delete", version: await version(dec) }))).status).toBe(200);
+    await setSlot(jan, `5|3|2|${fri}|0`, `w:${onWed}`);
+    expect((await slot(jan, `5|3|2|${fri}|0`)).rows[0].worker_id).toBe(onWed);
+  });
+
   it("Infância: matrícula, turma, chamada e cronograma", async () => {
     const students = await import("@/app/api/evangelizandos/route");
     const attendance = await import("@/app/api/education/[department]/attendance/route");

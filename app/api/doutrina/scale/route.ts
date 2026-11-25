@@ -5,11 +5,11 @@ import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import {
-  assertMonthVersion, canEditDoutrina, insertSlots, loadFixed, loadScale, loadScaleOptions, requireDoutrina, reviewScale
+  assertMonthVersion, canEditDoutrina, insertSlots, loadFixed, loadPsychOutside, loadScale, loadScaleOptions, lockScales, requireDoutrina, reviewScale
 } from "@/lib/doutrina-data";
 import {
-  buildScale, canAddExtra, isExtraPosition, isValidMonth, monthDays, parseFixedKey, parseSlotKey, roleOf, scaleStatusLabel, slotKey,
-  studySequence, validateFixed, validateSlotValue, type ScaleStatus
+  buildScale, canAddExtra, isExtraPosition, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, roleOf, scaleStatusLabel, slotAvailability,
+  slotKey, studySequence, validateFixed, validateSlotChoice, type ScaleStatus
 } from "@/lib/doutrina-scale";
 
 const monthSchema = z.string().refine(isValidMonth, "Mês inválido.");
@@ -42,8 +42,10 @@ export async function GET(request: Request) {
     const actor = await requireActor();
     await requireDoutrina(actor, "read", "escalas");
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
-    const [scale, options, canEdit, fixed] = await Promise.all([loadScale(ym), loadScaleOptions(), canEditDoutrina(actor, "escalas"), loadFixed()]);
-    const review = scale.month?.reviewed ? reviewScale(scale.assignments, options) : null;
+    const [scale, options, canEdit, fixed, outside] = await Promise.all([
+      loadScale(ym), loadScaleOptions(), canEditDoutrina(actor, "escalas"), loadFixed(), loadPsychOutside(ym)
+    ]);
+    const review = scale.month?.reviewed ? reviewScale(scale.assignments, options, ym, outside) : null;
     return Response.json({
       month: scale.month ? { ...scale.month, statusLabel: scaleStatusLabel[scale.month.status] } : null,
       assignments: Object.fromEntries(scale.assignments),
@@ -52,7 +54,9 @@ export async function GET(request: Request) {
       review,
       options,
       canEdit,
-      fixed
+      fixed,
+      /** Psicofônicos de quarta e sexta dos meses vizinhos nas semanas que viram o mês (RN-ESC-001). */
+      outside
     }, { headers: noStore });
   } catch (error) {
     return errorResponse(error);
@@ -69,6 +73,7 @@ export async function POST(request: Request) {
     const input = actionSchema.parse(await request.json());
     const author = actor;
     const result = await transaction(async (client) => {
+      await lockScales(client);
       const scale = await loadScale(input.month, client, true);
       assertMonthVersion(scale.month, input.version);
       const current = scale.month && scale.month.status !== "deleted" ? scale.month : null;
@@ -95,7 +100,17 @@ export async function POST(request: Request) {
           if (pattern && !validateFixed(pattern, worker, fixed)) fixed.set(row.key, row.worker_id);
           else skipped.push(`${row.worker_name} (${row.section_name} → ${row.role_label})`);
         }
-        const generated = buildScale(input.month, options.workers, options.speakers, options.studies, fixed);
+        // Psicofônicos de quarta/sexta dos meses vizinhos contam na semana que vira o mês (RN-ESC-001).
+        const outside = await loadPsychOutside(input.month, client);
+        const generated = buildScale(input.month, options.workers, options.speakers, options.studies, fixed, outside);
+        // Fixo que ficou de fora num dia por já ser psicofônico na outra reunião da semana.
+        const psychSkipped: string[] = [];
+        for (const row of fixedRows) {
+          const pattern = fixed.has(row.key) ? parseFixedKey(row.key) : null;
+          if (!pattern) continue;
+          const days = monthDays(input.month, pattern.dow).filter((day) => generated.get(slotKey({ ...pattern, day })) !== `w:${row.worker_id}`);
+          if (days.length) psychSkipped.push(`${row.worker_name} (dia ${days.map((d) => String(d).padStart(2, "0")).join(", ")})`);
+        }
         const saved = await client.query<{ id: string }>(
           `insert into app.scale_months (department_key, year, month, status, reviewed, generated_at, created_by, updated_by)
            values ('doutrina', $1, $2, 'generated', false, now(), $3, $3)
@@ -116,9 +131,9 @@ export async function POST(request: Request) {
           category: removed.rowCount ? "Edição" : "Inclusão",
           action: removed.rowCount ? "Exclusão e nova geração de escala" : "Geração de escala",
           ...audit("Escala mensal"), entityId: monthId,
-          details: `${input.month}: ${removed.rowCount ?? 0} removida(s) · ${generated.size} gerada(s) · ${missing} vaga(s) pendente(s) · ${fixed.size} fixo(s)${skipped.length ? ` · fixos ignorados: ${skipped.join("; ")}` : ""}`
+          details: `${input.month}: ${removed.rowCount ?? 0} removida(s) · ${generated.size} gerada(s) · ${missing} vaga(s) pendente(s) · ${fixed.size} fixo(s)${skipped.length ? ` · fixos ignorados: ${skipped.join("; ")}` : ""}${psychSkipped.length ? ` · fixos fora por já serem psicofônicos na outra reunião da semana: ${psychSkipped.join("; ")}` : ""}`
         }, client);
-        return { removed: removed.rowCount ?? 0, added: generated.size, missing, fixed: fixed.size, skipped };
+        return { removed: removed.rowCount ?? 0, added: generated.size, missing, fixed: fixed.size, skipped, psychSkipped };
       }
 
       if (!current) throw new AppError("Não há escala ativa neste mês. Gere a escala primeiro.", 404, "SCALE_NOT_FOUND");
@@ -144,7 +159,7 @@ export async function POST(request: Request) {
         return { status: "published" };
       }
 
-      const review = reviewScale(scale.assignments, await loadScaleOptions(client));
+      const review = reviewScale(scale.assignments, await loadScaleOptions(client), input.month, await loadPsychOutside(input.month, client));
       const issues = review.conflicts.length + review.invalid.length;
       if (input.action === "check" || issues) {
         await setStatus(issues ? "pending_issues" : "checked", true);
@@ -181,17 +196,21 @@ export async function PATCH(request: Request) {
     const slot = parseSlotKey(input.key);
     if (!slot) throw new AppError("Posição inválida.");
     const result = await transaction(async (client) => {
+      await lockScales(client);
       const scale = await loadScale(input.month, client, true);
       if (!scale.month || scale.month.status === "deleted") throw new AppError("Não há escala ativa neste mês.", 404, "SCALE_NOT_FOUND");
       assertMonthVersion(scale.month, input.version);
       if (!scale.assignments.has(input.key)) throw new AppError("Posição inexistente nesta escala.", 404, "SLOT_NOT_FOUND");
       const options = await loadScaleOptions(client);
-      const problem = validateSlotValue(slot, input.value, { ...options, assignments: scale.assignments });
+      const outside = await loadPsychOutside(input.month, client);
+      // Ninguém em duas funções na mesma data; psicofônico só numa das reuniões (quarta ou sexta) da semana.
+      const problem = validateSlotChoice(input.month, slot, input.value, { ...options, assignments: scale.assignments, outside });
       if (problem) throw new AppError(problem, 409, "SLOT_INVALID");
       const before = scale.assignments.get(input.key);
       await insertSlots(client, scale.month.id, input.month, [[input.key, input.value]], { edited: true });
       const followed: number[] = [];
       const busyDays: number[] = [];
+      const psychDays: number[] = [];
       if (input.series && isExtraPosition(slot) && input.value.startsWith("w:")) {
         const current = new Map(scale.assignments).set(input.key, input.value);
         for (const day of monthDays(input.month, slot.dow).filter((d) => d > slot.day)) {
@@ -205,7 +224,12 @@ export async function PATCH(request: Request) {
           }
           let target = slotKey({ ...slot, day });
           if (current.get(target)) target = slotKey({ ...slot, day, pos: Math.max(roleOf(slot).min, ...keys.map((k) => Number(k.split("|")[4]) + 1)) });
-          if (validateSlotValue(parseSlotKey(target)!, input.value, { ...options, assignments: current })) continue;
+          // Psicofônico na outra reunião (quarta/sexta) dessa semana: fica de fora.
+          if (isWeeklyPsych(slot) && slotAvailability(input.month, parseSlotKey(target)!, input.value.slice(2), { assignments: current, outside }).blocked) {
+            psychDays.push(day);
+            continue;
+          }
+          if (validateSlotChoice(input.month, parseSlotKey(target)!, input.value, { ...options, assignments: current, outside })) continue;
           await insertSlots(client, scale.month.id, input.month, [[target, input.value]], { edited: true, extra: true });
           current.set(target, input.value);
           followed.push(day);
@@ -227,10 +251,10 @@ export async function PATCH(request: Request) {
       );
       await appendAudit(actor, {
         category: "Edição", action: "Alteração manual de escala", ...audit("Escala mensal"), entityId: scale.month.id,
-        details: `${input.month} · ${roleOf(slot).section.n} → ${roleOf(slot).label} · dia ${slot.day}${followed.length ? ` · repetido nos dias ${followed.join(", ")}` : ""}${sequenced.length ? ` · sequência nos dias ${sequenced.join(", ")}` : ""}`,
+        details: `${input.month} · ${roleOf(slot).section.n} → ${roleOf(slot).label} · dia ${slot.day}${followed.length ? ` · repetido nos dias ${followed.join(", ")}` : ""}${psychDays.length ? ` · fora dos dias ${psychDays.join(", ")} (psicofônico na outra reunião da semana)` : ""}${sequenced.length ? ` · sequência nos dias ${sequenced.join(", ")}` : ""}`,
         before: { value: before }, after: { value: input.value }
       }, client);
-      return { version: updated.rows[0].version, followed: followed.length, busyDays, sequenced };
+      return { version: updated.rows[0].version, followed: followed.length, busyDays, psychDays, sequenced };
     });
     return Response.json(result);
   } catch (error) {
@@ -246,6 +270,7 @@ export async function PUT(request: Request) {
     await requireDoutrina(actor, "update", "escalas");
     const input = extraSchema.parse(await request.json());
     const result = await transaction(async (client) => {
+      await lockScales(client);
       const scale = await loadScale(input.month, client, true);
       if (!scale.month || scale.month.status === "deleted") throw new AppError("Não há escala ativa neste mês.", 404, "SCALE_NOT_FOUND");
       assertMonthVersion(scale.month, input.version);

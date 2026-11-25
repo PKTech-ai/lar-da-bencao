@@ -80,19 +80,123 @@ export function slotDate(ym: string, day: number) {
   return `${ym}-${String(day).padStart(2, "0")}`;
 }
 
-/** Segunda-feira da semana do dia (chave da alternância quarta/sexta). */
-function weekKey(ym: string, day: number) {
+const dowOf = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
+const shortDate = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
+
+/** Segunda-feira da semana (segunda a domingo) de uma data AAAA-MM-DD, mesmo quando a semana vira o mês ou o ano. */
+export function weekStart(date: string) {
+  const d = new Date(`${date}T12:00:00Z`);
+  const dow = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Da segunda da primeira semana ao domingo da última semana que tocam o mês. */
+export function monthWeekRange(ym: string) {
   const [y, m] = ym.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, day));
-  const dow = date.getUTCDay();
-  date.setUTCDate(date.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
-  return date.toISOString().slice(0, 10);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const end = new Date(`${weekStart(slotDate(ym, lastDay))}T12:00:00Z`);
+  end.setUTCDate(end.getUTCDate() + 6);
+  return { from: weekStart(`${ym}-01`), to: end.toISOString().slice(0, 10) };
 }
 
 export function roleOf(slot: Pick<Slot, "dow" | "si" | "ri">) {
   const section = TEMPLATES[slot.dow][slot.si];
   const row = section.r[slot.ri];
   return { section, label: row[0], type: row[1], min: row[2] };
+}
+
+/**
+ * RN-ESC-001 — exclusividade semanal: psicofônico das reuniões mediúnicas de quarta e de sexta.
+ * As demais funções (e a psicofonia de segunda e domingo) não entram nesta regra.
+ * O banco repete a regra pelo rótulo "→ PSICOF." (migração 202611251200_psicofonico_semana.sql).
+ */
+export function isWeeklyPsych(slot: Pick<Slot, "dow" | "si" | "ri">) {
+  return (slot.dow === 3 || slot.dow === 5) && roleOf(slot).type === "Psicofônico";
+}
+
+const WEEKDAY: Record<number, string> = { 3: "quarta-feira", 5: "sexta-feira" };
+
+/** Mensagem da regra, com o dia da reunião em que o médium já está. Texto igual ao do banco. */
+export function psychWeekMessage(bookedDate: string) {
+  return `Este médium já está escalado como psicofônico na ${WEEKDAY[dowOf(bookedDate)] ?? "quarta-feira/sexta-feira"} desta semana. `
+    + "Sua inclusão na outra reunião mediúnica não será permitida, respeitando o período destinado ao estudo e ao aperfeiçoamento doutrinário.";
+}
+
+/** Psicofônico de quarta ou sexta já escalado. `key` só existe para posições da escala aberta (as dos meses vizinhos vêm sem). */
+export type PsychBooking = { date: string; workerId: string; key?: string };
+
+/** Psicofônicos de quarta e sexta da escala do mês. */
+export function psychBookings(ym: string, assignments: ReadonlyMap<string, string>): PsychBooking[] {
+  const list: PsychBooking[] = [];
+  for (const [key, value] of assignments) {
+    if (!value.startsWith("w:")) continue;
+    const slot = parseSlotKey(key);
+    if (slot && isWeeklyPsych(slot)) list.push({ date: slotDate(ym, slot.day), workerId: value.slice(2), key });
+  }
+  return list;
+}
+
+export type ScaleContext = { assignments: ReadonlyMap<string, string>; outside?: readonly PsychBooking[] };
+
+/** Índice da escala para consultar disponibilidade muitas vezes (a tela calcula para cada nome de cada posição). */
+export type AvailabilityIndex = { sameDay: Map<string, string[]>; weekPsych: Map<string, PsychBooking[]> };
+
+export function availabilityIndex(ym: string, context: ScaleContext): AvailabilityIndex {
+  const sameDay = new Map<string, string[]>();
+  for (const [key, value] of context.assignments) {
+    const slot = value.startsWith("w:") ? parseSlotKey(key) : null;
+    if (!slot) continue;
+    const id = `${slot.dow}|${slot.day}|${value}`;
+    if (!sameDay.has(id)) sameDay.set(id, []);
+    sameDay.get(id)!.push(key);
+  }
+  const weekPsych = new Map<string, PsychBooking[]>();
+  for (const booking of [...psychBookings(ym, context.assignments), ...(context.outside ?? [])]) {
+    const id = `${booking.workerId}|${weekStart(booking.date)}`;
+    if (!weekPsych.has(id)) weekPsych.set(id, []);
+    weekPsych.get(id)!.push(booking);
+  }
+  return { sameDay, weekPsych };
+}
+
+/** Onde a pessoa já é psicofônica (quarta ou sexta) na semana da posição, em outra data. Vale para qualquer função. */
+export function psychInWeek(ym: string, slot: Slot, workerId: string, context: ScaleContext,
+  index: AvailabilityIndex = availabilityIndex(ym, context)): PsychBooking | null {
+  const self = slotKey(slot);
+  const date = slotDate(ym, slot.day);
+  return (index.weekPsych.get(`${workerId}|${weekStart(date)}`) ?? [])
+    .filter((b) => b.key !== self && b.date !== date)
+    .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+}
+
+/** Verde: disponível. Azul: já é psicofônico na quarta ou sexta da semana. Vermelho: já escalado em outra função na data. */
+export type Availability = { color: "green" | "blue" | "red"; blocked: boolean; note: string; message: string };
+
+/**
+ * Disponibilidade de um trabalhador para uma posição, olhando a escala aberta e os meses vizinhos.
+ * Bloqueia duas funções na mesma data (qualquer atividade) e o psicofônico na quarta e na sexta da mesma semana.
+ * Nas demais funções o azul só informa.
+ */
+export function slotAvailability(ym: string, slot: Slot, workerId: string, context: ScaleContext,
+  index: AvailabilityIndex = availabilityIndex(ym, context)): Availability {
+  const self = slotKey(slot);
+  const busy = (index.sameDay.get(`${slot.dow}|${slot.day}|w:${workerId}`) ?? []).find((key) => key !== self);
+  if (busy) {
+    const role = roleOf(parseSlotKey(busy)!);
+    const where = `${role.section.n} → ${role.label}`;
+    return {
+      color: "red", blocked: true, note: `já escalado em ${where} neste dia`,
+      message: `Este trabalhador já está escalado em ${where} nesta data. Ninguém exerce duas funções na mesma data: tire-o de lá antes.`
+    };
+  }
+  const booked = psychInWeek(ym, slot, workerId, context, index);
+  if (booked) {
+    const info = `psicofônico em ${shortDate(booked.date)} (${DAY_NAME[dowOf(booked.date)]}) · MEDIÚNICA → PSICOF.`;
+    if (isWeeklyPsych(slot)) return { color: "blue", blocked: true, note: info, message: psychWeekMessage(booked.date) };
+    return { color: "blue", blocked: false, note: info, message: `Já escalado nesta semana como ${info}` };
+  }
+  return { color: "green", blocked: false, note: "", message: "" };
 }
 
 /** Extras manuais: passistas só na linha PASSISTAS do Grupo do Passe; recepcionistas e psicofônicos sempre. */
@@ -125,7 +229,7 @@ export function parseFixedKey(key: string): FixedPattern | null {
 
 /**
  * Regras para marcar um fixo (puras): só trabalhador, posição prevista no modelo, com a função e o dia na ficha,
- * uma função fixa por dia. A folga quarta/sexta do psicofônico não impede a escolha.
+ * uma função fixa por dia e, pela RN-ESC-001, nunca psicofônico fixo na quarta e na sexta ao mesmo tempo.
  */
 export function validateFixed(pattern: FixedPattern, worker: ScaleWorker | undefined, current: ReadonlyMap<string, string>): string | null {
   const row = TEMPLATES[pattern.dow]?.[pattern.si]?.r[pattern.ri];
@@ -141,6 +245,10 @@ export function validateFixed(pattern: FixedPattern, worker: ScaleWorker | undef
     const other = parseFixedKey(key);
     if (!other) continue;
     if (other.dow === pattern.dow) return `${worker.name} já está fixo em ${TEMPLATES[other.dow][other.si].n} neste dia.`;
+    if (isWeeklyPsych(pattern) && isWeeklyPsych(other)) {
+      return `${worker.name} já é fixo como psicofônico na ${WEEKDAY[other.dow]}. `
+        + "Sua inclusão na outra reunião mediúnica não será permitida, respeitando o período destinado ao estudo e ao aperfeiçoamento doutrinário.";
+    }
   }
   return null;
 }
@@ -163,35 +271,49 @@ export function supersededFixed(pattern: FixedPattern, worker: ScaleWorker | und
 /**
  * Gera a escala do mês. `fixed` (`dia-da-semana|seção|linha|posição` → trabalhador) entra primeiro em todas as
  * ocorrências e já conta na divisão do mês; o restante segue a regra de sempre. Sem fixos, o resultado é o mesmo de antes.
+ * `outside`: psicofônicos de quarta e sexta dos meses vizinhos nas semanas que viram o mês (RN-ESC-001).
+ * O fixo que cairia na outra reunião da semana em que a pessoa já é psicofônica fica de fora naquele dia.
  */
 export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers: readonly ScaleSpeaker[], studies: readonly ScaleStudy[],
-  fixed: ReadonlyMap<string, string> = new Map()) {
+  fixed: ReadonlyMap<string, string> = new Map(), outside: readonly PsychBooking[] = []) {
   const assignments = new Map<string, string>();
   const count = new Map<string, number>();
-  const wednesdayPsych = new Map<string, Set<string>>();
   const bump = (id: string) => count.set(id, (count.get(id) ?? 0) + 1);
   const ordered = (list: ScaleWorker[]) => list.sort((a, b) => (count.get(a.id) ?? 0) - (count.get(b.id) ?? 0) || a.name.localeCompare(b.name, "pt-BR") || a.id.localeCompare(b.id));
-  const blockWednesday = (week: string, id: string) => {
-    if (!wednesdayPsych.has(week)) wednesdayPsych.set(week, new Set());
-    wednesdayPsych.get(week)!.add(id);
+  // Semana → quem já é psicofônico de quarta/sexta e em que data (deste mês e dos vizinhos).
+  const psychWeek = new Map<string, Map<string, string>>();
+  const book = (date: string, id: string) => {
+    const week = weekStart(date);
+    if (!psychWeek.has(week)) psychWeek.set(week, new Map());
+    psychWeek.get(week)!.set(id, date);
   };
+  const bookedElsewhere = (date: string, id: string) => {
+    const other = psychWeek.get(weekStart(date))?.get(id);
+    return other !== undefined && other !== date;
+  };
+  for (const b of outside) book(b.date, b.workerId);
   // Quem é fixo já "gastou" essas escalas: não é puxado para outras vagas antes dos demais.
   const fixedPatterns = [...fixed]
     .map(([key, id]) => ({ pattern: parseFixedKey(key), id }))
     .filter((f): f is { pattern: FixedPattern; id: string } => f.pattern !== null)
     .sort((a, b) => a.pattern.si - b.pattern.si || a.pattern.ri - b.pattern.ri || a.pattern.pos - b.pattern.pos);
   for (const { pattern, id } of fixedPatterns) monthDays(ym, pattern.dow).forEach(() => bump(id));
+  // Psicofônico fixo na sexta não é sorteado para a quarta (e vice-versa): a quarta é preenchida antes da sexta.
+  const fixedPsych = new Map<number, Set<string>>([[3, new Set()], [5, new Set()]]);
+  for (const { pattern, id } of fixedPatterns) if (isWeeklyPsych(pattern)) fixedPsych.get(pattern.dow)!.add(id);
 
   for (const dow of [0, 1, 3, 4, 5, 6]) {
     for (const day of monthDays(ym, dow)) {
       const used = new Set<string>();
-      const week = weekKey(ym, day);
+      const date = slotDate(ym, day);
       // Fixos primeiro, inclusive os de posição adicional.
       for (const { pattern, id } of fixedPatterns) {
         if (pattern.dow !== dow || used.has(id)) continue;
+        const psych = isWeeklyPsych(pattern);
+        if (psych && bookedElsewhere(date, id)) continue;
         assignments.set(slotKey({ ...pattern, day }), `w:${id}`);
         used.add(id);
-        if (roleOf(pattern).type === "Psicofônico" && dow === 3) blockWednesday(week, id);
+        if (psych) book(date, id);
       }
       TEMPLATES[dow].forEach((section, si) => {
         section.r.forEach(([, type, min], ri) => {
@@ -216,11 +338,10 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
               }
               continue;
             }
-            let pool = workers.filter((w) => eligible(w, type, dow) && !used.has(w.id));
-            if (type === "Psicofônico" && dow === 5) {
-              const blocked = wednesdayPsych.get(week) ?? new Set<string>();
-              pool = pool.filter((w) => !blocked.has(w.id));
-            }
+            const psych = isWeeklyPsych({ dow, si, ri });
+            const pairFixed = psych ? fixedPsych.get(dow === 3 ? 5 : 3)! : null;
+            const pool = workers.filter((w) => eligible(w, type, dow) && !used.has(w.id)
+              && !(psych && (bookedElsewhere(date, w.id) || pairFixed!.has(w.id))));
             const chosen = ordered(pool)[0];
             if (!chosen) {
               assignments.set(key, "");
@@ -229,7 +350,7 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
             assignments.set(key, `w:${chosen.id}`);
             used.add(chosen.id);
             bump(chosen.id);
-            if (type === "Psicofônico" && dow === 3) blockWednesday(week, chosen.id);
+            if (psych) book(date, chosen.id);
           }
         });
       });
@@ -238,9 +359,10 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
   return assignments;
 }
 
-export type Conflict = { id: string; type: "same_day"; workerId: string; keys: string[] };
+/** `same_day`: duas funções na mesma data. `psych_week`: psicofônico na quarta e na sexta da mesma semana (`outsideDates`: datas de meses vizinhos). */
+export type Conflict = { id: string; type: "same_day" | "psych_week"; workerId: string; keys: string[]; outsideDates?: string[] };
 
-export function findConflicts(assignments: ReadonlyMap<string, string>): Conflict[] {
+export function findConflicts(assignments: ReadonlyMap<string, string>, ym?: string, outside: readonly PsychBooking[] = []): Conflict[] {
   const conflicts: Conflict[] = [];
   const sameDay = new Map<string, string[]>();
   for (const [key, value] of assignments) {
@@ -252,6 +374,18 @@ export function findConflicts(assignments: ReadonlyMap<string, string>): Conflic
   }
   for (const [group, keys] of sameDay) {
     if (keys.length > 1) conflicts.push({ id: `same:${keys.sort().join(":")}`, type: "same_day", workerId: group.split("|")[2].slice(2), keys });
+  }
+  if (!ym) return conflicts;
+  const weeks = new Map<string, PsychBooking[]>();
+  for (const booking of [...psychBookings(ym, assignments), ...outside]) {
+    const group = `${booking.workerId}|${weekStart(booking.date)}`;
+    weeks.set(group, [...(weeks.get(group) ?? []), booking]);
+  }
+  for (const [group, list] of weeks) {
+    const keys = list.flatMap((b) => (b.key ? [b.key] : [])).sort();
+    if (!keys.length || new Set(list.map((b) => b.date)).size < 2) continue;
+    const outsideDates = list.filter((b) => !b.key).map((b) => b.date).sort();
+    conflicts.push({ id: `psych:${group}`, type: "psych_week", workerId: group.split("|")[0], keys, ...(outsideDates.length ? { outsideDates } : {}) });
   }
   return conflicts;
 }
@@ -279,8 +413,8 @@ export function studySequence(studies: readonly ScaleStudy[], chosenId: string, 
 }
 
 /**
- * Valida a escolha manual de uma posição. Duplicidade no mesmo dia é permitida (aparece na conferência);
- * psicofônico na quarta e na sexta da mesma semana também: a folga só orienta a geração automática.
+ * Valida a pessoa ou o estudo de uma posição contra o modelo e a ficha (função, dia, aprovação).
+ * Não olha o restante da escala: para a escolha manual use `validateSlotChoice`.
  */
 export function validateSlotValue(
   slot: Slot,
@@ -303,6 +437,22 @@ export function validateSlotValue(
   if (!worker) return "Trabalhador sem aprovação da Diretoria ou fora da Doutrina.";
   if (!eligible(worker, type, slot.dow)) return `Trabalhador sem a função ${type} ou indisponível neste dia.`;
   return null;
+}
+
+/**
+ * Escolha manual (inclusão, troca, substituição): ficha e modelo, mais a escala inteira e os meses vizinhos —
+ * ninguém em duas funções na mesma data e nenhum psicofônico na quarta e na sexta da mesma semana (RN-ESC-001).
+ */
+export function validateSlotChoice(
+  ym: string,
+  slot: Slot,
+  value: string,
+  context: ScaleContext & { workers: readonly ScaleWorker[]; speakers: readonly ScaleSpeaker[]; studies: readonly ScaleStudy[] }
+): string | null {
+  const problem = validateSlotValue(slot, value, context);
+  if (problem || !value.startsWith("w:")) return problem;
+  const availability = slotAvailability(ym, slot, value.slice(2), context);
+  return availability.blocked ? availability.message : null;
 }
 
 export type ScaleStatus = "generated" | "in_review" | "pending_issues" | "checked" | "approved" | "published" | "deleted";

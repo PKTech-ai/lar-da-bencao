@@ -4,8 +4,10 @@ import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
-import { insertSlots, loadFixed, loadScale, loadScaleOptions, requireDoutrina } from "@/lib/doutrina-data";
-import { TEMPLATES, isValidMonth, monthDays, parseFixedKey, parseSlotKey, slotKey, supersededFixed, validateFixed, validateSlotValue } from "@/lib/doutrina-scale";
+import { insertSlots, loadFixed, loadPsychOutside, loadScale, loadScaleOptions, lockScales, requireDoutrina } from "@/lib/doutrina-data";
+import {
+  TEMPLATES, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, psychInWeek, slotKey, supersededFixed, validateFixed, validateSlotValue
+} from "@/lib/doutrina-scale";
 
 /** `month`: escala aberta na tela; o fixo já entra em todas as semanas dela. */
 const markSchema = z.object({ key: z.string().max(20), worker_id: z.string().uuid(), month: z.string().refine(isValidMonth).optional() });
@@ -23,6 +25,7 @@ export async function POST(request: Request) {
     if (!pattern) throw new AppError("Posição inválida.");
     const result = await transaction(async (client) => {
       await client.query("select pg_advisory_xact_lock(hashtext('scale_fixed:doutrina'))");
+      await lockScales(client);
       const [options, rows] = [await loadScaleOptions(client), await loadFixed(client)];
       const scale = input.month ? await loadScale(input.month, client, true) : null;
       const sheet = input.month && scale?.month && scale.month.status !== "deleted" ? { ym: input.month, assignments: scale.assignments } : undefined;
@@ -53,8 +56,10 @@ export async function POST(request: Request) {
       const applied: number[] = [];
       const busyDays: number[] = [];
       const movedDays: number[] = [];
+      const psychDays: number[] = [];
       if (input.month && scale?.month && scale.month.status !== "deleted") {
         const value = `w:${worker!.id}`;
+        const outside = isWeeklyPsych(pattern) ? await loadPsychOutside(input.month, client) : [];
         const current = new Map(scale.assignments);
         const regular: [string, string][] = [];
         const extra: [string, string][] = [];
@@ -67,6 +72,11 @@ export async function POST(request: Request) {
           if (current.get(target) === value) continue;
           if (validateSlotValue(parseSlotKey(target)!, value, { ...options, assignments: current })) {
             busyDays.push(day);
+            continue;
+          }
+          // RN-ESC-001: já é psicofônico na outra reunião (quarta/sexta) dessa semana — o fixo não tira de lá, fica de fora.
+          if (isWeeklyPsych(pattern) && psychInWeek(input.month, parseSlotKey(target)!, worker!.id, { assignments: current, outside })) {
+            psychDays.push(day);
             continue;
           }
           const elsewhere = [...current.keys()].filter((k) => current.get(k) === value && k !== target && k.startsWith(`${pattern.dow}|`) && k.split("|")[3] === String(day));
@@ -99,10 +109,10 @@ export async function POST(request: Request) {
       }
       await appendAudit(actor, {
         category: before ? "Edição" : "Inclusão", action: "Trabalhador marcado como fixo na escala", ...audit, entityId: inserted.rows[0].id,
-        details: `${worker!.name} · ${section.n} → ${label}${applied.length ? ` · aplicado em ${input.month}: dias ${applied.join(", ")}` : ""}${movedDays.length ? ` · retirado de outra atividade nos dias ${movedDays.join(", ")}` : ""}${superseded.length ? ` · deixou de ser fixo em ${superseded.map((r) => r.section_name).join(", ")}` : ""}`,
+        details: `${worker!.name} · ${section.n} → ${label}${applied.length ? ` · aplicado em ${input.month}: dias ${applied.join(", ")}` : ""}${movedDays.length ? ` · retirado de outra atividade nos dias ${movedDays.join(", ")}` : ""}${psychDays.length ? ` · fora dos dias ${psychDays.join(", ")} (psicofônico na outra reunião da semana)` : ""}${superseded.length ? ` · deixou de ser fixo em ${superseded.map((r) => r.section_name).join(", ")}` : ""}`,
         before: before ? { worker: before.worker_name } : null, after: { worker: worker!.name }
       }, client);
-      return { id: inserted.rows[0].id, applied: applied.length, busyDays, movedDays, replaced: superseded.map((r) => r.section_name) };
+      return { id: inserted.rows[0].id, applied: applied.length, busyDays, movedDays, psychDays, replaced: superseded.map((r) => r.section_name) };
     });
     return Response.json(result, { status: 201 });
   } catch (error) {

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { attendanceStats, isValidAttendanceCell } from "@/lib/doutrina-attendance";
 import {
-  FREE_THEME, buildScale, canAddExtra, findConflicts, fixedKey, monthDays, parseFixedKey, parseSlotKey, roleOf, slotKey, studySequence, supersededFixed, validateFixed,
-  validateSlotValue, type ScaleWorker
+  FREE_THEME, TEMPLATES, buildScale, canAddExtra, findConflicts, fixedKey, isWeeklyPsych, monthDays, monthWeekRange, parseFixedKey, parseSlotKey, psychWeekMessage,
+  roleOf, slotAvailability, slotKey, studySequence, supersededFixed, validateFixed, validateSlotChoice, validateSlotValue, weekStart, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
 const ALL = ["Passista", "Psicofônico", "Dialogador", "Dirigente de Reunião", "Dirigente de Estudo", "Expositor de Estudo", "Palestrante", "Dirigente de Palestra", "Entrevistador", "Recepcionista"];
@@ -110,15 +110,21 @@ describe("conferência e edição manual", () => {
     expect(conflicts[0]).toMatchObject({ type: "same_day", workerId: workers[0].id });
   });
 
-  it("psicofônico na quarta e na sexta da mesma semana não é pendência", () => {
+  it("psicofônico na quarta e na sexta da mesma semana é pendência (RN-ESC-001)", () => {
     const assignments = new Map([["3|7|2|2|0", w1], ["5|3|2|4|0", w1]]);
-    expect(findConflicts(assignments)).toEqual([]);
+    expect(findConflicts(assignments, "2026-09")).toEqual([{ id: `psych:${workers[0].id}|2026-08-31`, type: "psych_week", workerId: workers[0].id, keys: ["3|7|2|2|0", "5|3|2|4|0"] }]);
+    // Semanas diferentes (quarta 02/09 e sexta 11/09) não são pendência.
+    expect(findConflicts(new Map([["3|7|2|2|0", w1], ["5|3|2|11|0", w1]]), "2026-09")).toEqual([]);
   });
 
-  it("aceita a escolha fora da folga e a duplicidade (vai para a conferência)", () => {
+  it("recusa a escolha manual de psicofônico na outra reunião da semana e de duas funções na mesma data", () => {
     const context = { assignments: new Map([["3|7|2|2|0", w1]]), workers, speakers, studies };
+    expect(validateSlotChoice("2026-09", parseSlotKey("5|3|2|4|0")!, w1, context)).toBe(psychWeekMessage("2026-09-02"));
+    expect(validateSlotChoice("2026-09", parseSlotKey("3|7|0|2|0")!, w1, context)).toMatch(/já está escalado em MEDIÚNICA → PSICOF\. nesta data/);
+    // Outras funções na sexta: permitido (o azul só informa).
+    expect(validateSlotChoice("2026-09", parseSlotKey("5|3|1|4|0")!, w1, context)).toBeNull();
+    // A ficha continua valendo.
     expect(validateSlotValue(parseSlotKey("5|3|2|4|0")!, w1, context)).toBeNull();
-    expect(validateSlotValue(parseSlotKey("3|7|0|2|0")!, w1, context)).toBeNull();
   });
 
   it("recusa trabalhador sem função, sem aprovação ou estudo de outro tipo", () => {
@@ -138,6 +144,87 @@ describe("conferência e edição manual", () => {
     expect(canAddExtra({ dow: 3, si: 0, ri: 0 })).toBe(true); // RECEPÇÃO
     expect(canAddExtra({ dow: 0, si: 1, ri: 2 })).toBe(true); // PSICOF.
     expect(canAddExtra({ dow: 3, si: 1, ri: 0 })).toBe(false); // ENTREVISTA
+  });
+});
+
+describe("RN-ESC-001 — exclusividade semanal do psicofônico", () => {
+  const workers = team(40);
+  const x = workers[5];
+  const wx = `w:${x.id}`;
+  const psychOn = (scale: Map<string, string>, ym: string, dow: number, day: number) =>
+    [...scale].filter(([k]) => { const s = parseSlotKey(k)!; return s.dow === dow && s.day === day && isWeeklyPsych(s); }).map(([, v]) => v);
+
+  it("semana de segunda a domingo, mesmo virando mês e ano", () => {
+    expect(weekStart("2026-12-30")).toBe("2026-12-28");
+    expect(weekStart("2027-01-01")).toBe("2026-12-28");
+    expect(weekStart("2027-01-03")).toBe("2026-12-28");
+    expect(weekStart("2027-01-04")).toBe("2027-01-04");
+    expect(monthWeekRange("2027-01")).toEqual({ from: "2026-12-28", to: "2027-01-31" });
+    expect(monthWeekRange("2026-12")).toEqual({ from: "2026-11-30", to: "2027-01-03" });
+  });
+
+  it("só o psicofônico da quarta e da sexta entra na regra; o banco depende do rótulo PSICOF.", () => {
+    for (const [dow, sections] of Object.entries(TEMPLATES)) {
+      sections.forEach((section, si) => section.r.forEach(([label, type], ri) => {
+        expect(label === "PSICOF.").toBe(type === "Psicofônico");
+        expect(isWeeklyPsych({ dow: Number(dow), si, ri })).toBe(type === "Psicofônico" && (dow === "3" || dow === "5"));
+      }));
+    }
+  });
+
+  it("cores: verde disponível, azul já psicofônico na semana, vermelho já escalado na data", () => {
+    const assignments = new Map([["3|7|2|2|0", wx], ["3|7|2|2|1", ""], ["5|3|2|4|0", ""], ["5|3|1|4|0", ""], ["5|0|0|4|0", ""]]);
+    const ctx = { assignments };
+    expect(slotAvailability("2026-09", parseSlotKey("5|3|2|4|0")!, workers[6].id, ctx)).toMatchObject({ color: "green", blocked: false });
+    expect(slotAvailability("2026-09", parseSlotKey("5|3|2|4|0")!, x.id, ctx)).toMatchObject({
+      color: "blue", blocked: true, note: "psicofônico em 02/09 (QUARTA-FEIRA) · MEDIÚNICA → PSICOF.",
+      message: "Este médium já está escalado como psicofônico na quarta-feira desta semana. Sua inclusão na outra reunião mediúnica não será permitida, respeitando o período destinado ao estudo e ao aperfeiçoamento doutrinário."
+    });
+    expect(slotAvailability("2026-09", parseSlotKey("5|3|1|4|0")!, x.id, ctx)).toMatchObject({ color: "blue", blocked: false });
+    expect(slotAvailability("2026-09", parseSlotKey("3|7|2|2|1")!, x.id, ctx)).toMatchObject({ color: "red", blocked: true });
+    // A própria posição não conta contra a pessoa.
+    expect(slotAvailability("2026-09", parseSlotKey("3|7|2|2|0")!, x.id, ctx)).toMatchObject({ color: "green" });
+    // Domingo e segunda (funcionamento interno) não bloqueiam.
+    const sunday = { assignments: new Map([["0|1|2|6|0", wx]]) };
+    expect(slotAvailability("2026-08", parseSlotKey("3|7|2|26|0")!, x.id, { assignments: new Map([["1|0|2|24|0", wx]]) })).toMatchObject({ color: "green" });
+    expect(slotAvailability("2026-09", parseSlotKey("5|3|2|4|0")!, x.id, sunday)).toMatchObject({ color: "green" });
+  });
+
+  it("vale entre meses: quarta 30/12/2026 bloqueia a sexta 01/01/2027 e vice-versa", () => {
+    const jan = { assignments: new Map([["5|3|2|1|0", ""]]), outside: [{ date: "2026-12-30", workerId: x.id }] };
+    expect(slotAvailability("2027-01", parseSlotKey("5|3|2|1|0")!, x.id, jan)).toMatchObject({ color: "blue", blocked: true });
+    expect(validateSlotChoice("2027-01", parseSlotKey("5|3|2|1|0")!, wx, { ...jan, workers, speakers, studies })).toMatch(/na quarta-feira desta semana/);
+    const dec = { assignments: new Map([["3|7|2|30|0", ""]]), outside: [{ date: "2027-01-01", workerId: x.id }] };
+    expect(validateSlotChoice("2026-12", parseSlotKey("3|7|2|30|0")!, wx, { ...dec, workers, speakers, studies })).toMatch(/na sexta-feira desta semana/);
+    // Na conferência, a pendência mostra a data do outro mês.
+    expect(findConflicts(new Map([["5|3|2|1|0", wx]]), "2027-01", jan.outside)).toMatchObject([{ type: "psych_week", keys: ["5|3|2|1|0"], outsideDates: ["2026-12-30"] }]);
+  });
+
+  it("a geração respeita os meses vizinhos, nas duas ordens", () => {
+    // Quem a geração poria como psicofônico na sexta 01/01/2027 fica de fora se já estiver na quarta 30/12/2026.
+    const plain = buildScale("2027-01", workers, speakers, studies);
+    const fridayIds = psychOn(plain, "2027-01", 5, 1).map((v) => v.slice(2));
+    expect(fridayIds.length).toBe(4);
+    const jan = buildScale("2027-01", workers, speakers, studies, new Map(), fridayIds.map((id) => ({ date: "2026-12-30", workerId: id })));
+    expect(psychOn(jan, "2027-01", 5, 1).filter((v) => fridayIds.includes(v.slice(2)))).toEqual([]);
+    expect(psychOn(jan, "2027-01", 5, 1).every((v) => v.startsWith("w:"))).toBe(true);
+    // Dezembro gerado depois: a quarta 30/12 não pega quem já está na sexta 01/01.
+    const plainDec = buildScale("2026-12", workers, speakers, studies);
+    const wedIds = psychOn(plainDec, "2026-12", 3, 30).map((v) => v.slice(2));
+    const dec = buildScale("2026-12", workers, speakers, studies, new Map(), wedIds.map((id) => ({ date: "2027-01-01", workerId: id })));
+    expect(psychOn(dec, "2026-12", 3, 30).filter((v) => wedIds.includes(v.slice(2)))).toEqual([]);
+    expect(findConflicts(dec, "2026-12", wedIds.map((id) => ({ date: "2027-01-01", workerId: id })))).toEqual([]);
+  });
+
+  it("psicofônico fixo na sexta nunca é sorteado para a quarta; o fixo fica de fora na semana já ocupada", () => {
+    const fri = fixedKey({ dow: 5, si: 3, ri: 2, pos: 0 });
+    const scale = buildScale("2027-01", workers, speakers, studies, new Map([[fri, x.id]]), [{ date: "2026-12-30", workerId: x.id }]);
+    for (const day of monthDays("2027-01", 3)) expect(psychOn(scale, "2027-01", 3, day)).not.toContain(wx);
+    // 01/01: já era psicofônico na quarta 30/12 — o fixo não entra; nas outras sextas, entra.
+    expect(scale.get(slotKey({ dow: 5, si: 3, ri: 2, day: 1, pos: 0 }))).not.toBe(wx);
+    expect(psychOn(scale, "2027-01", 5, 1)).not.toContain(wx);
+    for (const day of monthDays("2027-01", 5).slice(1)) expect(scale.get(slotKey({ dow: 5, si: 3, ri: 2, day, pos: 0 }))).toBe(wx);
+    expect(findConflicts(scale, "2027-01", [{ date: "2026-12-30", workerId: x.id }])).toEqual([]);
   });
 });
 
@@ -167,7 +254,8 @@ const route = vi.hoisted(() => ({
   statusUpdates: [] as string[],
   audits: [] as string[],
   canEdit: true,
-  fixed: [] as { id: string; key: string; worker_id: string; worker_name: string; section_name: string; role_label: string; created_at: string; created_by_name: string }[]
+  fixed: [] as { id: string; key: string; worker_id: string; worker_name: string; section_name: string; role_label: string; created_at: string; created_by_name: string }[],
+  outside: [] as { date: string; workerId: string }[]
 }));
 
 vi.mock("@/lib/csrf", () => ({ assertSameOrigin: () => undefined }));
@@ -204,6 +292,8 @@ vi.mock("@/lib/doutrina-data", async (importOriginal) => {
     canEditDoutrina: async () => route.canEdit,
     loadScaleOptions: async () => ({ workers: team(40), speakers, studies }),
     loadFixed: async () => route.fixed,
+    lockScales: async () => undefined,
+    loadPsychOutside: async () => route.outside,
     loadScale: async () => ({ month: route.month, assignments: route.assignments, edited: new Set(), extras: new Set() }),
     insertSlots: async (_: unknown, __: string, ___: string, slots: [string, string][]) => {
       for (const [key, value] of slots) route.assignments.set(key, value);
@@ -253,7 +343,11 @@ describe("trabalhadores fixos", () => {
     expect(validateFixed({ dow: 1, si: 0, ri: 1, pos: 5 }, only, new Map())).toMatch(/Posição inválida/);
     expect(validateFixed({ dow: 1, si: 0, ri: 1, pos: 0 }, undefined, new Map())).toMatch(/fora da Doutrina/);
     expect(validateFixed({ dow: 1, si: 0, ri: 2, pos: 0 }, ana, new Map([["1|0|0|0", ana.id]]))).toMatch(/já está fixo/);
-    expect(validateFixed({ dow: 5, si: 3, ri: 2, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toBeNull();
+    // RN-ESC-001: psicofônico fixo na quarta não pode ser fixo como psicofônico na sexta (e vice-versa); outra função na sexta pode.
+    expect(validateFixed({ dow: 5, si: 3, ri: 2, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toMatch(/fixo como psicofônico na quarta-feira\. Sua inclusão na outra reunião mediúnica não será permitida/);
+    expect(validateFixed({ dow: 3, si: 7, ri: 2, pos: 1 }, ana, new Map([["5|3|2|0", ana.id]]))).toMatch(/na sexta-feira/);
+    expect(validateFixed({ dow: 5, si: 3, ri: 1, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toBeNull();
+    expect(validateFixed({ dow: 0, si: 1, ri: 2, pos: 0 }, ana, new Map([["3|7|2|0", ana.id]]))).toBeNull();
   });
 
   it("fixo antigo que não está valendo não bloqueia; o que está na escala continua bloqueando", () => {
@@ -295,6 +389,7 @@ describe("API da escala", () => {
     route.audits = [];
     route.canEdit = true;
     route.fixed = [];
+    route.outside = [];
   });
 
   it("gera, recusa gerar duas vezes sem confirmação e regenera", async () => {
@@ -357,11 +452,48 @@ describe("API da escala", () => {
     expect(route.month!.status).toBe("in_review");
   });
 
+  it("troca manual: recusa psicofônico na outra reunião da semana (inclusive mês vizinho) e duas funções na data", async () => {
+    await post({ action: "generate" });
+    const [wed] = monthDays("2026-09", 3);
+    const [fri] = monthDays("2026-09", 5);
+    const onWed = route.assignments.get(`3|7|2|${wed}|0`)!;
+    // Livre na sexta em outras funções, para o aviso ser o da regra da semana.
+    for (const [k, v] of route.assignments) if (v === onWed && k.startsWith(`5|`) && k.split("|")[3] === String(fri)) route.assignments.set(k, "");
+    const version = route.month!.version;
+    const denied = await patch({ key: `5|3|2|${fri}|0`, value: onWed, version });
+    expect(denied.status).toBe(409);
+    expect((await denied.json()).error).toBe(psychWeekMessage(`2026-09-${String(wed).padStart(2, "0")}`));
+    const sameDay = await patch({ key: `3|0|0|${wed}|0`, value: onWed, version });
+    expect(sameDay.status).toBe(409);
+    expect((await sameDay.json()).error).toMatch(/nesta data/);
+    // Sexta 25/09: quem está na quarta 23/09 é bloqueado; a semana de 30/09 + 02/10 conta com o mês seguinte.
+    const lastWed = monthDays("2026-09", 3).at(-1)!;
+    const free = team(40).find((w) => ![...route.assignments].some(([k, v]) => v === `w:${w.id}` && k.split("|")[0] === "3" && k.split("|")[3] === String(lastWed)))!;
+    route.outside = [{ date: "2026-10-02", workerId: free.id }];
+    const cross = await patch({ key: `3|7|2|${lastWed}|0`, value: `w:${free.id}`, version });
+    expect(cross.status).toBe(409);
+    expect((await cross.json()).error).toMatch(/na sexta-feira desta semana/);
+    expect(route.assignments.get(`3|7|2|${lastWed}|0`)).not.toBe(`w:${free.id}`);
+  });
+
+  it("conferência aponta psicofônico na quarta e na sexta da mesma semana e não aprova", async () => {
+    await post({ action: "generate" });
+    const [wed] = monthDays("2026-09", 3);
+    const [fri] = monthDays("2026-09", 5);
+    route.assignments.set(`5|3|2|${fri}|0`, route.assignments.get(`3|7|2|${wed}|0`)!);
+    const res = await post({ action: "approve", version: route.month!.version });
+    const body = await res.json();
+    expect(body).toMatchObject({ status: "pending_issues", approved: false });
+    expect(body.review.conflicts.some((c: { type: string }) => c.type === "psych_week")).toBe(true);
+  });
+
   it("adicional: o trabalhador escolhido segue para as semanas seguintes do mês", async () => {
     await post({ action: "generate" });
     const [first, ...rest] = monthDays("2026-09", 3);
     route.assignments.set(`3|0|0|${first}|2`, "");
-    const chosen = `w:${uuid(40)}`;
+    // Alguém livre na 1ª quarta: duas funções na mesma data não são aceitas.
+    const free = () => `w:${team(40).reverse().find((w) => ![...route.assignments].some(([k, v]) => v === `w:${w.id}` && k.startsWith("3|") && k.split("|")[3] === String(first)))!.id}`;
+    const chosen = free();
     const res = await patch({ key: `3|0|0|${first}|2`, value: chosen, version: route.month!.version, series: true });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -373,7 +505,8 @@ describe("API da escala", () => {
     expect(body.followed + body.busyDays.length).toBe(rest.length);
     expect(body.followed).toBeGreaterThan(0);
     // Posição normal (não adicional) não se repete.
-    const normal = await patch({ key: `3|1|0|${first}|0`, value: `w:${uuid(39)}`, version: route.month!.version, series: true });
+    const normal = await patch({ key: `3|1|0|${first}|0`, value: free(), version: route.month!.version, series: true });
+    expect(normal.status).toBe(200);
     expect((await normal.json()).followed).toBe(0);
   });
 

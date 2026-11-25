@@ -1,6 +1,6 @@
 import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { loadScale, loadScaleOptions, reviewScale } from "@/lib/doutrina-data";
+import { loadPsychOutside, loadScale, loadScaleOptions, reviewScale } from "@/lib/doutrina-data";
 import { scaleStatusLabel } from "@/lib/doutrina-scale";
 import { isFlagEnabled } from "@/lib/feature-flags";
 import { cashboxData } from "@/lib/ingressos/caixa";
@@ -166,7 +166,7 @@ export async function painelAssistencia(): Promise<Painel> {
 
 export async function painelDoutrina(): Promise<Painel> {
   const ym = currentMonth();
-  const [numbers, trend, scale, options] = await Promise.all([
+  const [numbers, trend, scale, options, outside] = await Promise.all([
     query<{ workers: number; pending: number; public: number }>(
       `select (select count(*)::int from app.workers w join app.worker_departments d on d.worker_id = w.id and d.department_key = 'doutrina' where w.status = 'active') as workers,
               (select count(*)::int from app.workers w join app.worker_departments d on d.worker_id = w.id and d.department_key = 'doutrina' where w.status = 'pending') as pending,
@@ -176,12 +176,13 @@ export async function painelDoutrina(): Promise<Painel> {
        select m.month, (select coalesce(sum(value), 0)::int from app.attendance_counts a where a.department_key = 'doutrina' and to_char(a.sheet_date, 'YYYY-MM') = m.month) as total
          from m order by m.month`),
     loadScale(ym),
-    loadScaleOptions()
+    loadScaleOptions(),
+    loadPsychOutside(ym)
   ]);
   const n = numbers.rows[0];
   const active = scale.month && scale.month.status !== "deleted" ? scale.month : null;
   const empty = active ? [...scale.assignments.values()].filter((v) => !v).length : 0;
-  const review = active ? reviewScale(scale.assignments, options) : null;
+  const review = active ? reviewScale(scale.assignments, options, ym, outside) : null;
   const conflicts = review ? review.conflicts.length + review.invalid.length : 0;
   return {
     kpis: [

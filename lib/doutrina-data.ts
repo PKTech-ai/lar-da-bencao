@@ -6,8 +6,8 @@ import { AppError } from "@/lib/errors";
 import { requireFlag } from "@/lib/feature-flags";
 import { assertModule, hasModule } from "@/lib/permissions";
 import {
-  findConflicts, parseSlotKey, roleOf, slotDate, validateSlotValue,
-  type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
+  findConflicts, isWeeklyPsych, monthWeekRange, parseSlotKey, roleOf, slotDate, validateSlotValue,
+  type PsychBooking, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
 type Db = Pick<PoolClient, "query">;
@@ -80,9 +80,35 @@ export async function loadScale(ym: string, db: Db = pool, lock = false) {
   return { month: row, assignments, edited, extras };
 }
 
-/** Conflitos do mock + posições que deixaram de ser válidas (ex.: trabalhador afastado depois da geração). */
-export function reviewScale(assignments: ReadonlyMap<string, string>, options: Awaited<ReturnType<typeof loadScaleOptions>>) {
-  const conflicts = findConflicts(assignments);
+/**
+ * Uma escrita de escala por vez (todas as datas e meses), para a regra da semana valer entre meses vizinhos.
+ * Chame no início da transação, antes de travar o mês. O banco usa a mesma trava na sua conferência final.
+ */
+export async function lockScales(db: Db) {
+  await db.query("select pg_advisory_xact_lock(hashtext('escala:doutrina'))");
+}
+
+/** Psicofônicos de quarta e sexta dos outros meses nas semanas que viram o mês (RN-ESC-001). */
+export async function loadPsychOutside(ym: string, db: Db = pool): Promise<PsychBooking[]> {
+  const { from, to } = monthWeekRange(ym);
+  const [year, month] = ym.split("-").map(Number);
+  const rows = await db.query<{ date: string; worker_id: string; slot_key: string }>(
+    `select to_char(a.work_date, 'YYYY-MM-DD') as date, a.worker_id, a.slot_key
+       from app.scale_assignments a join app.scale_months m on m.id = a.scale_month_id
+      where m.department_key = 'doutrina' and m.status <> 'deleted' and not (m.year = $3 and m.month = $4)
+        and a.work_date between $1::date and $2::date and a.worker_id is not null and a.slot_key is not null`,
+    [from, to, year, month]
+  );
+  return rows.rows.flatMap((r) => {
+    const slot = parseSlotKey(r.slot_key);
+    return slot && isWeeklyPsych(slot) ? [{ date: r.date, workerId: r.worker_id }] : [];
+  });
+}
+
+/** Conflitos (mesma data e psicofônico na quarta e na sexta da semana) + posições que deixaram de ser válidas (ex.: trabalhador afastado). */
+export function reviewScale(assignments: ReadonlyMap<string, string>, options: Awaited<ReturnType<typeof loadScaleOptions>>,
+  ym: string, outside: readonly PsychBooking[] = []) {
+  const conflicts = findConflicts(assignments, ym, outside);
   const invalid: { key: string; message: string }[] = [];
   for (const [key, value] of assignments) {
     const slot = parseSlotKey(key);

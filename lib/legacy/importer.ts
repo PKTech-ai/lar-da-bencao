@@ -1,8 +1,8 @@
 import type { PoolClient } from "pg";
 import type { Actor } from "@/lib/auth";
 import { isValidAttendanceCell } from "@/lib/doutrina-attendance";
-import { insertSlots } from "@/lib/doutrina-data";
-import { FREE_THEME, parseSlotKey } from "@/lib/doutrina-scale";
+import { insertSlots, loadPsychOutside, lockScales } from "@/lib/doutrina-data";
+import { FREE_THEME, parseSlotKey, slotAvailability } from "@/lib/doutrina-scale";
 import { groupNames, isClassSunday } from "@/lib/education";
 import type { ImportPlan } from "@/lib/legacy/v215";
 
@@ -190,6 +190,8 @@ export async function applyPlan(client: PoolClient, importId: string, plan: Impo
   }
 
   let unmapped = 0;
+  let dropped = 0;
+  if (plan.scales.length) await lockScales(client);
   for (const s of plan.scales) {
     const [year, month] = s.month.split("-").map(Number);
     const created = await client.query<{ id: string }>(
@@ -200,6 +202,10 @@ export async function applyPlan(client: PoolClient, importId: string, plan: Impo
     if (!created.rows[0]) { tally("scale_month", false); continue; }
     const slots: [string, string][] = [];
     const edited: [string, string][] = [];
+    // Regras de hoje valem para o que vem do sistema antigo: duas funções na mesma data ou psicofônico na quarta e na
+    // sexta da mesma semana (RN-ESC-001, inclusive com meses já gravados) — a posição entra vazia, com aviso.
+    const outside = await loadPsychOutside(s.month, client);
+    const kept = new Map<string, string>();
     for (const [slot, value, wasEdited] of s.slots) {
       if (!parseSlotKey(slot)) { unmapped += 1; continue; }
       let mapped = "";
@@ -208,6 +214,11 @@ export async function applyPlan(client: PoolClient, importId: string, plan: Impo
       else if (value.startsWith("s:")) mapped = (await lookup("speaker", value.slice(2))) ? `s:${await lookup("speaker", value.slice(2))}` : "";
       else if (value.startsWith("t:")) mapped = (await lookup("study", `doutrina:${value.slice(2)}`)) ? `t:${await lookup("study", `doutrina:${value.slice(2)}`)}` : "";
       if (value && !mapped) unmapped += 1;
+      if (mapped.startsWith("w:") && slotAvailability(s.month, parseSlotKey(slot)!, mapped.slice(2), { assignments: kept, outside }).blocked) {
+        dropped += 1;
+        mapped = "";
+      }
+      kept.set(slot, mapped);
       (wasEdited ? edited : slots).push([slot, mapped]);
     }
     await insertSlots(client, created.rows[0].id, s.month, slots);
@@ -216,6 +227,7 @@ export async function applyPlan(client: PoolClient, importId: string, plan: Impo
     tally("scale_month", true);
   }
   if (unmapped) warnings.push(`${unmapped} posição(ões) de escala ficaram vazias (trabalhador, palestrante ou estudo não encontrado).`);
+  if (dropped) warnings.push(`${dropped} posição(ões) de escala ficaram vazias: a pessoa já estava em outra função na mesma data ou como psicofônico na outra reunião (quarta/sexta) da semana.`);
 
   if (plan.doctrine_phone) {
     await client.query(

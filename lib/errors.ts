@@ -61,14 +61,20 @@ export function failureMessage(error: unknown): string {
   return "A operação falhou. Tente de novo.";
 }
 
+/** Regra de negócio barrada pelo próprio banco (ex.: escala — supabase/migrations/202611251200_psicofonico_semana.sql). */
+const isDatabaseRule = (error: unknown) => Boolean(error && typeof error === "object" && "code" in error && error.code === "LB409");
+
 export function errorResponse(error: unknown) {
   const message = failureMessage(error);
+  const rule = isDatabaseRule(error);
   const appError = error instanceof AppError
     ? new AppError(message, error.status, error.code)
     : error instanceof ZodError
       ? new AppError(message, 400, "VALIDATION_ERROR")
-      : new AppError(message, 500, "INTERNAL_ERROR");
-  if (!(error instanceof AppError) && !(error instanceof ZodError)) console.error(error);
+      : rule
+        ? new AppError(message, 409, "BUSINESS_RULE")
+        : new AppError(message, 500, "INTERNAL_ERROR");
+  if (!(error instanceof AppError) && !(error instanceof ZodError) && !rule) console.error(error);
   return Response.json(
     { error: appError.message, code: appError.code },
     { status: appError.status, headers: { "Cache-Control": "private, no-store" } }
