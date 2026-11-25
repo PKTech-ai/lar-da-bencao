@@ -5,11 +5,11 @@ import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import {
-  assertMonthVersion, canEditDoutrina, insertSlots, loadFixed, loadPsychOutside, loadScale, loadScaleOptions, lockScales, requireDoutrina, reviewScale
+  assertMonthVersion, canEditDoutrina, insertSlots, loadFixed, loadPsychOutside, loadRecess, loadScale, loadScaleOptions, lockScales, requireDoutrina, reviewScale
 } from "@/lib/doutrina-data";
 import {
-  buildScale, canAddExtra, isExtraPosition, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, roleOf, scaleStatusLabel, slotAvailability,
-  slotKey, studySequence, validateFixed, validateSlotChoice, type ScaleStatus
+  buildScale, canAddExtra, isExtraPosition, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, recessSet, roleOf,
+  scaleStatusLabel, slotAvailability, slotKey, studySequence, validateFixed, validateSlotChoice, type ScaleStatus
 } from "@/lib/doutrina-scale";
 
 const monthSchema = z.string().refine(isValidMonth, "Mês inválido.");
@@ -35,6 +35,11 @@ const extraSchema = z.object({
 });
 
 const noStore = { "Cache-Control": "private, no-store" };
+
+/** Dia de recesso: ninguém é escalado. */
+function recessError(ym: string, day: number) {
+  return new AppError(`${String(day).padStart(2, "0")}/${ym.slice(5)} é dia de recesso: a casa não abre e ninguém é escalado. Para escalar, tire o recesso do dia.`, 409, "RECESS_DAY");
+}
 const audit = (section: string) => ({ module: "Doutrina", section, entityType: "scale_month" });
 
 export async function GET(request: Request) {
@@ -42,8 +47,8 @@ export async function GET(request: Request) {
     const actor = await requireActor();
     await requireDoutrina(actor, "read", "escalas");
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
-    const [scale, options, canEdit, fixed, outside] = await Promise.all([
-      loadScale(ym), loadScaleOptions(), canEditDoutrina(actor, "escalas"), loadFixed(), loadPsychOutside(ym)
+    const [scale, options, canEdit, fixed, outside, recess] = await Promise.all([
+      loadScale(ym), loadScaleOptions(), canEditDoutrina(actor, "escalas"), loadFixed(), loadPsychOutside(ym), loadRecess(ym)
     ]);
     const review = scale.month?.reviewed ? reviewScale(scale.assignments, options, ym, outside) : null;
     return Response.json({
@@ -56,7 +61,9 @@ export async function GET(request: Request) {
       canEdit,
       fixed,
       /** Psicofônicos de quarta e sexta dos meses vizinhos nas semanas que viram o mês (RN-ESC-001). */
-      outside
+      outside,
+      /** Dias de recesso do mês. */
+      recess
     }, { headers: noStore });
   } catch (error) {
     return errorResponse(error);
@@ -102,13 +109,15 @@ export async function POST(request: Request) {
         }
         // Psicofônicos de quarta/sexta dos meses vizinhos contam na semana que vira o mês (RN-ESC-001).
         const outside = await loadPsychOutside(input.month, client);
-        const generated = buildScale(input.month, options.workers, options.speakers, options.studies, fixed, outside);
+        // Recesso: as posições ficam vazias e ninguém é escalado nesses dias.
+        const recess = recessSet(input.month, await loadRecess(input.month, client));
+        const generated = buildScale(input.month, options.workers, options.speakers, options.studies, fixed, outside, recess);
         // Fixo que ficou de fora num dia por já ser psicofônico na outra reunião da semana.
         const psychSkipped: string[] = [];
         for (const row of fixedRows) {
           const pattern = fixed.has(row.key) ? parseFixedKey(row.key) : null;
           if (!pattern) continue;
-          const days = monthDays(input.month, pattern.dow).filter((day) => generated.get(slotKey({ ...pattern, day })) !== `w:${row.worker_id}`);
+          const days = monthDays(input.month, pattern.dow).filter((day) => !recess.has(day) && generated.get(slotKey({ ...pattern, day })) !== `w:${row.worker_id}`);
           if (days.length) psychSkipped.push(`${row.worker_name} (dia ${days.map((d) => String(d).padStart(2, "0")).join(", ")})`);
         }
         const saved = await client.query<{ id: string }>(
@@ -126,14 +135,14 @@ export async function POST(request: Request) {
         const slots = [...generated];
         await insertSlots(client, monthId, input.month, slots.filter(([key]) => !isExtraPosition(parseSlotKey(key)!)));
         await insertSlots(client, monthId, input.month, slots.filter(([key]) => isExtraPosition(parseSlotKey(key)!)), { extra: true });
-        const missing = [...generated.values()].filter((value) => !value).length;
+        const missing = [...generated].filter(([key, value]) => !value && !recess.has(parseSlotKey(key)!.day)).length;
         await appendAudit(author, {
           category: removed.rowCount ? "Edição" : "Inclusão",
           action: removed.rowCount ? "Exclusão e nova geração de escala" : "Geração de escala",
           ...audit("Escala mensal"), entityId: monthId,
           details: `${input.month}: ${removed.rowCount ?? 0} removida(s) · ${generated.size} gerada(s) · ${missing} vaga(s) pendente(s) · ${fixed.size} fixo(s)${skipped.length ? ` · fixos ignorados: ${skipped.join("; ")}` : ""}${psychSkipped.length ? ` · fixos fora por já serem psicofônicos na outra reunião da semana: ${psychSkipped.join("; ")}` : ""}`
         }, client);
-        return { removed: removed.rowCount ?? 0, added: generated.size, missing, fixed: fixed.size, skipped, psychSkipped };
+        return { removed: removed.rowCount ?? 0, added: generated.size, missing, fixed: fixed.size, skipped, psychSkipped, recess: recess.size };
       }
 
       if (!current) throw new AppError("Não há escala ativa neste mês. Gere a escala primeiro.", 404, "SCALE_NOT_FOUND");
@@ -201,6 +210,8 @@ export async function PATCH(request: Request) {
       if (!scale.month || scale.month.status === "deleted") throw new AppError("Não há escala ativa neste mês.", 404, "SCALE_NOT_FOUND");
       assertMonthVersion(scale.month, input.version);
       if (!scale.assignments.has(input.key)) throw new AppError("Posição inexistente nesta escala.", 404, "SLOT_NOT_FOUND");
+      const recess = recessSet(input.month, await loadRecess(input.month, client));
+      if (input.value && recess.has(slot.day)) throw recessError(input.month, slot.day);
       const options = await loadScaleOptions(client);
       const outside = await loadPsychOutside(input.month, client);
       // Ninguém em duas funções na mesma data; psicofônico só numa das reuniões (quarta ou sexta) da semana.
@@ -211,9 +222,14 @@ export async function PATCH(request: Request) {
       const followed: number[] = [];
       const busyDays: number[] = [];
       const psychDays: number[] = [];
+      const recessDays: number[] = [];
       if (input.series && isExtraPosition(slot) && input.value.startsWith("w:")) {
         const current = new Map(scale.assignments).set(input.key, input.value);
         for (const day of monthDays(input.month, slot.dow).filter((d) => d > slot.day)) {
+          if (recess.has(day)) {
+            recessDays.push(day);
+            continue;
+          }
           const prefix = `${slot.dow}|${slot.si}|${slot.ri}|${day}|`;
           const keys = [...current.keys()].filter((k) => k.startsWith(prefix));
           if (!keys.length || keys.some((k) => current.get(k) === input.value)) continue;
@@ -238,7 +254,7 @@ export async function PATCH(request: Request) {
       // Roteiro numerado: os dias seguintes da mesma linha recebem os próximos números.
       const sequenced: number[] = [];
       if (roleOf(slot).type === "STUDY" && input.value.startsWith("t:")) {
-        const days = monthDays(input.month, slot.dow).filter((d) => d > slot.day && scale.assignments.has(slotKey({ ...slot, day: d })));
+        const days = monthDays(input.month, slot.dow).filter((d) => d > slot.day && !recess.has(d) && scale.assignments.has(slotKey({ ...slot, day: d })));
         const rows = studySequence(options.studies, input.value.slice(2), days.length)
           .map((study, i): [string, string] => [slotKey({ ...slot, day: days[i] }), `t:${study.id}`]);
         await insertSlots(client, scale.month.id, input.month, rows, { edited: true });
@@ -254,7 +270,7 @@ export async function PATCH(request: Request) {
         details: `${input.month} · ${roleOf(slot).section.n} → ${roleOf(slot).label} · dia ${slot.day}${followed.length ? ` · repetido nos dias ${followed.join(", ")}` : ""}${psychDays.length ? ` · fora dos dias ${psychDays.join(", ")} (psicofônico na outra reunião da semana)` : ""}${sequenced.length ? ` · sequência nos dias ${sequenced.join(", ")}` : ""}`,
         before: { value: before }, after: { value: input.value }
       }, client);
-      return { version: updated.rows[0].version, followed: followed.length, busyDays, psychDays, sequenced };
+      return { version: updated.rows[0].version, followed: followed.length, busyDays, psychDays, recessDays, sequenced };
     });
     return Response.json(result);
   } catch (error) {
@@ -278,6 +294,8 @@ export async function PUT(request: Request) {
       if (input.op === "add") {
         const slot = parseSlotKey(`${input.key}|0`);
         if (!slot || !canAddExtra(slot)) throw new AppError("Esta função não aceita posições adicionais.");
+        const recess = recessSet(input.month, await loadRecess(input.month, client));
+        if (recess.has(slot.day)) throw recessError(input.month, slot.day);
         const prefix = `${input.key}|`;
         const used = [...scale.assignments.keys()].filter((k) => k.startsWith(prefix)).map((k) => Number(k.split("|")[4]));
         if (!used.length) throw new AppError("Dia fora desta escala.", 404, "SLOT_NOT_FOUND");

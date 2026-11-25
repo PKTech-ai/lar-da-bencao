@@ -105,6 +105,16 @@ export async function loadPsychOutside(ym: string, db: Db = pool): Promise<Psych
   });
 }
 
+/** Dias de recesso do mês (a casa não abre; ninguém é escalado). */
+export async function loadRecess(ym: string, db: Db = pool): Promise<string[]> {
+  const rows = await db.query<{ date: string }>(
+    `select to_char(recess_date, 'YYYY-MM-DD') as date from app.scale_recess
+      where department_key = 'doutrina' and to_char(recess_date, 'YYYY-MM') = $1 order by recess_date`,
+    [ym]
+  );
+  return rows.rows.map((r) => r.date);
+}
+
 /** Conflitos (mesma data e psicofônico na quarta e na sexta da semana) + posições que deixaram de ser válidas (ex.: trabalhador afastado). */
 export function reviewScale(assignments: ReadonlyMap<string, string>, options: Awaited<ReturnType<typeof loadScaleOptions>>,
   ym: string, outside: readonly PsychBooking[] = []) {

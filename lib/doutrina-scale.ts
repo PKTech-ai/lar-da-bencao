@@ -41,6 +41,14 @@ export const TEMPLATES: Record<number, Section[]> = {
   0: [palestra, mediunica, passe]
 };
 
+/** Dia de recesso: a casa não abre, ninguém é escalado (nem os fixos). Vale para a data inteira, todas as atividades. */
+export const RECESS_LABEL = "RECESSO";
+
+/** Recessos do mês (datas `AAAA-MM-DD`) → números dos dias. */
+export function recessSet(ym: string, dates: readonly string[]) {
+  return new Set(dates.filter((d) => d.slice(0, 7) === ym).map((d) => Number(d.slice(8, 10))));
+}
+
 export type ScaleWorker = { id: string; name: string; functions: readonly string[]; days: readonly number[] };
 export type ScaleSpeaker = { id: string; name: string };
 export type ScaleStudy = { id: string; type: string; code: string; title: string };
@@ -273,9 +281,10 @@ export function supersededFixed(pattern: FixedPattern, worker: ScaleWorker | und
  * ocorrências e já conta na divisão do mês; o restante segue a regra de sempre. Sem fixos, o resultado é o mesmo de antes.
  * `outside`: psicofônicos de quarta e sexta dos meses vizinhos nas semanas que viram o mês (RN-ESC-001).
  * O fixo que cairia na outra reunião da semana em que a pessoa já é psicofônica fica de fora naquele dia.
+ * `closed`: dias de recesso — as posições existem, vazias, e ninguém é escalado nem conta na divisão do mês.
  */
 export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers: readonly ScaleSpeaker[], studies: readonly ScaleStudy[],
-  fixed: ReadonlyMap<string, string> = new Map(), outside: readonly PsychBooking[] = []) {
+  fixed: ReadonlyMap<string, string> = new Map(), outside: readonly PsychBooking[] = [], closed: Pick<ReadonlySet<number>, "has"> = new Set()) {
   const assignments = new Map<string, string>();
   const count = new Map<string, number>();
   const bump = (id: string) => count.set(id, (count.get(id) ?? 0) + 1);
@@ -297,13 +306,19 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
     .map(([key, id]) => ({ pattern: parseFixedKey(key), id }))
     .filter((f): f is { pattern: FixedPattern; id: string } => f.pattern !== null)
     .sort((a, b) => a.pattern.si - b.pattern.si || a.pattern.ri - b.pattern.ri || a.pattern.pos - b.pattern.pos);
-  for (const { pattern, id } of fixedPatterns) monthDays(ym, pattern.dow).forEach(() => bump(id));
+  for (const { pattern, id } of fixedPatterns) monthDays(ym, pattern.dow).filter((day) => !closed.has(day)).forEach(() => bump(id));
   // Psicofônico fixo na sexta não é sorteado para a quarta (e vice-versa): a quarta é preenchida antes da sexta.
   const fixedPsych = new Map<number, Set<string>>([[3, new Set()], [5, new Set()]]);
   for (const { pattern, id } of fixedPatterns) if (isWeeklyPsych(pattern)) fixedPsych.get(pattern.dow)!.add(id);
 
   for (const dow of [0, 1, 3, 4, 5, 6]) {
     for (const day of monthDays(ym, dow)) {
+      if (closed.has(day)) {
+        TEMPLATES[dow].forEach((section, si) => section.r.forEach(([, , min], ri) => {
+          for (let pos = 0; pos < min; pos += 1) assignments.set(slotKey({ dow, si, ri, day, pos }), "");
+        }));
+        continue;
+      }
       const used = new Set<string>();
       const date = slotDate(ym, day);
       // Fixos primeiro, inclusive os de posição adicional.
@@ -339,9 +354,10 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
               continue;
             }
             const psych = isWeeklyPsych({ dow, si, ri });
-            const pairFixed = psych ? fixedPsych.get(dow === 3 ? 5 : 3)! : null;
+            // A outra reunião da semana em recesso não tem fixo para proteger.
+            const pairFixed = psych && !closed.has(dow === 3 ? day + 2 : day - 2) ? fixedPsych.get(dow === 3 ? 5 : 3)! : new Set<string>();
             const pool = workers.filter((w) => eligible(w, type, dow) && !used.has(w.id)
-              && !(psych && (bookedElsewhere(date, w.id) || pairFixed!.has(w.id))));
+              && !(psych && (bookedElsewhere(date, w.id) || pairFixed.has(w.id))));
             const chosen = ordered(pool)[0];
             if (!chosen) {
               assignments.set(key, "");

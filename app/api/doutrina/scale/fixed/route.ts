@@ -4,9 +4,9 @@ import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
-import { insertSlots, loadFixed, loadPsychOutside, loadScale, loadScaleOptions, lockScales, requireDoutrina } from "@/lib/doutrina-data";
+import { insertSlots, loadFixed, loadPsychOutside, loadRecess, loadScale, loadScaleOptions, lockScales, requireDoutrina } from "@/lib/doutrina-data";
 import {
-  TEMPLATES, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, psychInWeek, slotKey, supersededFixed, validateFixed, validateSlotValue
+  TEMPLATES, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, psychInWeek, recessSet, slotKey, supersededFixed, validateFixed, validateSlotValue
 } from "@/lib/doutrina-scale";
 
 /** `month`: escala aberta na tela; o fixo já entra em todas as semanas dela. */
@@ -57,9 +57,11 @@ export async function POST(request: Request) {
       const busyDays: number[] = [];
       const movedDays: number[] = [];
       const psychDays: number[] = [];
+      const recessDays: number[] = [];
       if (input.month && scale?.month && scale.month.status !== "deleted") {
         const value = `w:${worker!.id}`;
         const outside = isWeeklyPsych(pattern) ? await loadPsychOutside(input.month, client) : [];
+        const recess = recessSet(input.month, await loadRecess(input.month, client));
         const current = new Map(scale.assignments);
         const regular: [string, string][] = [];
         const extra: [string, string][] = [];
@@ -70,6 +72,11 @@ export async function POST(request: Request) {
           if (![...current.keys()].some((k) => k.startsWith(prefix))) continue;
           const target = slotKey({ ...pattern, day });
           if (current.get(target) === value) continue;
+          // Recesso: a casa não abre, o fixo não entra.
+          if (recess.has(day)) {
+            recessDays.push(day);
+            continue;
+          }
           if (validateSlotValue(parseSlotKey(target)!, value, { ...options, assignments: current })) {
             busyDays.push(day);
             continue;
@@ -112,7 +119,7 @@ export async function POST(request: Request) {
         details: `${worker!.name} · ${section.n} → ${label}${applied.length ? ` · aplicado em ${input.month}: dias ${applied.join(", ")}` : ""}${movedDays.length ? ` · retirado de outra atividade nos dias ${movedDays.join(", ")}` : ""}${psychDays.length ? ` · fora dos dias ${psychDays.join(", ")} (psicofônico na outra reunião da semana)` : ""}${superseded.length ? ` · deixou de ser fixo em ${superseded.map((r) => r.section_name).join(", ")}` : ""}`,
         before: before ? { worker: before.worker_name } : null, after: { worker: worker!.name }
       }, client);
-      return { id: inserted.rows[0].id, applied: applied.length, busyDays, movedDays, psychDays, replaced: superseded.map((r) => r.section_name) };
+      return { id: inserted.rows[0].id, applied: applied.length, busyDays, movedDays, psychDays, recessDays, replaced: superseded.map((r) => r.section_name) };
     });
     return Response.json(result, { status: 201 });
   } catch (error) {

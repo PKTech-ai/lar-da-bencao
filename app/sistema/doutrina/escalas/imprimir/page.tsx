@@ -4,8 +4,8 @@ import { PrintButton } from "@/components/print-button";
 import { appendAudit } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { departmentCoordinators } from "@/lib/department-coordinators";
-import { loadScale } from "@/lib/doutrina-data";
-import { DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, TEMPLATES, isValidMonth, monthDays, scaleStatusLabel } from "@/lib/doutrina-scale";
+import { loadRecess, loadScale } from "@/lib/doutrina-data";
+import { DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_LABEL, TEMPLATES, isValidMonth, monthDays, recessSet, scaleStatusLabel } from "@/lib/doutrina-scale";
 import { requireModulePage } from "@/lib/page-auth";
 
 const QUOTE = "Trabalhemos juntos e unamos os nossos esforços, a fim de que o Senhor, ao chegar, encontre acabada a obra.";
@@ -21,7 +21,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
   const scale = await loadScale(ym);
   if (!scale.month || scale.month.status === "deleted") notFound();
 
-  const [names, coordinators, contact] = await Promise.all([
+  const [names, coordinators, contact, recessDates] = await Promise.all([
     query<{ ref: string; label: string }>(
       `select 'w:' || id as ref, full_name as label from app.workers
         where id in (select worker_id from app.scale_assignments where scale_month_id = $1 and worker_id is not null)
@@ -34,8 +34,10 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
       [scale.month.id]
     ),
     departmentCoordinators("doutrina"),
-    query<{ phone: string | null }>("select phone from app.department_contacts where department_key = 'doutrina'")
+    query<{ phone: string | null }>("select phone from app.department_contacts where department_key = 'doutrina'"),
+    loadRecess(ym)
   ]);
+  const recess = recessSet(ym, recessDates);
   const label = new Map(names.rows.map((row) => [row.ref, row.label]));
   label.set(FREE_THEME, "TEMA LIVRE");
   await appendAudit(actor, {
@@ -67,6 +69,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
                       <tr key={rowLabel + ri}>
                         <td>{rowLabel}</td>
                         {days.map((day) => {
+                          if (recess.has(day)) return ri ? null : <td key={day} rowSpan={section.r.length} className="recess-cell">{RECESS_LABEL}</td>;
                           const prefix = `${dow}|${si}|${ri}|${day}|`;
                           const values = [...scale.assignments].filter(([k]) => k.startsWith(prefix))
                             .sort(([a], [b]) => Number(a.split("|")[4]) - Number(b.split("|")[4]))

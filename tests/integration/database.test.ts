@@ -312,6 +312,56 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect((await slot(jan, `5|3|2|${fri}|0`)).rows[0].worker_id).toBe(onWed);
   });
 
+  it("recesso: marca o dia, tira quem estava escalado, a geração respeita e dá para tirar", async () => {
+    const scale = await import("@/app/api/doutrina/scale/route");
+    const recess = await import("@/app/api/doutrina/scale/recess/route");
+    const { monthDays } = await import("@/lib/doutrina-scale");
+    const year = 2040 + Math.floor(Math.random() * 40);
+    const ym = `${year}-07`;
+    const day = monthDays(ym, 5)[1];
+    const date = `${ym}-${String(day).padStart(2, "0")}`;
+    await owner(async (client) => {
+      await client.query("delete from app.scale_months where department_key = 'doutrina' and year = $1 and month = 7", [year]);
+      await client.query("delete from app.scale_recess where recess_date between $1::date and $2::date", [`${ym}-01`, `${ym}-31`]);
+    });
+    current.actor = coordinator;
+    expect((await scale.POST(json("POST", { month: ym, action: "generate" }))).status).toBe(200);
+    const onDay = () => query<{ n: number; filled: number }>(
+      `select count(*)::int as n, count(a.worker_id)::int + count(a.speaker_id)::int as filled from app.scale_assignments a
+         join app.scale_months m on m.id = a.scale_month_id where m.department_key = 'doutrina' and m.year = $1 and m.month = 7 and a.work_date = $2::date`,
+      [year, date]);
+    expect((await onDay()).rows[0].filled).toBeGreaterThan(0);
+
+    // Trabalhador comum não marca recesso.
+    current.actor = worker;
+    expect((await recess.PUT(json("PUT", { date, recess: true }))).status).toBe(403);
+    current.actor = coordinator;
+    const marked = await recess.PUT(json("PUT", { date, recess: true }));
+    expect(marked.status).toBe(200);
+    expect((await marked.json()).cleared).toBeGreaterThan(0);
+    expect((await onDay()).rows[0]).toMatchObject({ filled: 0 });
+    const state = await (await scale.GET(json("GET", undefined, `https://app.test/x?month=${ym}`))).json();
+    expect(state.recess).toEqual([date]);
+    expect(state.month.status).toBe("in_review");
+
+    // Gerar de novo não escala ninguém no recesso; a edição é recusada.
+    expect((await scale.POST(json("POST", { month: ym, action: "regenerate", version: state.month.version }))).status).toBe(200);
+    expect((await onDay()).rows[0]).toMatchObject({ filled: 0 });
+    const regenerated = await (await scale.GET(json("GET", undefined, `https://app.test/x?month=${ym}`))).json();
+    const anyWorker = regenerated.options.workers[0].id;
+    const denied = await scale.PATCH(json("PATCH", { month: ym, key: `5|0|0|${day}|0`, value: `w:${anyWorker}`, version: regenerated.month.version }));
+    expect(denied.status).toBe(409);
+
+    // Tirar o recesso: o dia volta com as posições vazias para preencher.
+    expect((await recess.PUT(json("PUT", { date, recess: false }))).status).toBe(200);
+    const after = await (await scale.GET(json("GET", undefined, `https://app.test/x?month=${ym}`))).json();
+    expect(after.recess).toEqual([]);
+    expect((await onDay()).rows[0].n).toBeGreaterThan(0);
+    // Data sem atividade (terça) é recusada.
+    const tuesday = `${ym}-${String(monthDays(ym, 5)[0] + 4).padStart(2, "0")}`;
+    expect((await recess.PUT(json("PUT", { date: tuesday, recess: true }))).status).toBe(400);
+  });
+
   it("Infância: matrícula, turma, chamada e cronograma", async () => {
     const students = await import("@/app/api/evangelizandos/route");
     const attendance = await import("@/app/api/education/[department]/attendance/route");

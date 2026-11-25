@@ -1,7 +1,7 @@
 import type { Actor } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { loadPsychOutside, loadScale, loadScaleOptions, reviewScale } from "@/lib/doutrina-data";
-import { scaleStatusLabel } from "@/lib/doutrina-scale";
+import { loadPsychOutside, loadRecess, loadScale, loadScaleOptions, reviewScale } from "@/lib/doutrina-data";
+import { parseSlotKey, recessSet, scaleStatusLabel } from "@/lib/doutrina-scale";
 import { isFlagEnabled } from "@/lib/feature-flags";
 import { cashboxData } from "@/lib/ingressos/caixa";
 import { roleAllows, ticketRole } from "@/lib/ingressos/acesso";
@@ -166,7 +166,7 @@ export async function painelAssistencia(): Promise<Painel> {
 
 export async function painelDoutrina(): Promise<Painel> {
   const ym = currentMonth();
-  const [numbers, trend, scale, options, outside] = await Promise.all([
+  const [numbers, trend, scale, options, outside, recessDays] = await Promise.all([
     query<{ workers: number; pending: number; public: number }>(
       `select (select count(*)::int from app.workers w join app.worker_departments d on d.worker_id = w.id and d.department_key = 'doutrina' where w.status = 'active') as workers,
               (select count(*)::int from app.workers w join app.worker_departments d on d.worker_id = w.id and d.department_key = 'doutrina' where w.status = 'pending') as pending,
@@ -177,11 +177,14 @@ export async function painelDoutrina(): Promise<Painel> {
          from m order by m.month`),
     loadScale(ym),
     loadScaleOptions(),
-    loadPsychOutside(ym)
+    loadPsychOutside(ym),
+    loadRecess(ym)
   ]);
   const n = numbers.rows[0];
   const active = scale.month && scale.month.status !== "deleted" ? scale.month : null;
-  const empty = active ? [...scale.assignments.values()].filter((v) => !v).length : 0;
+  // Dia de recesso não tem vaga a preencher.
+  const recess = recessSet(ym, recessDays);
+  const empty = active ? [...scale.assignments].filter(([key, v]) => !v && !recess.has(parseSlotKey(key)?.day ?? 0)).length : 0;
   const review = active ? reviewScale(scale.assignments, options, ym, outside) : null;
   const conflicts = review ? review.conflicts.length + review.invalid.length : 0;
   return {

@@ -255,7 +255,8 @@ const route = vi.hoisted(() => ({
   audits: [] as string[],
   canEdit: true,
   fixed: [] as { id: string; key: string; worker_id: string; worker_name: string; section_name: string; role_label: string; created_at: string; created_by_name: string }[],
-  outside: [] as { date: string; workerId: string }[]
+  outside: [] as { date: string; workerId: string }[],
+  recess: [] as string[]
 }));
 
 vi.mock("@/lib/csrf", () => ({ assertSameOrigin: () => undefined }));
@@ -294,6 +295,7 @@ vi.mock("@/lib/doutrina-data", async (importOriginal) => {
     loadFixed: async () => route.fixed,
     lockScales: async () => undefined,
     loadPsychOutside: async () => route.outside,
+    loadRecess: async () => route.recess,
     loadScale: async () => ({ month: route.month, assignments: route.assignments, edited: new Set(), extras: new Set() }),
     insertSlots: async (_: unknown, __: string, ___: string, slots: [string, string][]) => {
       for (const [key, value] of slots) route.assignments.set(key, value);
@@ -390,6 +392,7 @@ describe("API da escala", () => {
     route.canEdit = true;
     route.fixed = [];
     route.outside = [];
+    route.recess = [];
   });
 
   it("gera, recusa gerar duas vezes sem confirmação e regenera", async () => {
@@ -510,11 +513,59 @@ describe("API da escala", () => {
     expect((await normal.json()).followed).toBe(0);
   });
 
+  it("recesso: ninguém é escalado no dia, não conta como vaga e a edição é recusada", async () => {
+    const [first, second] = monthDays("2026-09", 3);
+    const [ana] = team(40);
+    route.recess = [`2026-09-${String(second).padStart(2, "0")}`];
+    route.fixed = [{ id: "f1", key: "3|1|0|0", worker_id: ana.id, worker_name: ana.name, section_name: "ENTREVISTA", role_label: "ENTREV.", created_at: "", created_by_name: "" }];
+    const res = await post({ action: "generate" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.recess).toBe(1);
+    const onRecess = (k: string) => { const s = parseSlotKey(k)!; return s.dow === 3 && s.day === second; };
+    const slots = [...route.assignments].filter(([k]) => onRecess(k));
+    // As posições existem (a folha mostra RECESSO), todas vazias, inclusive a do fixo.
+    expect(slots.length).toBeGreaterThan(5);
+    expect(slots.every(([, v]) => v === "")).toBe(true);
+    expect(route.assignments.get(`3|1|0|${first}|0`)).toBe(`w:${ana.id}`);
+    expect(body.missing).toBe([...route.assignments].filter(([k, v]) => !v && !onRecess(k)).length);
+
+    const refused = await patch({ key: `3|1|0|${second}|0`, value: `w:${ana.id}`, version: route.month!.version });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ code: "RECESS_DAY", error: expect.stringMatching(/^\d{2}\/09 é dia de recesso: a casa não abre e ninguém é escalado/) });
+    const add = await scaleRoute.PUT(new Request("https://app.test/x", { method: "PUT", body: JSON.stringify({ month: "2026-09", op: "add", key: `3|0|0|${second}`, version: route.month!.version }) }));
+    expect(add.status).toBe(409);
+
+    // Adicional repetido nas semanas seguintes pula o recesso.
+    route.assignments.set(`3|0|0|${first}|2`, "");
+    const free = team(40).reverse().find((w) => ![...route.assignments].some(([k, v]) => v === `w:${w.id}` && k.startsWith("3|") && k.split("|")[3] === String(first)))!;
+    const series = await patch({ key: `3|0|0|${first}|2`, value: `w:${free.id}`, version: route.month!.version, series: true });
+    expect(series.status).toBe(200);
+    expect((await series.json()).recessDays).toEqual([second]);
+    expect([...route.assignments].filter(([k, v]) => onRecess(k) && v)).toEqual([]);
+  });
+
   it("exclusão lógica mantém o mês e remove as posições", async () => {
     await post({ action: "generate" });
     expect((await post({ action: "delete", version: route.month!.version })).status).toBe(200);
     expect(route.month!.status).toBe("deleted");
     expect(route.assignments.size).toBe(0);
     expect((await post({ action: "check" })).status).toBe(404);
+  });
+});
+
+describe("recesso na geração", () => {
+  it("o dia fica com as mesmas posições, vazias, e ninguém (nem fixo) é escalado", () => {
+    const workers = team(40);
+    const day = monthDays("2026-10", 5)[1];
+    const fixed = new Map([[fixedKey({ dow: 5, si: 3, ri: 2, pos: 0 }), workers[0].id]]);
+    const normal = buildScale("2026-10", workers, speakers, studies, fixed);
+    const scale = buildScale("2026-10", workers, speakers, studies, fixed, [], new Set([day]));
+    const onDay = (m: Map<string, string>) => [...m].filter(([k]) => parseSlotKey(k)!.dow === 5 && parseSlotKey(k)!.day === day);
+    expect(onDay(scale).map(([k]) => k).sort()).toEqual(onDay(normal).map(([k]) => k).sort());
+    expect(onDay(scale).every(([, v]) => v === "")).toBe(true);
+    // Nas outras sextas o fixo continua.
+    for (const other of monthDays("2026-10", 5).filter((d) => d !== day)) expect(scale.get(slotKey({ dow: 5, si: 3, ri: 2, day: other, pos: 0 }))).toBe(`w:${workers[0].id}`);
+    expect(findConflicts(scale)).toEqual([]);
   });
 });
