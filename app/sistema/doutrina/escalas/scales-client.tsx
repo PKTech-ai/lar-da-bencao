@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMobileDay } from "@/components/mobile-day-columns";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, TEMPLATES, availabilityIndex, canAddExtra, monthDays, parseSlotKey, psychWeekMessage, roleOf, slotAvailability, slotKey,
   type Availability, type Conflict, type PsychBooking, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
@@ -49,13 +49,16 @@ export function ScalesClient() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Só a leitura mais recente vale: uma resposta antiga que chega depois não sobrescreve a nova.
+  const loadSeq = useRef(0);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     const response = await fetch(`/api/doutrina/scale?month=${ym}`, { cache: "no-store" });
     const body = await response.json();
+    if (seq !== loadSeq.current) return;
     if (!response.ok) throw new Error(body.error);
     setData(body);
   }, [ym]);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
   // Volta para a tela: recalcula a disponibilidade com o que outra pessoa mudou nas escalas (inclusive meses vizinhos).
   useEffect(() => {
