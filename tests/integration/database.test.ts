@@ -334,18 +334,29 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
 
     // Trabalhador comum não marca recesso.
     current.actor = worker;
-    expect((await recess.PUT(json("PUT", { date, recess: true }))).status).toBe(403);
+    expect((await recess.PUT(json("PUT", { date, kind: "recesso" }))).status).toBe(403);
     current.actor = coordinator;
-    const marked = await recess.PUT(json("PUT", { date, recess: true }));
+    const marked = await recess.PUT(json("PUT", { date, kind: "recesso" }));
     expect(marked.status).toBe(200);
     expect((await marked.json()).cleared).toBeGreaterThan(0);
     expect((await onDay()).rows[0]).toMatchObject({ filled: 0 });
     const state = await (await scale.GET(json("GET", undefined, `https://app.test/x?month=${ym}`))).json();
-    expect(state.recess).toEqual([date]);
+    expect(state.recess).toEqual([{ date, kind: "recesso" }]);
     expect(state.month.status).toBe("in_review");
 
+    // Trocar o recesso por um evento da casa: o dia continua sem ninguém e só muda o nome.
+    const event = await recess.PUT(json("PUT", { date, kind: "encerramento_evangelizacao" }));
+    expect(event.status).toBe(200);
+    expect(await event.json()).toMatchObject({ kind: "encerramento_evangelizacao", cleared: 0 });
+    const renamed = await (await scale.GET(json("GET", undefined, `https://app.test/x?month=${ym}`))).json();
+    expect(renamed.recess).toEqual([{ date, kind: "encerramento_evangelizacao" }]);
+    expect((await recess.PUT(json("PUT", { date, kind: "festa" }))).status).toBe(400);
+    // O banco só aceita os tipos conhecidos.
+    await expect(owner((client) => client.query("update app.scale_recess set kind = 'festa' where recess_date = $1::date", [date])))
+      .rejects.toMatchObject({ code: "23514" });
+
     // Gerar de novo não escala ninguém no recesso; a edição é recusada.
-    expect((await scale.POST(json("POST", { month: ym, action: "regenerate", version: state.month.version }))).status).toBe(200);
+    expect((await scale.POST(json("POST", { month: ym, action: "regenerate", version: renamed.month.version }))).status).toBe(200);
     expect((await onDay()).rows[0]).toMatchObject({ filled: 0 });
     const regenerated = await (await scale.GET(json("GET", undefined, `https://app.test/x?month=${ym}`))).json();
     const anyWorker = regenerated.options.workers[0].id;
@@ -353,13 +364,13 @@ describe.skipIf(!enabled)("Postgres real (papel de runtime lar_app)", async () =
     expect(denied.status).toBe(409);
 
     // Tirar o recesso: o dia volta com as posições vazias para preencher.
-    expect((await recess.PUT(json("PUT", { date, recess: false }))).status).toBe(200);
+    expect((await recess.PUT(json("PUT", { date, kind: null }))).status).toBe(200);
     const after = await (await scale.GET(json("GET", undefined, `https://app.test/x?month=${ym}`))).json();
     expect(after.recess).toEqual([]);
     expect((await onDay()).rows[0].n).toBeGreaterThan(0);
     // Data sem atividade (terça) é recusada.
     const tuesday = `${ym}-${String(monthDays(ym, 5)[0] + 4).padStart(2, "0")}`;
-    expect((await recess.PUT(json("PUT", { date: tuesday, recess: true }))).status).toBe(400);
+    expect((await recess.PUT(json("PUT", { date: tuesday, kind: "recesso" }))).status).toBe(400);
   });
 
   it("Infância: matrícula, turma, chamada e cronograma", async () => {

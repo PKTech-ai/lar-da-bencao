@@ -5,18 +5,19 @@ import { assertSameOrigin } from "@/lib/csrf";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import { insertSlots, loadScale, lockScales, requireDoutrina } from "@/lib/doutrina-data";
-import { DAY_NAME, TEMPLATES, isValidMonth, parseSlotKey } from "@/lib/doutrina-scale";
+import { DAY_NAME, RECESS_KINDS, RECESS_KIND_KEYS, TEMPLATES, isValidMonth, parseSlotKey } from "@/lib/doutrina-scale";
 
 const schema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
-  /** `true` marca o recesso; `false` tira. */
-  recess: z.boolean()
+  /** Recesso ou evento da casa; `null` volta o dia para a escala normal. */
+  kind: z.enum(RECESS_KIND_KEYS).nullable()
 });
 
 /**
- * Marca ou tira o recesso de uma data da escala.
- * Com a escala do mês aberta, o dia fica sem ninguém: adicionais saem e as demais posições ficam vazias.
- * Tirar o recesso deixa as posições vazias para preencher (ou "Gerar novamente").
+ * Escolhe o que acontece numa data da escala: escala normal, recesso ou evento da casa (encerramento da
+ * evangelização, confraternização). Recesso e eventos deixam o dia sem ninguém: com a escala do mês aberta,
+ * adicionais saem e as demais posições ficam vazias. Trocar um pelo outro só muda o nome do dia.
+ * Voltar para a escala normal deixa as posições vazias para preencher (ou "Gerar novamente").
  */
 export async function PUT(request: Request) {
   try {
@@ -34,10 +35,16 @@ export async function PUT(request: Request) {
 
     const result = await transaction(async (client) => {
       await lockScales(client);
-      const before = await client.query("select 1 from app.scale_recess where department_key = 'doutrina' and recess_date = $1::date", [input.date]);
-      if ((before.rowCount ?? 0) > 0 === input.recess) return { recess: input.recess, cleared: 0 };
-      if (input.recess) {
-        await client.query("insert into app.scale_recess (recess_date, created_by) values ($1::date, $2)", [input.date, actor.id]);
+      const before = await client.query<{ kind: string }>(
+        "select kind from app.scale_recess where department_key = 'doutrina' and recess_date = $1::date", [input.date]);
+      const previous = before.rows[0]?.kind ?? null;
+      if (previous === input.kind) return { kind: input.kind, cleared: 0 };
+      if (input.kind) {
+        await client.query(
+          `insert into app.scale_recess (recess_date, kind, created_by) values ($1::date, $2, $3)
+           on conflict (department_key, recess_date) do update set kind = excluded.kind`,
+          [input.date, input.kind, actor.id]
+        );
       } else {
         await client.query("delete from app.scale_recess where department_key = 'doutrina' and recess_date = $1::date", [input.date]);
       }
@@ -45,7 +52,8 @@ export async function PUT(request: Request) {
       let cleared = 0;
       const scale = await loadScale(ym, client, true);
       if (scale.month && scale.month.status !== "deleted") {
-        if (input.recess) {
+        // Só quem sai da escala normal precisa esvaziar o dia; entre recesso e evento ele já está vazio.
+        if (input.kind && !previous) {
           const keys = [...scale.assignments.keys()].filter((k) => { const s = parseSlotKey(k); return s?.dow === dow && s.day === day; });
           const extras = keys.filter((k) => scale.extras.has(k));
           const filled = keys.filter((k) => !scale.extras.has(k) && scale.assignments.get(k));
@@ -59,13 +67,14 @@ export async function PUT(request: Request) {
           [scale.month.id, actor.id]
         );
       }
+      const name = (kind: string | null) => (kind ? RECESS_KINDS[kind as keyof typeof RECESS_KINDS]?.option ?? kind : "Escala normal");
       await appendAudit(actor, {
-        category: input.recess ? "Inclusão" : "Exclusão",
-        action: input.recess ? "Recesso marcado na escala" : "Recesso retirado da escala",
+        category: input.kind ? (previous ? "Edição" : "Inclusão") : "Exclusão",
+        action: input.kind ? `Dia sem escala marcado: ${name(input.kind)}` : `Dia sem escala retirado: ${name(previous)}`,
         module: "Doutrina", section: "Escala mensal", entityType: "scale_recess", entityId: input.date,
-        details: `${shown} · ${DAY_NAME[dow]}${cleared ? ` · ${cleared} pessoa(s) retirada(s) do dia` : ""}`
+        details: `${shown} · ${DAY_NAME[dow]}${previous && input.kind ? ` · antes: ${name(previous)}` : ""}${cleared ? ` · ${cleared} pessoa(s) retirada(s) do dia` : ""}`
       }, client);
-      return { recess: input.recess, cleared };
+      return { kind: input.kind, cleared };
     });
     return Response.json(result);
   } catch (error) {

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useMobileDay } from "@/components/mobile-day-columns";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_LABEL, TEMPLATES, availabilityIndex, canAddExtra, monthDays, parseSlotKey, psychWeekMessage, recessSet, roleOf,
-  slotAvailability, slotKey,
-  type Availability, type Conflict, type PsychBooking, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
+  DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_KINDS, RECESS_KIND_KEYS, TEMPLATES, availabilityIndex, canAddExtra, monthDays, parseSlotKey, psychRuleDay,
+  psychWeekMessage, recessKinds, recessSet, roleOf, slotAvailability, slotKey,
+  type Availability, type Conflict, type PsychBooking, type RecessDay, type RecessKind, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
 type Payload = {
@@ -20,8 +20,8 @@ type Payload = {
   fixed: { id: string; key: string; worker_id: string; worker_name: string; section_name: string; role_label: string }[];
   /** Psicofônicos de quarta e sexta dos meses vizinhos nas semanas que viram o mês. */
   outside: PsychBooking[];
-  /** Datas de recesso do mês (`AAAA-MM-DD`). */
-  recess: string[];
+  /** Dias sem escala do mês (recesso ou evento da casa). */
+  recess: RecessDay[];
 };
 
 type Choice = { value: string; label: string; tone?: Availability["color"]; availability?: Availability };
@@ -98,7 +98,7 @@ export function ScalesClient() {
         const skipped = (body.skipped as string[] | undefined) ?? [];
         const psychSkipped = (body.psychSkipped as string[] | undefined) ?? [];
         return `Escala gerada: ${body.added} posição(ões), ${body.missing} vaga(s) pendente(s), ${body.fixed ?? 0} fixo(s) mantido(s).`
-          + (Number(body.recess) ? ` ${body.recess} dia(s) de recesso ficaram sem ninguém escalado.` : "")
+          + (Number(body.recess) ? ` ${body.recess} dia(s) de recesso ou evento ficaram sem ninguém escalado.` : "")
           + (skipped.length ? ` Fixos que não valem mais (afastados ou sem a função/dia na ficha): ${skipped.join("; ")}.` : " Confira funções e trabalhadores.")
           + (psychSkipped.length ? ` Fixos que ficaram de fora por já serem psicofônicos na outra reunião da semana: ${psychSkipped.join("; ")}.` : "");
       }
@@ -132,6 +132,7 @@ export function ScalesClient() {
   const workerName = useMemo(() => new Map((data?.options.workers ?? []).map((w) => [w.id, w.name])), [data]);
   const fixedByKey = useMemo(() => new Map((data?.fixed ?? []).map((f) => [f.key, f])), [data]);
   const recess = useMemo(() => recessSet(ym, data?.recess ?? []), [ym, data]);
+  const recessKind = useMemo(() => recessKinds(ym, data?.recess ?? []), [ym, data]);
   // Fixos marcados depois da última geração ainda não aparecem em todas as semanas do mês.
   const fixedPending = useMemo(() => (data?.fixed ?? []).filter((f) => {
     const [fdow, fsi, fri, fpos] = f.key.split("|").map(Number);
@@ -142,16 +143,16 @@ export function ScalesClient() {
     });
   }).length, [data, byKey, ym, recess]);
 
-  /** Recesso: a casa não abre na data e ninguém é escalado (o dia inteiro, todas as atividades). */
-  function toggleRecess(day: number, on: boolean) {
+  /** Dia sem escala: recesso ou evento da casa. Ninguém é escalado na data (o dia inteiro, todas as atividades). */
+  function setDayKind(day: number, kind: RecessKind | null) {
     const shown = `${String(day).padStart(2, "0")}/${ym.slice(5)}`;
-    if (on) {
+    if (kind && !recess.has(day)) {
       const people = [...byKey].filter(([k, v]) => { const s = parseSlotKey(k); return s?.day === day && s.dow === dow && /^[ws]:/.test(v); }).length;
-      if (people && !window.confirm(`Marcar ${shown} como recesso? ${people} pessoa(s) escalada(s) nesse dia sairão da escala.`)) return;
+      if (people && !window.confirm(`Marcar ${shown} como ${RECESS_KINDS[kind].option}? Nesse dia ninguém é escalado: ${people} pessoa(s) escalada(s) sairão da escala.`)) return;
     }
-    void call("PUT", { date: `${ym}-${String(day).padStart(2, "0")}`, recess: on }, (body) => on
-      ? `${shown} marcado como recesso: ninguém é escalado nesse dia.${Number(body.cleared) ? ` ${body.cleared} pessoa(s) saíram da escala do dia.` : ""}`
-      : `Recesso de ${shown} retirado.${active ? " Preencha as posições do dia ou use “Gerar novamente”." : ""}`, "/api/doutrina/scale/recess");
+    void call("PUT", { date: `${ym}-${String(day).padStart(2, "0")}`, kind }, (body) => kind
+      ? `${shown} marcado como ${RECESS_KINDS[kind].option}: ninguém é escalado nesse dia.${Number(body.cleared) ? ` ${body.cleared} pessoa(s) saíram da escala do dia.` : ""}`
+      : `${shown} voltou para a escala normal.${active ? " Preencha as posições do dia ou use “Gerar novamente”." : ""}`, "/api/doutrina/scale/recess");
   }
 
   function togglePin(patternKey: string, current: string) {
@@ -173,7 +174,7 @@ export function ScalesClient() {
         + (moved ? ` No(s) dia(s) ${moved} saiu da outra atividade em que estava: escolha quem fica no lugar.` : "")
         + (skipped ? ` Fora do(s) dia(s) ${skipped}: indisponível na ficha.` : "")
         + (psych ? ` Fora do(s) dia(s) ${psych}: já é psicofônico na outra reunião mediúnica da semana.` : "")
-        + (recessed ? ` Fora do(s) dia(s) ${recessed}: recesso.` : "");
+        + (recessed ? ` Fora do(s) dia(s) ${recessed}: recesso ou evento.` : "");
     }, "/api/doutrina/scale/fixed");
   }
 
@@ -224,7 +225,7 @@ export function ScalesClient() {
       const recessed = days(body.recessDays);
       const note = (busy ? ` Fora do(s) dia(s) ${busy}: já escalado em outra atividade.` : "")
         + (psych ? ` Fora do(s) dia(s) ${psych}: já é psicofônico na outra reunião mediúnica da semana.` : "")
-        + (recessed ? ` Fora do(s) dia(s) ${recessed}: recesso.` : "") + heads;
+        + (recessed ? ` Fora do(s) dia(s) ${recessed}: recesso ou evento.` : "") + heads;
       const sequenced = (body.sequenced as number[] | undefined) ?? [];
       if (sequenced.length) return `Escala atualizada. Os dias ${days(sequenced)} receberam os roteiros seguintes, em sequência.${heads}`;
       return Number(body.followed) ? `Adicional repetido em ${body.followed} semana(s) seguinte(s).${note}` : `Escala atualizada.${note}`;
@@ -235,7 +236,7 @@ export function ScalesClient() {
   const dates = monthDays(ym, dow);
   // Celular: uma data por vez (a de hoje ou a última que já passou no mês).
   const todayKey = currentMonth() === ym ? String(Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()).slice(8))).padStart(2, "0") : "00";
-  const mobile = useMobileDay(dates.map((d) => ({ key: String(d).padStart(2, "0"), label: `${String(d).padStart(2, "0")}/${ym.slice(5)}${recess.has(d) ? " · recesso" : ""}` })), todayKey);
+  const mobile = useMobileDay(dates.map((d) => ({ key: String(d).padStart(2, "0"), label: `${String(d).padStart(2, "0")}/${ym.slice(5)}${recessKind.has(d) ? ` · ${RECESS_KINDS[recessKind.get(d)!].short}` : ""}` })), todayKey);
 
   return (
     <div className="grid">
@@ -250,11 +251,15 @@ export function ScalesClient() {
         </div>
         {data?.canEdit && dates.length ? (
           <fieldset className="recess-days">
-            <legend>Recesso nesta folha (a casa não abre e ninguém é escalado no dia)</legend>
+            <legend>Dia especial nesta folha (recesso ou evento: ninguém é escalado no dia)</legend>
             {dates.map((day) => (
-              <label key={day} className="check-inline">
-                <input type="checkbox" checked={recess.has(day)} disabled={busy} onChange={(e) => toggleRecess(day, e.target.checked)} />
+              <label key={day}>
                 {String(day).padStart(2, "0")}/{ym.slice(5)}
+                <select value={recessKind.get(day) ?? ""} disabled={busy}
+                  onChange={(e) => setDayKind(day, (e.target.value || null) as RecessKind | null)}>
+                  <option value="">Escala normal</option>
+                  {RECESS_KIND_KEYS.map((k) => <option key={k} value={k}>{RECESS_KINDS[k].option}</option>)}
+                </select>
               </label>
             ))}
           </fieldset>
@@ -329,7 +334,9 @@ export function ScalesClient() {
           {mobile.picker}
           {data?.canEdit ? (
             <p className="small muted no-print scale-legend">
-              Ao escolher: 🟢 disponível · 🔵 já é psicofônico na quarta ou na sexta desta semana (não pode ser psicofônico na outra reunião) · 🔴 já escalado em outra função nesta data
+              {psychRuleDay(dow)
+                ? "Ao escolher: 🟢 disponível · 🔵 já é psicofônico na quarta ou na sexta desta semana (não pode ser psicofônico na outra reunião) · 🔴 já escalado em outra função nesta data"
+                : "Ao escolher: 🟢 disponível · 🔴 já escalado em outra função nesta data. A regra do psicofônico vale só para quarta e sexta: neste dia, todos os médiuns podem ser escalados conforme o dia disponível na ficha."}
             </p>
           ) : null}
           <div className="sheet-title">CENTRO ESPÍRITA FILANTRÓPICO LAR DA BÊNÇÃO</div>
@@ -345,8 +352,9 @@ export function ScalesClient() {
                       <tr key={label + ri}>
                         <td>{label}</td>
                         {dates.map((day) => {
-                          if (recess.has(day)) {
-                            return ri ? null : <td key={day} data-day={String(day).padStart(2, "0")} rowSpan={section.r.length} className="recess-cell">{RECESS_LABEL}</td>;
+                          const closed = recessKind.get(day);
+                          if (closed) {
+                            return ri ? null : <td key={day} data-day={String(day).padStart(2, "0")} rowSpan={section.r.length} className="recess-cell">{RECESS_KINDS[closed].sheet}</td>;
                           }
                           const prefix = `${dow}|${si}|${ri}|${day}|`;
                           const keys = [...byKey.keys()].filter((k) => k.startsWith(prefix)).sort((a, b) => Number(a.split("|")[4]) - Number(b.split("|")[4]));

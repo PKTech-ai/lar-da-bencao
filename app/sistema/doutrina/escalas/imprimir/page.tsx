@@ -5,7 +5,7 @@ import { appendAudit } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { departmentCoordinators } from "@/lib/department-coordinators";
 import { loadRecess, loadScale } from "@/lib/doutrina-data";
-import { DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_LABEL, TEMPLATES, isValidMonth, monthDays, recessSet, scaleStatusLabel } from "@/lib/doutrina-scale";
+import { DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_KINDS, TEMPLATES, isValidMonth, monthDays, recessKinds, scaleStatusLabel } from "@/lib/doutrina-scale";
 import { requireModulePage } from "@/lib/page-auth";
 
 const QUOTE = "Trabalhemos juntos e unamos os nossos esforços, a fim de que o Senhor, ao chegar, encontre acabada a obra.";
@@ -37,7 +37,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
     query<{ phone: string | null }>("select phone from app.department_contacts where department_key = 'doutrina'"),
     loadRecess(ym)
   ]);
-  const recess = recessSet(ym, recessDates);
+  const recess = recessKinds(ym, recessDates);
   const label = new Map(names.rows.map((row) => [row.ref, row.label]));
   label.set(FREE_THEME, "TEMA LIVRE");
   await appendAudit(actor, {
@@ -69,7 +69,8 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
                       <tr key={rowLabel + ri}>
                         <td>{rowLabel}</td>
                         {days.map((day) => {
-                          if (recess.has(day)) return ri ? null : <td key={day} rowSpan={section.r.length} className="recess-cell">{RECESS_LABEL}</td>;
+                          const closed = recess.get(day);
+                          if (closed) return ri ? null : <td key={day} rowSpan={section.r.length} className="recess-cell">{RECESS_KINDS[closed].sheet}</td>;
                           const prefix = `${dow}|${si}|${ri}|${day}|`;
                           const values = [...scale.assignments].filter(([k]) => k.startsWith(prefix))
                             .sort(([a], [b]) => Number(a.split("|")[4]) - Number(b.split("|")[4]))

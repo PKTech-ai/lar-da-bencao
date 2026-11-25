@@ -8,8 +8,8 @@ import {
   assertMonthVersion, canEditDoutrina, insertSlots, loadFixed, loadPsychOutside, loadRecess, loadScale, loadScaleOptions, lockScales, requireDoutrina, reviewScale
 } from "@/lib/doutrina-data";
 import {
-  buildScale, canAddExtra, isExtraPosition, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, recessSet, roleOf,
-  scaleStatusLabel, slotAvailability, slotKey, studySequence, validateFixed, validateSlotChoice, type ScaleStatus
+  RECESS_KINDS, buildScale, canAddExtra, isExtraPosition, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, recessKinds, recessSet, roleOf,
+  scaleStatusLabel, slotAvailability, slotKey, studySequence, validateFixed, validateSlotChoice, type RecessDay, type ScaleStatus
 } from "@/lib/doutrina-scale";
 
 const monthSchema = z.string().refine(isValidMonth, "Mês inválido.");
@@ -36,9 +36,12 @@ const extraSchema = z.object({
 
 const noStore = { "Cache-Control": "private, no-store" };
 
-/** Dia de recesso: ninguém é escalado. */
-function recessError(ym: string, day: number) {
-  return new AppError(`${String(day).padStart(2, "0")}/${ym.slice(5)} é dia de recesso: a casa não abre e ninguém é escalado. Para escalar, tire o recesso do dia.`, 409, "RECESS_DAY");
+/** Dia sem escala (recesso ou evento da casa): ninguém é escalado. */
+function recessError(ym: string, day: number, days: readonly RecessDay[]) {
+  const kind = recessKinds(ym, days).get(day) ?? "recesso";
+  const shown = `${String(day).padStart(2, "0")}/${ym.slice(5)}`;
+  const what = kind === "recesso" ? "dia de recesso: a casa não abre" : `dia de ${RECESS_KINDS[kind].option}: não há escala`;
+  return new AppError(`${shown} é ${what} e ninguém é escalado. Para escalar, escolha “Escala normal” para o dia.`, 409, "RECESS_DAY");
 }
 const audit = (section: string) => ({ module: "Doutrina", section, entityType: "scale_month" });
 
@@ -62,7 +65,7 @@ export async function GET(request: Request) {
       fixed,
       /** Psicofônicos de quarta e sexta dos meses vizinhos nas semanas que viram o mês (RN-ESC-001). */
       outside,
-      /** Dias de recesso do mês. */
+      /** Dias sem escala do mês (recesso ou evento da casa), com o tipo. */
       recess
     }, { headers: noStore });
   } catch (error) {
@@ -210,8 +213,9 @@ export async function PATCH(request: Request) {
       if (!scale.month || scale.month.status === "deleted") throw new AppError("Não há escala ativa neste mês.", 404, "SCALE_NOT_FOUND");
       assertMonthVersion(scale.month, input.version);
       if (!scale.assignments.has(input.key)) throw new AppError("Posição inexistente nesta escala.", 404, "SLOT_NOT_FOUND");
-      const recess = recessSet(input.month, await loadRecess(input.month, client));
-      if (input.value && recess.has(slot.day)) throw recessError(input.month, slot.day);
+      const closed = await loadRecess(input.month, client);
+      const recess = recessSet(input.month, closed);
+      if (input.value && recess.has(slot.day)) throw recessError(input.month, slot.day, closed);
       const options = await loadScaleOptions(client);
       const outside = await loadPsychOutside(input.month, client);
       // Ninguém em duas funções na mesma data; psicofônico só numa das reuniões (quarta ou sexta) da semana.
@@ -294,8 +298,8 @@ export async function PUT(request: Request) {
       if (input.op === "add") {
         const slot = parseSlotKey(`${input.key}|0`);
         if (!slot || !canAddExtra(slot)) throw new AppError("Esta função não aceita posições adicionais.");
-        const recess = recessSet(input.month, await loadRecess(input.month, client));
-        if (recess.has(slot.day)) throw recessError(input.month, slot.day);
+        const closed = await loadRecess(input.month, client);
+        if (recessSet(input.month, closed).has(slot.day)) throw recessError(input.month, slot.day, closed);
         const prefix = `${input.key}|`;
         const used = [...scale.assignments.keys()].filter((k) => k.startsWith(prefix)).map((k) => Number(k.split("|")[4]));
         if (!used.length) throw new AppError("Dia fora desta escala.", 404, "SLOT_NOT_FOUND");

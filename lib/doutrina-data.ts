@@ -7,7 +7,7 @@ import { requireFlag } from "@/lib/feature-flags";
 import { assertModule, hasModule } from "@/lib/permissions";
 import {
   findConflicts, isWeeklyPsych, monthWeekRange, parseSlotKey, roleOf, slotDate, validateSlotValue,
-  type PsychBooking, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
+  type PsychBooking, type RecessDay, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
 type Db = Pick<PoolClient, "query">;
@@ -105,14 +105,14 @@ export async function loadPsychOutside(ym: string, db: Db = pool): Promise<Psych
   });
 }
 
-/** Dias de recesso do mês (a casa não abre; ninguém é escalado). */
-export async function loadRecess(ym: string, db: Db = pool): Promise<string[]> {
-  const rows = await db.query<{ date: string }>(
-    `select to_char(recess_date, 'YYYY-MM-DD') as date from app.scale_recess
+/** Dias sem escala do mês: recesso ou evento da casa (ninguém é escalado). */
+export async function loadRecess(ym: string, db: Db = pool): Promise<RecessDay[]> {
+  const rows = await db.query<RecessDay>(
+    `select to_char(recess_date, 'YYYY-MM-DD') as date, kind from app.scale_recess
       where department_key = 'doutrina' and to_char(recess_date, 'YYYY-MM') = $1 order by recess_date`,
     [ym]
   );
-  return rows.rows.map((r) => r.date);
+  return rows.rows.map((r) => ({ date: r.date, kind: r.kind }));
 }
 
 /** Conflitos (mesma data e psicofônico na quarta e na sexta da semana) + posições que deixaram de ser válidas (ex.: trabalhador afastado). */

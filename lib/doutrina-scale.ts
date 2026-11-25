@@ -41,12 +41,30 @@ export const TEMPLATES: Record<number, Section[]> = {
   0: [palestra, mediunica, passe]
 };
 
-/** Dia de recesso: a casa não abre, ninguém é escalado (nem os fixos). Vale para a data inteira, todas as atividades. */
-export const RECESS_LABEL = "RECESSO";
+/**
+ * Dia sem escala, escolhido data a data na tela: recesso (a casa não abre) ou um evento da casa que toma o lugar das
+ * atividades do dia. Em todos, ninguém é escalado (nem os fixos) na data inteira, e a folha mostra o nome do dia.
+ * O banco aceita só estas chaves (migração 202611251800_escala_dia_especial.sql).
+ */
+export const RECESS_KINDS = {
+  recesso: { sheet: "RECESSO", option: "Recesso (a casa não abre)", short: "recesso" },
+  encerramento_evangelizacao: { sheet: "ENCERRAMENTO DA EVANGELIZAÇÃO", option: "Encerramento da Evangelização", short: "encerramento da evangelização" },
+  confraternizacao: { sheet: "CONFRATERNIZAÇÃO DOS TRABALHADORES — CAFÉ DA MANHÃ", option: "Confraternização dos trabalhadores — café da manhã", short: "confraternização" }
+} as const;
+export type RecessKind = keyof typeof RECESS_KINDS;
+export const RECESS_KIND_KEYS = Object.keys(RECESS_KINDS) as [RecessKind, ...RecessKind[]];
 
-/** Recessos do mês (datas `AAAA-MM-DD`) → números dos dias. */
-export function recessSet(ym: string, dates: readonly string[]) {
-  return new Set(dates.filter((d) => d.slice(0, 7) === ym).map((d) => Number(d.slice(8, 10))));
+/** Dia sem escala gravado: data `AAAA-MM-DD` e o tipo. */
+export type RecessDay = { date: string; kind: RecessKind };
+
+/** Dias sem escala do mês → números dos dias. */
+export function recessSet(ym: string, days: readonly RecessDay[]) {
+  return new Set(days.filter((d) => d.date.slice(0, 7) === ym).map((d) => Number(d.date.slice(8, 10))));
+}
+
+/** Dias sem escala do mês → tipo de cada dia (para o nome na folha). */
+export function recessKinds(ym: string, days: readonly RecessDay[]) {
+  return new Map(days.filter((d) => d.date.slice(0, 7) === ym).map((d) => [Number(d.date.slice(8, 10)), d.kind] as const));
 }
 
 export type ScaleWorker = { id: string; name: string; functions: readonly string[]; days: readonly number[] };
@@ -181,10 +199,15 @@ export function psychInWeek(ym: string, slot: Slot, workerId: string, context: S
 /** Verde: disponível. Azul: já é psicofônico na quarta ou sexta da semana. Vermelho: já escalado em outra função na data. */
 export type Availability = { color: "green" | "blue" | "red"; blocked: boolean; note: string; message: string };
 
+/** Folhas em que a RN-ESC-001 aparece (quarta e sexta). Nos outros dias (domingo, segunda...) o médium é escalado só pela ficha. */
+export function psychRuleDay(dow: number) {
+  return dow === 3 || dow === 5;
+}
+
 /**
  * Disponibilidade de um trabalhador para uma posição, olhando a escala aberta e os meses vizinhos.
  * Bloqueia duas funções na mesma data (qualquer atividade) e o psicofônico na quarta e na sexta da mesma semana.
- * Nas demais funções o azul só informa.
+ * Nas demais funções da quarta e da sexta o azul só informa; nos outros dias não há azul.
  */
 export function slotAvailability(ym: string, slot: Slot, workerId: string, context: ScaleContext,
   index: AvailabilityIndex = availabilityIndex(ym, context)): Availability {
@@ -198,7 +221,7 @@ export function slotAvailability(ym: string, slot: Slot, workerId: string, conte
       message: `Este trabalhador já está escalado em ${where} nesta data. Ninguém exerce duas funções na mesma data: tire-o de lá antes.`
     };
   }
-  const booked = psychInWeek(ym, slot, workerId, context, index);
+  const booked = psychRuleDay(slot.dow) ? psychInWeek(ym, slot, workerId, context, index) : null;
   if (booked) {
     const info = `psicofônico em ${shortDate(booked.date)} (${DAY_NAME[dowOf(booked.date)]}) · MEDIÚNICA → PSICOF.`;
     if (isWeeklyPsych(slot)) return { color: "blue", blocked: true, note: info, message: psychWeekMessage(booked.date) };

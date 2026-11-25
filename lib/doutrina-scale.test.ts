@@ -188,6 +188,14 @@ describe("RN-ESC-001 — exclusividade semanal do psicofônico", () => {
     const sunday = { assignments: new Map([["0|1|2|6|0", wx]]) };
     expect(slotAvailability("2026-08", parseSlotKey("3|7|2|26|0")!, x.id, { assignments: new Map([["1|0|2|24|0", wx]]) })).toMatchObject({ color: "green" });
     expect(slotAvailability("2026-09", parseSlotKey("5|3|2|4|0")!, x.id, sunday)).toMatchObject({ color: "green" });
+    // E o contrário: quem é psicofônico na quarta ou na sexta fica verde no domingo e na segunda (só a ficha conta).
+    const weekday = { assignments: new Map([["3|7|2|2|0", wx], ["0|1|2|6|0", ""], ["0|2|1|6|0", ""], ["0|0|0|6|0", ""]]) };
+    for (const key of ["0|1|2|6|0", "0|2|1|6|0", "0|0|0|6|0"]) {
+      expect(slotAvailability("2026-09", parseSlotKey(key)!, x.id, weekday)).toMatchObject({ color: "green", blocked: false, note: "", message: "" });
+    }
+    const friday = { assignments: new Map([["5|3|2|4|0", wx], ["0|1|2|6|0", ""]]) };
+    expect(slotAvailability("2026-09", parseSlotKey("0|1|2|6|0")!, x.id, friday)).toMatchObject({ color: "green" });
+    expect(validateSlotChoice("2026-09", parseSlotKey("0|1|2|6|0")!, wx, { ...friday, workers, speakers, studies })).toBeNull();
   });
 
   it("vale entre meses: quarta 30/12/2026 bloqueia a sexta 01/01/2027 e vice-versa", () => {
@@ -256,7 +264,7 @@ const route = vi.hoisted(() => ({
   canEdit: true,
   fixed: [] as { id: string; key: string; worker_id: string; worker_name: string; section_name: string; role_label: string; created_at: string; created_by_name: string }[],
   outside: [] as { date: string; workerId: string }[],
-  recess: [] as string[]
+  recess: [] as { date: string; kind: "recesso" | "encerramento_evangelizacao" | "confraternizacao" }[]
 }));
 
 vi.mock("@/lib/csrf", () => ({ assertSameOrigin: () => undefined }));
@@ -516,7 +524,7 @@ describe("API da escala", () => {
   it("recesso: ninguém é escalado no dia, não conta como vaga e a edição é recusada", async () => {
     const [first, second] = monthDays("2026-09", 3);
     const [ana] = team(40);
-    route.recess = [`2026-09-${String(second).padStart(2, "0")}`];
+    route.recess = [{ date: `2026-09-${String(second).padStart(2, "0")}`, kind: "recesso" }];
     route.fixed = [{ id: "f1", key: "3|1|0|0", worker_id: ana.id, worker_name: ana.name, section_name: "ENTREVISTA", role_label: "ENTREV.", created_at: "", created_by_name: "" }];
     const res = await post({ action: "generate" });
     expect(res.status).toBe(200);
@@ -533,6 +541,12 @@ describe("API da escala", () => {
     const refused = await patch({ key: `3|1|0|${second}|0`, value: `w:${ana.id}`, version: route.month!.version });
     expect(refused.status).toBe(409);
     expect(await refused.json()).toMatchObject({ code: "RECESS_DAY", error: expect.stringMatching(/^\d{2}\/09 é dia de recesso: a casa não abre e ninguém é escalado/) });
+    // Evento da casa no lugar do recesso: mesma trava, com o nome do evento.
+    route.recess = [{ date: `2026-09-${String(second).padStart(2, "0")}`, kind: "confraternizacao" }];
+    const party = await patch({ key: `3|1|0|${second}|0`, value: `w:${ana.id}`, version: route.month!.version });
+    expect(party.status).toBe(409);
+    expect((await party.json()).error).toMatch(/^\d{2}\/09 é dia de Confraternização dos trabalhadores — café da manhã: não há escala e ninguém é escalado\. Para escalar, escolha “Escala normal”/);
+    route.recess = [{ date: `2026-09-${String(second).padStart(2, "0")}`, kind: "recesso" }];
     const add = await scaleRoute.PUT(new Request("https://app.test/x", { method: "PUT", body: JSON.stringify({ month: "2026-09", op: "add", key: `3|0|0|${second}`, version: route.month!.version }) }));
     expect(add.status).toBe(409);
 

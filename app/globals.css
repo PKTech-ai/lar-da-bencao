@@ -300,7 +300,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .scale-legend { margin: 0 0 8px; }
 .recess-days { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; padding: 8px 12px; border: 1px solid var(--border-soft); border-radius: 8px; }
 .recess-days legend { font-size: 13px; font-weight: 700; padding: 0 4px; }
-.scale-sheet td.recess-cell { text-align: center; vertical-align: middle; font-weight: 700; letter-spacing: .12em; color: var(--blue-900); background: var(--blue-100); }
+.recess-days label { gap: 4px; font-size: 13px; min-width: 0; }
+.recess-days select { max-width: 100%; }
+.scale-sheet td.recess-cell { text-align: center; vertical-align: middle; font-weight: 700; letter-spacing: .06em; color: var(--blue-900); background: var(--blue-100); }
 .slot-extra { display: flex; gap: 4px; align-items: flex-start; }
 .link-button { background: none; border: 0; color: var(--blue-800); font-weight: 700; cursor: pointer; padding: 2px 0; font-size: 12px; }
 .library { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; }
