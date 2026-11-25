@@ -233,7 +233,12 @@ export function StudyLibrary({ department }: { department: Department }) {
                       <td>{s.reference ?? "—"}</td>
                       <td>
                         {s.attachment_id && s.attachment_status === "active"
-                          ? <a className="button" href={`/api/attachments/${s.attachment_id}/download`}>Baixar</a>
+                          ? (
+                            <div className="row-actions">
+                              <a className="button" href={`/api/attachments/${s.attachment_id}/download?inline=1`} target="_blank" rel="noopener noreferrer">Abrir</a>
+                              <a className="link-button" href={`/api/attachments/${s.attachment_id}/download`}>Baixar</a>
+                            </div>
+                          )
                           : s.attachment_id ? <span className="small">{s.attachment_status}</span> : s.links ? null : "—"}
                         {s.links ? (
                           <div className="row-actions" title="Abre no OneDrive">

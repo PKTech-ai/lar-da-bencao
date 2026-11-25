@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
-import { INTERNAL_CHECK_ENGINE, INTERNAL_CHECK_MIME_TYPES, authorizeAttachment, uploadTokenHash, verifyImageStructure } from "@/lib/attachments";
+import {
+  INTERNAL_CHECK_ENGINE, INTERNAL_CHECK_MIME_TYPES, authorizeAttachment, internalPdfCheckAllowed, uploadTokenHash, verifyImageStructure, verifyPdfStructure
+} from "@/lib/attachments";
 import { transaction } from "@/lib/db";
 import { serverEnv } from "@/lib/env";
 import { AppError, errorResponse } from "@/lib/errors";
@@ -18,7 +20,7 @@ const verdictSchema = z.object({ clean: z.boolean(), engine: z.string().max(100)
 
 /**
  * Antivírus externo primeiro. Se ele não responder (fora do ar, endereço inválido, demora ou resposta estranha),
- * fotos JPG/PNG passam pela conferência interna; os demais tipos ficam sem anexar. Quando o antivírus responde
+ * fotos JPG/PNG e PDFs das Bibliotecas de Estudos passam pela conferência interna; os demais tipos ficam sem anexar. Quando o antivírus responde
  * "não limpo", o arquivo vai para a quarentena (nunca cai na conferência interna).
  */
 async function inspect(attachment: Attachment, body: Buffer<ArrayBuffer>): Promise<Verdict> {
@@ -44,7 +46,11 @@ async function inspect(attachment: Attachment, body: Buffer<ArrayBuffer>): Promi
     verifyImageStructure(attachment.mime_type, body);
     return { clean: true, engine: INTERNAL_CHECK_ENGINE };
   }
-  throw new AppError("O antivírus não respondeu, por isso este arquivo não foi anexado. Fotos em JPG ou PNG continuam sendo aceitas.", 503, "MALWARE_SCAN_UNAVAILABLE");
+  if (internalPdfCheckAllowed(attachment.owner_type, attachment.mime_type)) {
+    verifyPdfStructure(body);
+    return { clean: true, engine: INTERNAL_CHECK_ENGINE };
+  }
+  throw new AppError("O antivírus não respondeu, por isso este arquivo não foi anexado. Fotos em JPG ou PNG (e PDFs da Biblioteca de Estudos) continuam sendo aceitos.", 503, "MALWARE_SCAN_UNAVAILABLE");
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {

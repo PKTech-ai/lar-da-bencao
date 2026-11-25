@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { inflateSync } from "node:zlib";
 import type { Actor } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
 import { authorizeServiceOrderFiles } from "@/lib/ordens-servico";
@@ -66,6 +67,66 @@ export function verifyImageStructure(mime: string, bytes: Uint8Array) {
     : mime === "image/png" ? tail(0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82)
     : false;
   if (!complete) throw new AppError("Esta imagem está incompleta ou não é uma foto JPG/PNG. Tire outra foto ou escolha outra imagem.", 415, "INVALID_FILE_SIGNATURE");
+}
+
+/** PDFs que passam pela conferência interna quando o antivírus não responde: só material das Bibliotecas de Estudos. */
+export function internalPdfCheckAllowed(ownerType: string, mime: string) {
+  return mime === "application/pdf" && ownerType.startsWith("study_material_");
+}
+
+/** Nomes de PDF que executam algo, embutem arquivos, enviam dados ou escondem o conteúdo da conferência. */
+const PDF_BLOCKED_NAMES = new Set([
+  "JavaScript", "JS", "Launch", "EmbeddedFile", "EmbeddedFiles", "RichMedia", "XFA", "SubmitForm", "ImportData", "GoToE", "Encrypt"
+]);
+const PDF_NAME = /\/([^\s/[\]<>(){}%]+)/g;
+const PDF_STREAM = />>\s*stream\r?\n/g;
+
+/** `/J#61vaScript` é o mesmo nome que `/JavaScript`. */
+const decodePdfNames = (text: string) => text.replace(/#([0-9a-fA-F]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+
+function blockedPdfName(text: string) {
+  for (const [, raw] of text.matchAll(PDF_NAME)) {
+    const name = decodePdfNames(raw);
+    if (PDF_BLOCKED_NAMES.has(name)) return name;
+  }
+  return null;
+}
+
+/**
+ * Conferência interna de PDF (antivírus fora do ar): arquivo PDF completo, sem JavaScript, ação de abrir programa,
+ * arquivo embutido, formulário que envia dados nem criptografia. Os dicionários guardados em fluxos de objetos
+ * (/ObjStm) são descompactados e conferidos também; um fluxo de objetos ilegível recusa o arquivo.
+ */
+export function verifyPdfStructure(bytes: Uint8Array) {
+  validateSignature("application/pdf", bytes);
+  const text = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("latin1");
+  const refuse = (detail: string): never => {
+    throw new AppError(`Este PDF não passou na conferência interna (${detail}). Salve o arquivo de novo como PDF simples e tente outra vez.`, 415, "PDF_INTERNAL_CHECK_FAILED");
+  };
+  if (!text.slice(-1024).includes("%%EOF")) refuse("arquivo incompleto");
+  const visible: string[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(PDF_STREAM)) {
+    const start = match.index! + match[0].length;
+    if (start < cursor) continue;
+    const end = text.indexOf("endstream", start);
+    if (end < 0) refuse("fluxo sem fim");
+    const header = text.slice(cursor, start);
+    visible.push(header);
+    const dictionary = decodePdfNames(header.slice(Math.max(0, header.lastIndexOf("obj"))));
+    if (/\/Type\s*\/ObjStm\b/.test(dictionary)) {
+      if (!/\/Filter\s*\[?\s*\/FlateDecode\s*\]?/.test(dictionary)) refuse("fluxo de objetos sem compressão conhecida");
+      try {
+        visible.push(inflateSync(Buffer.from(text.slice(start, end).replace(/\r?\n$/, ""), "latin1")).toString("latin1"));
+      } catch {
+        refuse("fluxo de objetos ilegível");
+      }
+    }
+    cursor = end + "endstream".length;
+  }
+  visible.push(text.slice(cursor));
+  const blocked = blockedPdfName(visible.join("\n"));
+  if (blocked) refuse(`contém /${blocked}`);
 }
 
 export function attachmentPermission(ownerType: string) {

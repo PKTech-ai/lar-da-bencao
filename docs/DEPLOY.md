@@ -35,7 +35,11 @@ Se o `ANTIMALWARE_API_URL` não responder (fora do ar, endereço inválido, demo
 - **Fotos JPG/PNG** passam pela conferência interna (`verifyImageStructure`: começo e fim de imagem completa) e
   ficam ativas com `scan_engine = 'conferencia-interna'`. O Dedo-duro registra "conferência interna (antivírus indisponível)".
   Quando houver antivírus, essas fotos podem ser reinspecionadas filtrando por esse `scan_engine`.
-- **Demais tipos** (PDF, áudio, extrato, Word) não são anexados: a tela avisa que o antivírus não respondeu.
+- **PDFs das Bibliotecas de Estudos** (`study_material_*`, enviados por quem pode editar a biblioteca) passam pela
+  conferência interna de PDF (`verifyPdfStructure`): arquivo completo e sem JavaScript, ação de abrir programa, arquivo
+  embutido, formulário que envia dados ou criptografia (os fluxos de objetos são descompactados e conferidos também).
+  Ficam com o mesmo `scan_engine = 'conferencia-interna'`, para reinspeção quando houver antivírus.
+- **Demais tipos** (PDF fora da biblioteca, áudio, extrato, Word) não são anexados: a tela avisa que o antivírus não respondeu.
 - Se o antivírus responder "não limpo", o arquivo vai para a quarentena; a conferência interna nunca é usada nesse caso.
 
 ## 1. Banco e Auth (Supabase)
