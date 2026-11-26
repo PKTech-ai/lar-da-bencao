@@ -10,6 +10,7 @@ import { CULTO_HOURS } from "@/lib/doutrina-extras";
 import { brDate } from "@/lib/monthly-saturdays";
 import { DAY_HOURS, DAY_NAME, DOW_ORDER, RECESS_KINDS, TEMPLATES, isValidMonth, monthDays, recessKinds, rowOrder, scaleStatusLabel, themeLabel } from "@/lib/doutrina-scale";
 import { requireModulePage } from "@/lib/page-auth";
+import { SharePdfButton } from "./share-pdf-button";
 import { SheetFit } from "./sheet-fit";
 
 const QUOTE = "Trabalhemos juntos e unamos os nossos esforços, a fim de que o Senhor, ao chegar, encontre acabada a obra.";
@@ -36,12 +37,13 @@ const PRINT_CSS = `
 .scale-print h3 { margin: 0 0 ${s(2)}; padding: ${s(4)} ${s(8)}; background: #e9edf2; border-radius: 6px; font-size: ${s(11.5)}; line-height: 1.3; letter-spacing: .02em; color: #14212b; break-after: avoid; }
 .scale-print table { min-width: 0; width: 100%; table-layout: fixed; border-collapse: collapse; background: none; }
 .scale-print col.sp-label { width: ${s(100)}; }
-.scale-print th, .scale-print td { position: static; padding: ${s(3)} ${s(6)}; font-size: ${s(11.5)}; line-height: 1.25; color: #14212b; background: none; border-bottom: 1px solid #dde2e7; vertical-align: top; overflow-wrap: anywhere; }
-.scale-print th { font-size: ${s(10.5)}; font-weight: 600; color: #56636d; }
-.scale-print tbody tr:nth-child(even) td, .scale-print tbody tr:hover td { background: none; }
+/* ":root ... table" vence as regras de tabela do tema escuro: a folha fica sempre branca com letra escura (tela, impressão e PDF). */
+:root .scale-print table th, :root .scale-print table td { position: static; padding: ${s(3)} ${s(6)}; font-size: ${s(11.5)}; line-height: 1.25; color: #14212b; background: none; border-bottom: 1px solid #dde2e7; vertical-align: top; overflow-wrap: anywhere; }
+:root .scale-print table th { font-size: ${s(10.5)}; font-weight: 600; color: #56636d; }
+:root .scale-print tbody tr:nth-child(even) td, :root .scale-print tbody tr:hover td { background: none; }
 .scale-print td:first-child { font-weight: 700; }
 .scale-print tr { break-inside: avoid; page-break-inside: avoid; }
-.scale-print td.sp-recess { text-align: center; vertical-align: middle; font-weight: 700; letter-spacing: .06em; background: #eef0f3; }
+:root .scale-print tbody tr td.sp-recess { text-align: center; vertical-align: middle; font-weight: 700; letter-spacing: .06em; background: #eef0f3; }
 .scale-print .sp-ref { margin-top: 1px; font-size: ${s(10)}; line-height: 1.25; color: #56636d; }
 .scale-print .sp-foot { margin-top: ${s(8)}; font-size: ${s(11)}; line-height: 1.35; color: #14212b; }
 .scale-print .sp-foot p { margin: 0; }
@@ -50,6 +52,12 @@ const PRINT_CSS = `
   .scale-print .sp-day { overflow-x: auto; padding: 14px; }
   .scale-print .sp-frame { min-width: 720px; }
 }
+/* Palco do PDF (botão PDF para WhatsApp): fora da tela, na largura da folha, com o estilo da impressão. */
+.scale-print.sp-pdf { position: fixed; left: -10000px; top: 0; width: 281mm; display: block; pointer-events: none; }
+.scale-print.sp-pdf .sp-day { padding: 0; border-radius: 0; overflow: visible; }
+.scale-print.sp-pdf .sp-frame { width: 281mm; min-width: 0; }
+/* O desenho do PDF não conhece algarismos de largura fixa; sem isto sobra espaço depois do "1" (21 :00). */
+.scale-print.sp-pdf, .scale-print.sp-pdf * { font-variant-numeric: normal; }
 @media print {
   .scale-print { display: block; }
   .scale-print .sp-day { padding: 0; border-radius: 0; }
@@ -92,7 +100,11 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
     category: "Impressão", action: dows.length > 1 ? "Impressão da escala mensal consolidada" : "Impressão de folha da escala",
     module: "Doutrina", section: "Escala mensal", entityType: "scale_month", entityId: scale.month.id, details: `${ym}${dows.length === 1 ? ` · ${DAY_NAME[dows[0]]}` : ""}`
   });
-  const monthLabel = new Date(`${ym}-01T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }).toUpperCase();
+  const monthName = new Date(`${ym}-01T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+  const monthLabel = monthName.toUpperCase();
+  // Nome do PDF como aparece no WhatsApp: "Escala Quarta-feira - Dezembro de 2026.pdf" ou "Escala Doutrina - …" (mês todo).
+  const titleCase = (text: string) => text.toLowerCase().replace(/(^|\s)(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toUpperCase()).replace(/ De /g, " de ");
+  const pdfName = `Escala ${dows.length === 1 ? titleCase(DAY_NAME[dows[0]]) : "Doutrina"} - ${titleCase(monthName)}.pdf`;
   const footer = (
     <div className="sp-foot">
       <p>Responsável: {coordinators.join(" / ") || "Não informado"} · Contato: {contact.rows[0]?.phone || "Não informado"}</p>
@@ -104,7 +116,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
     <>
       <header className="module-section-head no-print">
         <div><h2>Impressão da escala</h2><p>{scaleStatusLabel[scale.month.status]}</p></div>
-        <div className="row-actions"><Link className="button" href="/sistema/doutrina/escalas">Voltar</Link><PrintButton /></div>
+        <div className="row-actions"><Link className="button" href="/sistema/doutrina/escalas">Voltar</Link><PrintButton /><SharePdfButton fileName={pdfName} title={`Escala de trabalhadores — ${monthName}`} /></div>
       </header>
       <div className="scale-print">
         <style>{PRINT_CSS}</style>
@@ -118,7 +130,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
             return (
               <div key={section.n + si}>
                 <h3>{section.n}</h3>
-                <table>
+                <table data-grid>
                   <colgroup><col className="sp-label" />{days.map((day) => <col key={day} />)}</colgroup>
                   <thead><tr><th>DIAS</th>{days.map((day) => <th key={day}>{String(day).padStart(2, "0")}</th>)}</tr></thead>
                   <tbody>
@@ -148,7 +160,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
           if (dow === 6) blocks.push(
             <div key="culto">
               <h3>CULTO NO LAR DOS TRABALHADORES — PENÚLTIMO SÁBADO · HORÁRIO: {CULTO_HOURS.toUpperCase()}</h3>
-              <table>
+              <table data-grid>
                 <colgroup><col className="sp-label" /><col /><col /><col /></colgroup>
                 <thead><tr><th>DATA</th><th>TRABALHADOR (LAR)</th><th>DIRIGENTE</th><th>EXPOSITOR</th></tr></thead>
                 <tbody>
