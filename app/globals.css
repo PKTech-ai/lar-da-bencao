@@ -619,8 +619,8 @@ table.visual-table .small { font-size: 13px; color: var(--muted); }
 @media print { .os-cards { display: none !important; } }
 
 /* Escala da Doutrina — trabalhadores fixos */
-.fixed-panel > summary { cursor: pointer; list-style: none; min-height: 32px; }
-.fixed-panel > summary::-webkit-details-marker { display: none; }
+.fixed-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.fixed-panel-head .button { flex: 0 0 auto; }
 .fixed-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
 .fixed-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
 .scale-sheet .slot-with-pin { display: flex; align-items: center; gap: 2px; }

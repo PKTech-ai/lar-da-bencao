@@ -80,6 +80,17 @@ export function ScalesClient() {
   const [busy, setBusy] = useState(false);
   /** Tema da palestra sendo digitado (posição e texto). */
   const [typing, setTyping] = useState<{ key: string; text: string } | null>(null);
+  /** Quadro dos trabalhadores fixos aberto ou recolhido (começa recolhido; lembra a escolha neste aparelho). */
+  const [fixedOpen, setFixedOpen] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem("escala-fixos-aberto") === "1") setFixedOpen(true); } catch { /* sem armazenamento */ }
+  }, []);
+  function toggleFixed() {
+    setFixedOpen((open) => {
+      try { localStorage.setItem("escala-fixos-aberto", open ? "0" : "1"); } catch { /* sem armazenamento */ }
+      return !open;
+    });
+  }
 
   // Só a leitura mais recente vale: uma resposta antiga que chega depois não sobrescreve a nova.
   const loadSeq = useRef(0);
@@ -340,9 +351,15 @@ export function ScalesClient() {
       {message ? <div className="success" role="status">{message}</div> : null}
 
       {data && (data.fixed.length || data.canEdit) ? (
-        <details className="card no-print fixed-panel" open={data.fixed.length > 0}>
-          <summary><strong>📌 Trabalhadores fixos ({data.fixed.length})</strong>
-            {fixedPending ? <span className="small"> · {fixedPending} ainda fora desta escala: use “Gerar novamente”</span> : null}</summary>
+        <section className="card no-print fixed-panel">
+          <div className="fixed-panel-head">
+            <span><strong>📌 Trabalhadores fixos ({data.fixed.length})</strong>
+              {fixedPending ? <span className="small"> · {fixedPending} ainda fora desta escala: use “Gerar novamente”</span> : null}</span>
+            <button type="button" className="button" aria-expanded={fixedOpen} aria-controls="fixed-panel-body" onClick={toggleFixed}>
+              {fixedOpen ? "Recolher ▴" : "Expandir ▾"}
+            </button>
+          </div>
+          {fixedOpen ? <div id="fixed-panel-body">
           <p className="small muted">O fixo fica na mesma função em todas as semanas, em toda escala gerada, até ser desmarcado.
             Para marcar, toque no 📍 ao lado do nome na folha do dia.</p>
           {data.fixed.length ? (
@@ -355,7 +372,8 @@ export function ScalesClient() {
               ))}
             </ul>
           ) : <p className="small">Nenhum trabalhador fixo.</p>}
-        </details>
+          </div> : null}
+        </section>
       ) : null}
 
       {data?.review && (data.review.conflicts.length || data.review.invalid.length) ? (
