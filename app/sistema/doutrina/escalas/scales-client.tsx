@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useMobileDay } from "@/components/mobile-day-columns";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_KINDS, RECESS_KIND_KEYS, TEMPLATES, availabilityIndex, canAddExtra, monthDays, parseSlotKey, psychRuleDay,
-  psychWeekMessage, recessKinds, recessSet, roleOf, slotAvailability, slotKey,
+  DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_KINDS, RECESS_KIND_KEYS, TEMPLATES, THEME_MAX, availabilityIndex, canAddExtra, monthDays, parseSlotKey, psychRuleDay,
+  psychWeekMessage, recessKinds, recessSet, roleOf, slotAvailability, slotKey, typedThemeText, typedThemeValue,
   type Availability, type Conflict, type PsychBooking, type RecessDay, type RecessKind, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
@@ -24,7 +24,29 @@ type Payload = {
   recess: RecessDay[];
 };
 
-type Choice = { value: string; label: string; tone?: Availability["color"]; availability?: Availability };
+/** `group`: título do bloco na lista (optgroup), na ordem em que aparece. */
+type Choice = { value: string; label: string; tone?: Availability["color"]; availability?: Availability; group?: string };
+
+/** Opção da lista do tema da palestra que abre a caixa para digitar (não é gravada). */
+const TYPE_THEME = "__digitar__";
+const PALESTRA_GROUP = "Temas de palestra";
+const ESE_GROUP = "O Evangelho Segundo o Espiritismo — roteiros";
+const studyLabel = (s: ScaleStudy) => `${s.code ? `${s.code} — ` : ""}${s.title}`;
+const sameText = (a: string, b: string) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }) === 0;
+
+/** Opções da lista, com os blocos (optgroup) na ordem em que aparecem. */
+function renderChoices(choices: Choice[], current: string) {
+  const option = (o: Choice) => <option key={o.value} value={o.value} className={o.tone && o.value !== current ? `opt-${o.tone}` : undefined}>{o.label}</option>;
+  const out: ReactNode[] = [];
+  for (let i = 0; i < choices.length;) {
+    const group = choices[i].group;
+    if (!group) { out.push(option(choices[i])); i += 1; continue; }
+    const items: Choice[] = [];
+    while (i < choices.length && choices[i].group === group) items.push(choices[i++]);
+    out.push(<optgroup key={group} label={group}>{items.map(option)}</optgroup>);
+  }
+  return out;
+}
 
 const ICON: Record<Availability["color"], string> = { green: "🟢", blue: "🔵", red: "🔴" };
 const fmtDate = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}`;
@@ -51,6 +73,8 @@ export function ScalesClient() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  /** Tema da palestra sendo digitado (posição e texto). */
+  const [typing, setTyping] = useState<{ key: string; text: string } | null>(null);
 
   // Só a leitura mais recente vale: uma resposta antiga que chega depois não sobrescreve a nova.
   const loadSeq = useRef(0);
@@ -196,9 +220,15 @@ export function ScalesClient() {
       return { value, label: `${flag}${w.name}${suffix}${note}`, tone: availability.color, availability };
     };
     if (type === "STUDY") {
-      if (section.s === "PALESTRA") list.push({ value: FREE_THEME, label: "TEMA LIVRE" });
-      data.options.studies.filter((s) => s.type === section.s).forEach((s) => list.push({ value: `t:${s.id}`, label: `${s.code ? `${s.code} — ` : ""}${s.title}` }));
-      return list;
+      const studies = (kind: string, group?: string): Choice[] =>
+        data.options.studies.filter((s) => s.type === kind).map((s) => ({ value: `t:${s.id}`, label: studyLabel(s), group }));
+      if (section.s !== "PALESTRA") return studies(section.s ?? "");
+      // Palestra pública: tema livre, tema digitado (ou buscado pelo título), temas de palestra e roteiros do ESE.
+      const typed = typedThemeText(current);
+      list.push({ value: FREE_THEME, label: "TEMA LIVRE" });
+      if (typed !== null) list.push({ value: current, label: `✎ ${typed}` });
+      list.push({ value: TYPE_THEME, label: "✎ Digitar ou buscar o tema…" });
+      return [...list, ...studies("PALESTRA", PALESTRA_GROUP), ...studies("ESE", ESE_GROUP)];
     }
     if (type === "SPEAKER") {
       data.options.workers.filter((w) => w.functions.includes("Palestrante")).forEach((w) => list.push(worker(w, " (INT.)")));
@@ -232,6 +262,23 @@ export function ScalesClient() {
     });
   }
 
+  /**
+   * Tema digitado da palestra: o título de um roteiro (ou tema de palestra) sugerido na lista vira o próprio estudo;
+   * "tema livre" vira Tema Livre; qualquer outro texto é gravado como digitado.
+   */
+  function saveTyped(key: string, current: string, choices: Choice[]) {
+    const text = (typing?.text ?? "").replace(/\s+/g, " ").trim();
+    const study = choices.find((c) => c.group && sameText(c.label, text));
+    const value = study ? study.value : sameText(text, "Tema Livre") ? FREE_THEME : typedThemeValue(text);
+    if (!value) {
+      setMessage("");
+      setError(`Digite o tema com 2 a ${THEME_MAX} letras, ou escolha um roteiro do ESE na lista.`);
+      return;
+    }
+    setTyping(null);
+    if (value !== current) choose(key, value, choices);
+  }
+
   const readOnly = !data?.canEdit || !active || busy;
   const dates = monthDays(ym, dow);
   // Celular: uma data por vez (a de hoje ou a última que já passou no mês).
@@ -242,9 +289,9 @@ export function ScalesClient() {
     <div className="grid">
       <section className="card no-print">
         <div className="form-row">
-          <label>Mês<input type="month" value={ym} onChange={(e) => e.target.value && setYm(e.target.value)} /></label>
+          <label>Mês<input type="month" value={ym} onChange={(e) => { if (e.target.value) { setYm(e.target.value); setTyping(null); } }} /></label>
           <label>Folha
-            <select value={dow} onChange={(e) => setDow(Number(e.target.value))}>
+            <select value={dow} onChange={(e) => { setDow(Number(e.target.value)); setTyping(null); }}>
               {DOW_ORDER.map((d) => <option key={d} value={d}>{DAY_NAME[d]}</option>)}
             </select>
           </label>
@@ -341,6 +388,13 @@ export function ScalesClient() {
           ) : null}
           <div className="sheet-title">CENTRO ESPÍRITA FILANTRÓPICO LAR DA BÊNÇÃO</div>
           <div className="sheet-sub">ESCALA DE TRABALHADORES — {DAY_NAME[dow]} — {ym.split("-").reverse().join("/")} · HORÁRIO: {DAY_HOURS[dow]}</div>
+          {typing ? (
+            /* Sugestões da caixa do tema digitado: ao digitar parte do título ou o número, aparecem os roteiros do ESE. */
+            <datalist id="palestra-temas">
+              <option value="Tema Livre" />
+              {(data?.options.studies ?? []).filter((s) => s.type === "PALESTRA" || s.type === "ESE").map((s) => <option key={s.id} value={studyLabel(s)} />)}
+            </datalist>
+          ) : null}
           {TEMPLATES[dow].map((section, si) => (
             <div key={section.n + si}>
               <h3>{section.n}</h3>
@@ -378,12 +432,28 @@ export function ScalesClient() {
                                     {pinned ? "📌" : "📍"}
                                   </button>
                                 ) : pinned ? <span className="pin-button is-pinned" title={`${pinned.worker_name} é fixo`}>📌</span> : null;
+                                if (typing?.key === key && !readOnly) {
+                                  return (
+                                    <form className="slot-with-pin theme-typing" key={key} onSubmit={(e) => { e.preventDefault(); saveTyped(key, current, choices); }}>
+                                      <input autoFocus list="palestra-temas" value={typing.text} maxLength={THEME_MAX} enterKeyHint="done"
+                                        placeholder="Digite o tema ou busque o roteiro" aria-label={`Tema digitado — ${describeSlot(key, ym)}`}
+                                        onChange={(e) => setTyping({ key, text: e.target.value })}
+                                        onKeyDown={(e) => { if (e.key === "Escape") setTyping(null); }} />
+                                      <button type="submit" className="button primary" title="Gravar o tema">OK</button>
+                                      <button type="button" className="slot-remove" title="Cancelar" aria-label="Cancelar o tema digitado" onClick={() => setTyping(null)}>×</button>
+                                    </form>
+                                  );
+                                }
                                 const select = (
                                   <select key={key} aria-label={describeSlot(key, ym)} className={cls} value={current} disabled={readOnly}
-                                    title={duplicateKeys.has(key) ? "Duplicidade: escalado mais de uma vez neste dia" : psychClash ? occupant!.message : occupant?.color === "blue" ? occupant.message : undefined}
-                                    onChange={(e) => choose(key, e.target.value, choices)}>
+                                    title={duplicateKeys.has(key) ? "Duplicidade: escalado mais de uma vez neste dia" : psychClash ? occupant!.message : occupant?.color === "blue" ? occupant.message
+                                      : roleOf({ dow, si, ri }).type === "STUDY" ? choices.find((c) => c.value === current)?.label : undefined}
+                                    onChange={(e) => {
+                                      if (e.target.value === TYPE_THEME) setTyping({ key, text: typedThemeText(current) ?? "" });
+                                      else choose(key, e.target.value, choices);
+                                    }}>
                                     <option value="">— selecionar —</option>
-                                    {choices.map((o) => <option key={o.value} value={o.value} className={o.tone && o.value !== current ? `opt-${o.tone}` : undefined}>{o.label}</option>)}
+                                    {renderChoices(choices, current)}
                                   </select>
                                 );
                                 const remove = readOnly ? null : extras.has(key) ? (

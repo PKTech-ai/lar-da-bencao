@@ -8,7 +8,7 @@ import {
   assertMonthVersion, canEditDoutrina, insertSlots, loadFixed, loadPsychOutside, loadRecess, loadScale, loadScaleOptions, lockScales, requireDoutrina, reviewScale
 } from "@/lib/doutrina-data";
 import {
-  RECESS_KINDS, buildScale, canAddExtra, isExtraPosition, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, recessKinds, recessSet, roleOf,
+  RECESS_KINDS, THEME_MAX, buildScale, canAddExtra, isExtraPosition, isValidMonth, isWeeklyPsych, monthDays, parseFixedKey, parseSlotKey, recessKinds, recessSet, roleOf,
   scaleStatusLabel, slotAvailability, slotKey, studySequence, validateFixed, validateSlotChoice, type RecessDay, type ScaleStatus
 } from "@/lib/doutrina-scale";
 
@@ -21,7 +21,8 @@ const actionSchema = z.object({
 const slotSchema = z.object({
   month: monthSchema,
   key: z.string().max(40),
-  value: z.string().max(60),
+  /** Pessoa, estudo ou tema (o tema digitado da palestra pública tem até THEME_MAX caracteres). */
+  value: z.string().max(THEME_MAX + 10),
   version: z.number().int().positive(),
   /** Posição adicional: o trabalhador escolhido segue para as semanas seguintes do mês. */
   series: z.boolean().optional()
@@ -256,8 +257,9 @@ export async function PATCH(request: Request) {
         }
       }
       // Roteiro numerado: os dias seguintes da mesma linha recebem os próximos números.
+      // Na palestra pública cada dia tem o seu tema (mesmo quando é um roteiro do ESE): não há sequência.
       const sequenced: number[] = [];
-      if (roleOf(slot).type === "STUDY" && input.value.startsWith("t:")) {
+      if (roleOf(slot).type === "STUDY" && roleOf(slot).section.s !== "PALESTRA" && input.value.startsWith("t:")) {
         const days = monthDays(input.month, slot.dow).filter((d) => d > slot.day && !recess.has(d) && scale.assignments.has(slotKey({ ...slot, day: d })));
         const rows = studySequence(options.studies, input.value.slice(2), days.length)
           .map((study, i): [string, string] => [slotKey({ ...slot, day: days[i] }), `t:${study.id}`]);

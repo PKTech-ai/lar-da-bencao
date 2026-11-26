@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { attendanceStats, isValidAttendanceCell } from "@/lib/doutrina-attendance";
 import {
-  FREE_THEME, TEMPLATES, buildScale, canAddExtra, findConflicts, fixedKey, isWeeklyPsych, monthDays, monthWeekRange, parseFixedKey, parseSlotKey, psychWeekMessage,
+  FREE_THEME, TEMPLATES, THEME_MAX, buildScale, themeLabel, typedThemeText, typedThemeValue, canAddExtra, findConflicts, fixedKey, isWeeklyPsych, monthDays, monthWeekRange, parseFixedKey, parseSlotKey, psychWeekMessage,
   roleOf, slotAvailability, slotKey, studySequence, supersededFixed, validateFixed, validateSlotChoice, validateSlotValue, weekStart, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
@@ -135,6 +135,37 @@ describe("conferência e edição manual", () => {
     expect(validateSlotValue(parseSlotKey("5|1|2|4|0")!, FREE_THEME, context)).toBeNull();
     expect(validateSlotValue(parseSlotKey("3|2|2|2|0")!, FREE_THEME, context)).toMatch(/incompatível/);
     expect(validateSlotValue(parseSlotKey("3|0|0|2|0")!, "", context)).toBeNull();
+  });
+
+  it("tema da palestra pública: tema livre, tema de palestra, roteiro do ESE ou tema digitado", () => {
+    const context = { assignments: new Map(), workers: team(1), speakers, studies };
+    for (const tema of ["5|1|2|4|0", "0|0|2|6|0"]) { // sexta e domingo
+      const slot = parseSlotKey(tema)!;
+      expect(validateSlotValue(slot, FREE_THEME, context)).toBeNull();
+      expect(validateSlotValue(slot, `t:${uuid(801)}`, context)).toBeNull(); // tema de palestra
+      expect(validateSlotValue(slot, `t:${uuid(800)}`, context)).toBeNull(); // roteiro do ESE
+      expect(validateSlotValue(slot, `t:${uuid(802)}`, context)).toMatch(/incompatível/); // MEP não
+      expect(validateSlotValue(slot, "txt:A caridade segundo Paulo", context)).toBeNull();
+      expect(validateSlotValue(slot, "txt:a", context)).toMatch(/2 a 120/);
+      expect(validateSlotValue(slot, `txt:${"x".repeat(THEME_MAX + 1)}`, context)).toMatch(/2 a 120/);
+      expect(validateSlotValue(slot, "txt: espaço sobrando ", context)).toMatch(/2 a 120/);
+    }
+    // Fora da palestra nada muda: tema digitado e roteiro do ESE no ESDE/MEP continuam recusados.
+    expect(validateSlotValue(parseSlotKey("3|2|2|2|0")!, "txt:Tema qualquer", context)).toMatch(/incompatível/);
+    expect(validateSlotValue(parseSlotKey("3|5|2|2|0")!, `t:${uuid(800)}`, context)).toMatch(/incompatível/);
+    expect(validateSlotValue(parseSlotKey("4|0|2|3|0")!, `t:${uuid(800)}`, context)).toMatch(/incompatível/);
+    expect(validateSlotValue(parseSlotKey("3|2|2|2|0")!, `t:${uuid(800)}`, context)).toBeNull(); // ESE da quarta
+  });
+
+  it("tema digitado: limpa espaços e recusa o curto, o longo e caractere de controle", () => {
+    expect(typedThemeValue("  A   caridade\n segundo Paulo ")).toBe("txt:A caridade segundo Paulo");
+    expect(typedThemeValue("a")).toBeNull();
+    expect(typedThemeValue("x".repeat(THEME_MAX + 1))).toBeNull();
+    expect(typedThemeValue(`tema${String.fromCharCode(1)}oculto`)).toBeNull();
+    expect(typedThemeText("txt:Perdão")).toBe("Perdão");
+    expect(themeLabel(FREE_THEME)).toBe("TEMA LIVRE");
+    expect(themeLabel("txt:Perdão")).toBe("Perdão");
+    expect(themeLabel(`t:${uuid(800)}`)).toBeNull();
   });
 
   it("posições adicionais só onde o mock permite", () => {

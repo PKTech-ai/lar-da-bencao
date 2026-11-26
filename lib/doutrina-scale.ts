@@ -74,6 +74,36 @@ export type Slot = { dow: number; si: number; ri: number; day: number; pos: numb
 
 export const FREE_THEME = "free:Tema Livre";
 
+/**
+ * Tema da palestra pública digitado na tela (`txt:<texto>`). O banco aceita o mesmo formato
+ * (migração 202611261200_tema_palestra.sql): até THEME_MAX caracteres, sem quebra de linha.
+ */
+export const TYPED_THEME = "txt:";
+export const THEME_MAX = 120;
+
+/** Texto digitado → valor gravado (`txt:...`), ou null quando curto, longo demais ou com caractere de controle. */
+export function typedThemeValue(text: string): string | null {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length < 2 || clean.length > THEME_MAX || /[\u0000-\u001f\u007f]/.test(clean)) return null;
+  return `${TYPED_THEME}${clean}`;
+}
+
+/** Texto de um tema digitado; null para os demais valores. */
+export function typedThemeText(value: string) {
+  return value.startsWith(TYPED_THEME) ? value.slice(TYPED_THEME.length) : null;
+}
+
+/** Nome na folha dos temas que não vêm do cadastro de estudos (tema livre e tema digitado). */
+export function themeLabel(value: string) {
+  if (value === FREE_THEME) return "TEMA LIVRE";
+  return typedThemeText(value);
+}
+
+/** Na palestra pública o tema pode vir dos temas de palestra ou dos roteiros do ESE. */
+export function themeStudyTypes(section: Pick<Section, "s">): readonly string[] {
+  return section.s === "PALESTRA" ? ["PALESTRA", "ESE"] : section.s ? [section.s] : [];
+}
+
 export function slotKey(slot: Slot) {
   return `${slot.dow}|${slot.si}|${slot.ri}|${slot.day}|${slot.pos}`;
 }
@@ -463,9 +493,13 @@ export function validateSlotValue(
   if (!value) return null;
   const { section, type } = roleOf(slot);
   if (type === "STUDY") {
-    if (value === FREE_THEME && section.s === "PALESTRA") return null;
+    if (section.s === "PALESTRA") {
+      if (value === FREE_THEME) return null;
+      const text = typedThemeText(value);
+      if (text !== null) return typedThemeValue(text) === value ? null : `Tema digitado inválido: use de 2 a ${THEME_MAX} caracteres.`;
+    }
     const study = value.startsWith("t:") ? context.studies.find((s) => s.id === value.slice(2)) : undefined;
-    return study && study.type === section.s ? null : "Estudo incompatível com esta atividade.";
+    return study && themeStudyTypes(section).includes(study.type) ? null : "Estudo incompatível com esta atividade.";
   }
   if (type === "SPEAKER") {
     if (value.startsWith("s:")) return context.speakers.some((s) => s.id === value.slice(2)) ? null : "Palestrante externo inativo ou inexistente.";
