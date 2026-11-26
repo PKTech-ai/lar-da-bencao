@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { attendanceStats, isValidAttendanceCell } from "@/lib/doutrina-attendance";
 import {
   FREE_THEME, TEMPLATES, THEME_MAX, buildScale, themeLabel, typedThemeText, typedThemeValue, canAddExtra, findConflicts, fixedKey, isWeeklyPsych, monthDays, monthWeekRange, parseFixedKey, parseSlotKey, psychWeekMessage,
-  roleOf, slotAvailability, slotKey, studySequence, supersededFixed, validateFixed, validateSlotChoice, validateSlotValue, weekStart, type ScaleWorker
+  roleOf, rowOrder, slotAvailability, slotKey, studySequence, supersededFixed, validateFixed, validateSlotChoice, validateSlotValue, weekStart, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
 const ALL = ["Passista", "Psicofônico", "Dialogador", "Dirigente de Reunião", "Dirigente de Estudo", "Expositor de Estudo", "Palestrante", "Dirigente de Palestra", "Entrevistador", "Recepcionista"];
@@ -203,6 +203,45 @@ describe("conferência e edição manual", () => {
     expect(canAddExtra({ dow: 3, si: 0, ri: 0 })).toBe(true); // RECEPÇÃO
     expect(canAddExtra({ dow: 0, si: 1, ri: 2 })).toBe(true); // PSICOF.
     expect(canAddExtra({ dow: 3, si: 1, ri: 0 })).toBe(false); // ENTREVISTA
+    expect(canAddExtra({ dow: 1, si: 0, ri: 3 })).toBe(true); // SEGUNDA → DIALOGADOR
+  });
+});
+
+describe("linha DIALOGADOR da segunda-feira", () => {
+  it("entra no fim do modelo (as chaves gravadas não mudam) e aparece abaixo do PASSISTA", () => {
+    const section = TEMPLATES[1][0];
+    expect(section.r.map(([label]) => label)).toEqual(["DIRIG.", "PASSISTA", "PSICOF.", "DIALOGADOR"]);
+    expect(rowOrder(section).map((ri) => section.r[ri][0])).toEqual(["DIRIG.", "PASSISTA", "DIALOGADOR", "PSICOF."]);
+    expect(roleOf({ dow: 1, si: 0, ri: 2 }).type).toBe("Psicofônico");
+    expect(roleOf({ dow: 1, si: 0, ri: 3 })).toMatchObject({ label: "DIALOGADOR", type: "Dialogador", min: 1 });
+    // Só a segunda ganha a linha; domingo, quarta e sexta continuam como antes.
+    for (const dow of [0, 3, 5]) expect(TEMPLATES[dow].flatMap((s) => s.r).some(([, type]) => type === "Dialogador")).toBe(false);
+    expect(rowOrder(TEMPLATES[0][1])).toEqual([0, 1, 2]);
+  });
+
+  it("a geração escala só quem tem Dialogador e segunda-feira na ficha", () => {
+    const dialog = { id: uuid(50), name: "Dialogadora", functions: ["Dialogador"], days: [1] };
+    const sunday = { id: uuid(51), name: "Só domingo", functions: ["Dialogador"], days: [0] };
+    const scale = buildScale("2026-12", [...team(10, ["Passista", "Psicofônico", "Dirigente de Reunião"]), dialog, sunday], [], []);
+    for (const day of monthDays("2026-12", 1)) expect(scale.get(`1|0|3|${day}|0`)).toBe(`w:${dialog.id}`);
+    expect([...scale.values()]).not.toContain(`w:${sunday.id}`);
+    expect(findConflicts(scale)).toEqual([]);
+  });
+
+  it("quem tem duas funções vai primeiro para o DIALOGADOR (linha que aparece antes do PSICOF.)", () => {
+    const both = { id: uuid(60), name: "Ana", functions: ["Dialogador", "Psicofônico"], days: [1] };
+    const scale = buildScale("2026-12", [both], [], []);
+    expect(scale.get("1|0|3|7|0")).toBe(`w:${both.id}`);
+    expect(scale.get("1|0|2|7|0")).toBe("");
+  });
+
+  it("escolha manual e fixo seguem a ficha, como nas outras linhas", () => {
+    const dialog = { id: uuid(70), name: "Bia", functions: ["Dialogador"], days: [1] };
+    const context = { assignments: new Map<string, string>(), workers: [dialog], speakers: [], studies: [] };
+    expect(validateSlotChoice("2026-12", parseSlotKey("1|0|3|7|0")!, `w:${dialog.id}`, context)).toBeNull();
+    expect(validateSlotChoice("2026-12", parseSlotKey("1|0|2|7|0")!, `w:${dialog.id}`, context)).toMatch(/sem a função Psicofônico/);
+    expect(validateFixed({ dow: 1, si: 0, ri: 3, pos: 0 }, dialog, new Map())).toBeNull();
+    expect(validateFixed({ dow: 1, si: 0, ri: 3, pos: 1 }, dialog, new Map())).toBeNull(); // adicional
   });
 });
 

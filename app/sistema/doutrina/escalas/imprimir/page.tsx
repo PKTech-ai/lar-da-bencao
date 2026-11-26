@@ -5,7 +5,7 @@ import { appendAudit } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { departmentCoordinators } from "@/lib/department-coordinators";
 import { loadRecess, loadScale } from "@/lib/doutrina-data";
-import { DAY_HOURS, DAY_NAME, DOW_ORDER, RECESS_KINDS, TEMPLATES, isValidMonth, monthDays, recessKinds, scaleStatusLabel, themeLabel } from "@/lib/doutrina-scale";
+import { DAY_HOURS, DAY_NAME, DOW_ORDER, RECESS_KINDS, TEMPLATES, isValidMonth, monthDays, recessKinds, rowOrder, scaleStatusLabel, themeLabel } from "@/lib/doutrina-scale";
 import { requireModulePage } from "@/lib/page-auth";
 
 const QUOTE = "Trabalhemos juntos e unamos os nossos esforços, a fim de que o Senhor, ao chegar, encontre acabada a obra.";
@@ -66,12 +66,12 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
                 <table>
                   <thead><tr><th>DIAS</th>{days.map((day) => <th key={day}>{String(day).padStart(2, "0")}</th>)}</tr></thead>
                   <tbody>
-                    {section.r.map(([rowLabel], ri) => (
+                    {rowOrder(section).map((ri, shown) => { const [rowLabel] = section.r[ri]; return (
                       <tr key={rowLabel + ri}>
                         <td>{rowLabel}</td>
                         {days.map((day) => {
                           const closed = recess.get(day);
-                          if (closed) return ri ? null : <td key={day} rowSpan={section.r.length} className="recess-cell">{RECESS_KINDS[closed].sheet}</td>;
+                          if (closed) return shown ? null : <td key={day} rowSpan={section.r.length} className="recess-cell">{RECESS_KINDS[closed].sheet}</td>;
                           const prefix = `${dow}|${si}|${ri}|${day}|`;
                           const values = [...scale.assignments].filter(([k]) => k.startsWith(prefix))
                             .sort(([a], [b]) => Number(a.split("|")[4]) - Number(b.split("|")[4]))
@@ -83,7 +83,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
                           );
                         })}
                       </tr>
-                    ))}
+                    ); })}
                   </tbody>
                 </table>
               </div>

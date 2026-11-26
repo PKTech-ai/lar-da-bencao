@@ -284,7 +284,7 @@ export async function PATCH(request: Request) {
   }
 }
 
-/** Posições adicionais (passistas do Grupo do Passe, recepcionistas e psicofônicos). */
+/** Posições adicionais (passistas do Grupo do Passe, recepcionistas, psicofônicos e dialogadores). */
 export async function PUT(request: Request) {
   try {
     assertSameOrigin(request);

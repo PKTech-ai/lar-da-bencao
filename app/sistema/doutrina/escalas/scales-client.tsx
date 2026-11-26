@@ -5,7 +5,7 @@ import { useMobileDay } from "@/components/mobile-day-columns";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_KINDS, RECESS_KIND_KEYS, TEMPLATES, THEME_MAX, availabilityIndex, canAddExtra, monthDays, parseSlotKey, psychRuleDay,
-  psychWeekMessage, acceptsTypedStudy, recessKinds, recessSet, roleOf, slotAvailability, slotKey, typedThemeText, typedThemeValue,
+  psychWeekMessage, acceptsTypedStudy, recessKinds, recessSet, roleOf, rowOrder, slotAvailability, slotKey, typedThemeText, typedThemeValue,
   type Availability, type Conflict, type PsychBooking, type RecessDay, type RecessKind, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
@@ -449,13 +449,13 @@ export function ScalesClient() {
                 <table data-grid="">
                   <thead><tr><th>DIAS</th>{dates.map((day) => <th key={day} data-day={String(day).padStart(2, "0")}>{String(day).padStart(2, "0")}</th>)}</tr></thead>
                   <tbody>
-                    {section.r.map(([label], ri) => (
+                    {rowOrder(section).map((ri, shown) => { const [label] = section.r[ri]; return (
                       <tr key={label + ri}>
                         <td>{label}</td>
                         {dates.map((day) => {
                           const closed = recessKind.get(day);
                           if (closed) {
-                            return ri ? null : <td key={day} data-day={String(day).padStart(2, "0")} rowSpan={section.r.length} className="recess-cell">{RECESS_KINDS[closed].sheet}</td>;
+                            return shown ? null : <td key={day} data-day={String(day).padStart(2, "0")} rowSpan={section.r.length} className="recess-cell">{RECESS_KINDS[closed].sheet}</td>;
                           }
                           const prefix = `${dow}|${si}|${ri}|${day}|`;
                           const keys = [...byKey.keys()].filter((k) => k.startsWith(prefix)).sort((a, b) => Number(a.split("|")[4]) - Number(b.split("|")[4]));
@@ -530,7 +530,7 @@ export function ScalesClient() {
                           );
                         })}
                       </tr>
-                    ))}
+                    ); })}
                   </tbody>
                 </table>
               </div>

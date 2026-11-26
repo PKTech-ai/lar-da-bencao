@@ -4,11 +4,20 @@
  */
 
 export type RoleType =
-  | "Dirigente de Reunião" | "Passista" | "Psicofônico" | "Recepcionista" | "Entrevistador"
+  | "Dirigente de Reunião" | "Passista" | "Dialogador" | "Psicofônico" | "Recepcionista" | "Entrevistador"
   | "Dirigente de Estudo" | "Expositor de Estudo" | "Dirigente de Palestra" | "SPEAKER" | "STUDY";
 
 export type StudyType = "ESE" | "ESDE" | "MEP" | "OBRA" | "PALESTRA";
-export type Section = { n: string; s?: StudyType; r: [label: string, type: RoleType, min: number][] };
+/**
+ * `r`: linhas na ordem em que foram criadas — o índice de cada uma está gravado no banco (chave da posição e fixos),
+ * então linha nova entra sempre no fim. `o`: ordem das linhas na folha (tela e impressão), quando difere de `r`.
+ */
+export type Section = { n: string; s?: StudyType; r: [label: string, type: RoleType, min: number][]; o?: readonly number[] };
+
+/** Índices das linhas da seção na ordem da folha. */
+export function rowOrder(section: Section): number[] {
+  return section.o ? [...section.o] : section.r.map((_, ri) => ri);
+}
 
 export const DOW_ORDER = [3, 4, 5, 6, 0, 1] as const;
 export const DAY_NAME: Record<number, string> = { 0: "DOMINGO", 1: "SEGUNDA-FEIRA", 3: "QUARTA-FEIRA", 4: "QUINTA-FEIRA", 5: "SEXTA-FEIRA", 6: "SÁBADO" };
@@ -20,7 +29,12 @@ const palestra: Section = { n: "PALESTRA PÚBLICA", s: "PALESTRA", r: [["DIRIG."
 const passe: Section = { n: "GRUPO DO PASSE", r: [["COORD.", "Passista", 1], ["PASSISTAS", "Passista", 4]] };
 
 export const TEMPLATES: Record<number, Section[]> = {
-  1: [{ n: "MEDIÚNICA — FUNCIONAMENTO INTERNO", r: [["DIRIG.", "Dirigente de Reunião", 1], ["PASSISTA", "Passista", 1], ["PSICOF.", "Psicofônico", 4]] }],
+  // DIALOGADOR foi criado depois (índice 3), mas aparece na folha logo abaixo do PASSISTA.
+  1: [{
+    n: "MEDIÚNICA — FUNCIONAMENTO INTERNO",
+    r: [["DIRIG.", "Dirigente de Reunião", 1], ["PASSISTA", "Passista", 1], ["PSICOF.", "Psicofônico", 4], ["DIALOGADOR", "Dialogador", 1]],
+    o: [0, 1, 3, 2]
+  }],
   3: [
     { n: "RECEPÇÃO", r: [["RECEP.", "Recepcionista", 2]] },
     { n: "ENTREVISTA", r: [["ENTREV.", "Entrevistador", 2]] },
@@ -275,11 +289,11 @@ export function slotAvailability(ym: string, slot: Slot, workerId: string, conte
   return { color: "green", blocked: false, note: "", message: "" };
 }
 
-/** Extras manuais: passistas só na linha PASSISTAS do Grupo do Passe; recepcionistas e psicofônicos sempre. */
+/** Extras manuais: passistas só na linha PASSISTAS do Grupo do Passe; recepcionistas, psicofônicos e dialogadores sempre. */
 export function canAddExtra(slot: Pick<Slot, "dow" | "si" | "ri">) {
   const { section, label, type } = roleOf(slot);
   if (type === "Passista") return /GRUPO DO PASSE/i.test(section.n) && /PASSISTAS/i.test(label);
-  return type === "Recepcionista" || type === "Psicofônico";
+  return type === "Recepcionista" || type === "Psicofônico" || type === "Dialogador";
 }
 
 /** Posição além do mínimo do modelo: só existe como adicional. */
@@ -309,7 +323,7 @@ export function parseFixedKey(key: string): FixedPattern | null {
  */
 export function validateFixed(pattern: FixedPattern, worker: ScaleWorker | undefined, current: ReadonlyMap<string, string>): string | null {
   const row = TEMPLATES[pattern.dow]?.[pattern.si]?.r[pattern.ri];
-  // Além do mínimo do modelo, só onde a função aceita adicional (recepção, passistas do Grupo do Passe, psicofônicos).
+  // Além do mínimo do modelo, só onde a função aceita adicional (recepção, passistas do Grupo do Passe, psicofônicos, dialogadores).
   if (!row || pattern.pos > 40 || (pattern.pos >= row[2] && !canAddExtra(pattern))) return "Posição inválida para trabalhador fixo.";
   const type = row[1] === "SPEAKER" ? "Palestrante" : row[1];
   if (type === "STUDY") return "Tema e roteiro não podem ser fixos.";
@@ -399,7 +413,9 @@ export function buildScale(ym: string, workers: readonly ScaleWorker[], speakers
         if (psych) book(date, id);
       }
       TEMPLATES[dow].forEach((section, si) => {
-        section.r.forEach(([, type, min], ri) => {
+        // Na ordem da folha: quem tem duas funções vai primeiro para a linha que aparece antes.
+        rowOrder(section).forEach((ri) => {
+          const [, type, min] = section.r[ri];
           for (let pos = 0; pos < min; pos += 1) {
             const key = slotKey({ dow, si, ri, day, pos });
             if (assignments.has(key)) continue;
