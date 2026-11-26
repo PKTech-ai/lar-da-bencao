@@ -7,7 +7,8 @@ import { writeDepartmentMarks } from "@/lib/department-access";
 import { marksFromLevel } from "@/lib/department-modules";
 import { AppError, errorResponse } from "@/lib/errors";
 import {
-  CONSELHO_MAX, higherLevel, isBoardSeat, levelFromLinks, ORG_DEPARTMENTS, ORG_SEATS, seatDepartments, seatLabel, seatLevel, unlinkEffect, type OrgSeat
+  CONSELHO_MAX, higherLevel, isBoardSeat, isDepartmentSeat, levelFromLinks, ORG_DEPARTMENTS, ORG_SEATS, seatDepartments, seatLabel, seatLevel,
+  unlinkEffect, type OrgSeat
 } from "@/lib/org-links";
 import { assertPermission, hasPermission } from "@/lib/permissions";
 
@@ -58,8 +59,8 @@ export async function POST(request: Request) {
     const actor = await requireActor();
     await assertPermission(actor, "users", "admin");
     const input = postSchema.parse(await request.json());
-    const department = input.seat === "coordenacao" ? input.department_key ?? null : null;
-    if (input.seat === "coordenacao" && !department) throw new AppError("Escolha o departamento.");
+    const department = isDepartmentSeat(input.seat) ? input.department_key ?? null : null;
+    if (isDepartmentSeat(input.seat) && !department) throw new AppError("Escolha o departamento.");
 
     const result = await transaction(async (client) => {
       // Trava a pessoa: uma alteração em Usuários › Acesso ao mesmo tempo espera esta terminar.
@@ -84,8 +85,18 @@ export async function POST(request: Request) {
         [input.seat, department]
       );
       if (taken.rows.some((r) => r.user_id === input.user_id)) throw new AppError(`${name} já está vinculado(a) em ${where}.`, 409, "ALREADY_LINKED");
-      if (isBoardSeat(input.seat) && taken.rows[0]) {
+      if ((isBoardSeat(input.seat) || input.seat === "subcoordenacao") && taken.rows[0]) {
         throw new AppError(`${where} já está com ${taken.rows[0].name}. Tire essa pessoa antes de vincular outra.`, 409, "SEAT_TAKEN");
+      }
+      // A mesma pessoa não é Coordenador(a) e Subcoordenador(a) do mesmo departamento (a pessoa já está travada acima).
+      if (department) {
+        const other = await client.query<{ seat: OrgSeat }>(
+          "select seat from app.org_links where user_id = $1 and department_key = $2 and seat <> $3",
+          [input.user_id, department, input.seat]
+        );
+        if (other.rows[0]) {
+          throw new AppError(`${name} já está em ${seatLabel(other.rows[0].seat, label(department))}. Tire de lá antes.`, 409, "ALREADY_IN_DEPARTMENT");
+        }
       }
       if (input.seat === "conselho_fiscal" && taken.rows.length >= CONSELHO_MAX) {
         throw new AppError(`O Conselho Fiscal já tem ${CONSELHO_MAX} membros. Tire um antes de vincular outro.`, 409, "SEAT_FULL");

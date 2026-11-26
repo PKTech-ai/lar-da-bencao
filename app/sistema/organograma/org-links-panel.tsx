@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BOARD_SEATS, CONSELHO_MAX, ORG_DEPARTMENTS, seatDepartments, seatLabel, seatLevel, unlinkEffect, type OrgSeat } from "@/lib/org-links";
+import {
+  BOARD_SEATS, CONSELHO_MAX, DEPARTMENT_SEATS, isDepartmentSeat, ORG_DEPARTMENTS, seatDepartments, seatLabel, seatLevel, unlinkEffect, type OrgSeat
+} from "@/lib/org-links";
 import "./org-links.css";
 
 type Link = { id: string; seat: OrgSeat; department_key: string | null; user_id: string; granted: string[]; name: string; active: boolean };
@@ -9,8 +11,8 @@ type Option = { id: string; name: string };
 type Payload = { links: Link[]; departments: { key: string; label: string }[]; users: Option[]; canEdit: boolean };
 
 /**
- * Organograma de Vinculação: quem ocupa cada cargo da Diretoria, do Conselho Fiscal e da Coordenação de cada
- * departamento. O Administrador vincula e desvincula; vincular já dá acesso total no setor do cargo.
+ * Organograma de Vinculação: quem ocupa cada cargo da Diretoria, do Conselho Fiscal e a Coordenação e a
+ * Subcoordenação de cada departamento. O Administrador vincula e desvincula; vincular já dá acesso no setor do cargo.
  */
 export function OrgLinksPanel() {
   const [data, setData] = useState<Payload | null>(null);
@@ -84,9 +86,11 @@ export function OrgLinksPanel() {
     </div>
   )) : <div className="org-link-person org-link-empty">{empty}</div>;
 
+  // `rows` = quem não pode ser escolhido (já está no cargo; no departamento, também quem está no outro cargo dele).
   const add = (seat: OrgSeat, department: string | null, rows: Link[]) => data.canEdit
     ? <AddPerson users={data.users.filter((u) => !rows.some((r) => r.user_id === u.id))} disabled={busy} onAdd={(user) => link(seat, department, user)} />
     : null;
+  const inDepartment = (key: string) => data.links.filter((l) => isDepartmentSeat(l.seat) && l.department_key === key);
 
   return (
     <div className="org-links">
@@ -94,7 +98,7 @@ export function OrgLinksPanel() {
       {message ? <div className="success" role="status">{message}</div> : null}
       <p className="small muted">
         {data.canEdit
-          ? <>Vincule cada pessoa ao seu cargo. Ao vincular, ela <strong>já ganha acesso total</strong> (consultar, alterar, editar e excluir) no seu setor: o <strong>Presidente</strong> em todos os departamentos; Secretário(a) e Tesoureiro(a), no próprio setor; os 3 membros do Conselho Fiscal, na página do Conselho Fiscal; cada coordenação, no próprio departamento. O <strong>Vice-Presidente só consulta</strong> a Diretoria, sem alterar. Ao tirar, o acesso sai junto. O perfil da pessoa não muda. Só aparece quem tem conta ativa no sistema.</>
+          ? <>Vincule cada pessoa ao seu cargo. Ao vincular, ela <strong>já ganha acesso total</strong> (consultar, alterar, editar e excluir) no seu setor: o <strong>Presidente</strong> em todos os departamentos; Secretário(a) e Tesoureiro(a), no próprio setor; os 3 membros do Conselho Fiscal, na página do Conselho Fiscal; cada Coordenador(a) e Subcoordenador(a), no próprio departamento. Secretaria e Tesouraria fazem parte da Diretoria. O <strong>Vice-Presidente só consulta</strong> a Diretoria, sem alterar. Ao tirar, o acesso sai junto. O perfil da pessoa não muda. Só aparece quem tem conta ativa no sistema.</>
           : <>Quem ocupa cada cargo da Casa. Só o Administrador do Sistema altera esta aba.</>}
       </p>
       <div className="org-analytic-wrap">
@@ -145,20 +149,25 @@ export function OrgLinksPanel() {
         </div>
         <div className="org-a-connector board-only" />
         <div className="org-a-dept-title">
-          DEPARTAMENTOS — COORDENAÇÃO
-          <small>Cada coordenador(a) vinculado(a) tem acesso total no próprio departamento</small>
+          DEPARTAMENTOS — COORDENAÇÃO E SUBCOORDENAÇÃO
+          <small>Cada coordenador(a) e subcoordenador(a) vinculado(a) tem acesso total no próprio departamento</small>
         </div>
         <div className="org-a-grid">
-          {ORG_DEPARTMENTS.filter((key) => active.includes(key)).map((key) => {
-            const rows = of("coordenacao", key);
-            return (
-              <div key={key} className="org-a-dept org-link-dept">
-                <strong>{label(key)}</strong>
-                {people(rows, "— sem coordenação —")}
-                {add("coordenacao", key, rows)}
-              </div>
-            );
-          })}
+          {ORG_DEPARTMENTS.filter((key) => active.includes(key)).map((key) => (
+            <div key={key} className="org-a-dept org-link-dept">
+              <strong>{label(key)}</strong>
+              {DEPARTMENT_SEATS.map(({ seat, label: title }) => {
+                const rows = of(seat, key);
+                return (
+                  <div key={seat} className="org-link-seat">
+                    <div className="org-link-seat-title">{title}</div>
+                    {people(rows)}
+                    {seat === "coordenacao" || !rows.length ? add(seat, key, inDepartment(key)) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     </div>
