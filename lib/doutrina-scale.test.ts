@@ -185,6 +185,34 @@ describe("conferência e edição manual", () => {
     expect(studySequence(book, uuid(807), 3)).toEqual([]); // tipo Obra fora da pasta não puxa os da pasta
   });
 
+  // Pasta MEP (mep: true): estudos de qualquer tipo; fora dela, só o tipo MEP.
+  const mep = [
+    ...studies,
+    { id: uuid(810), type: "OUTRO", code: "MEP 01", title: "Mediunidade: conceito", mep: true },
+    { id: uuid(811), type: "MEP", code: "MEP 02", title: "Médiuns: classificação", mep: true },
+    { id: uuid(812), type: "TREINAMENTO", code: "MEP 03", title: "Educação mediúnica", mep: true },
+    { id: uuid(813), type: "OBRA", code: "LE 004", title: "Da pasta LE", le: true }
+  ];
+
+  it("roteiro do MEP da quinta: roteiro digitado, estudos da pasta MEP e do tipo MEP", () => {
+    const context = { assignments: new Map(), workers: team(1), speakers, studies: mep };
+    const slot = parseSlotKey("4|0|2|3|0")!;
+    expect(validateSlotValue(slot, "txt:Roteiro 5 — Mediunidade na Bíblia", context)).toBeNull();
+    expect(validateSlotValue(slot, "txt:a", context)).toMatch(/Roteiro digitado inválido.*2 a 120/);
+    expect(validateSlotValue(slot, `t:${uuid(802)}`, context)).toBeNull(); // tipo MEP fora da pasta
+    expect(validateSlotValue(slot, `t:${uuid(810)}`, context)).toBeNull(); // pasta MEP, tipo Outro
+    expect(validateSlotValue(slot, `t:${uuid(813)}`, context)).toMatch(/incompatível/); // pasta LE não
+    expect(validateSlotValue(slot, FREE_THEME, context)).toMatch(/incompatível/);
+    // Estar na pasta MEP não serve para as outras atividades, e o texto digitado continua recusado no ESE e no ESDE.
+    expect(validateSlotValue(parseSlotKey("6|0|2|5|0")!, `t:${uuid(810)}`, context)).toMatch(/incompatível/);
+    expect(validateSlotValue(parseSlotKey("3|5|2|2|0")!, "txt:Tema qualquer", context)).toMatch(/incompatível/);
+  });
+
+  it("estudo da pasta MEP: as quintas seguintes recebem os próximos da mesma pasta", () => {
+    expect(studySequence(mep, uuid(810), 3).map((s) => s.code)).toEqual(["MEP 02", "MEP 03"]);
+    expect(studySequence(mep, uuid(802), 3)).toEqual([]); // tipo MEP fora da pasta não puxa os da pasta
+  });
+
   it("tema digitado: limpa espaços e recusa o curto, o longo e caractere de controle", () => {
     expect(typedThemeValue("  A   caridade\n segundo Paulo ")).toBe("txt:A caridade segundo Paulo");
     expect(typedThemeValue("a")).toBeNull();

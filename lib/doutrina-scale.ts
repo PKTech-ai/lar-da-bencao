@@ -506,7 +506,7 @@ const studyNumber = (study: ScaleStudy) => {
 
 /**
  * Estudos que vêm depois do escolhido, pela numeração (ROT. 070 → 071, 072…), para os próximos dias da mesma linha.
- * Um estudo da pasta O Livro dos Espíritos segue com os seguintes da mesma pasta, seja qual for o tipo.
+ * Um estudo da pasta O Livro dos Espíritos (ou da pasta MEP) segue com os seguintes da mesma pasta, seja qual for o tipo.
  */
 export function studySequence(studies: readonly ScaleStudy[], chosenId: string, count: number): ScaleStudy[] {
   const chosen = studies.find((s) => s.id === chosenId);
@@ -514,7 +514,7 @@ export function studySequence(studies: readonly ScaleStudy[], chosenId: string, 
   if (!chosen || start === null || chosen.type === "PALESTRA") return [];
   const next: ScaleStudy[] = [];
   let last = start;
-  const sameFamily = (s: ScaleStudy) => (chosen.le ? Boolean(s.le) : !s.le && s.type === chosen.type);
+  const sameFamily = (s: ScaleStudy) => (chosen.le ? Boolean(s.le) : chosen.mep ? Boolean(s.mep) : !s.le && !s.mep && s.type === chosen.type);
   for (const study of studies.filter((s) => sameFamily(s) && (studyNumber(s) ?? -1) > start).sort((a, b) => studyNumber(a)! - studyNumber(b)!)) {
     if (next.length >= count) break;
     if (studyNumber(study) === last) continue;
@@ -539,7 +539,7 @@ export function validateSlotValue(
     if (section.s === "PALESTRA" && value === FREE_THEME) return null;
     const text = typedThemeText(value);
     if (text !== null && acceptsTypedStudy(section)) {
-      return typedThemeValue(text) === value ? null : `${section.s === "OBRA" ? "Estudo" : "Tema"} digitado inválido: use de 2 a ${THEME_MAX} caracteres.`;
+      return typedThemeValue(text) === value ? null : `${typedStudyNoun(section)} digitado inválido: use de 2 a ${THEME_MAX} caracteres.`;
     }
     const study = value.startsWith("t:") ? context.studies.find((s) => s.id === value.slice(2)) : undefined;
     return study && studyFitsSection(section, study) ? null : "Estudo incompatível com esta atividade.";
