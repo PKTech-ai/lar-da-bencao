@@ -1,0 +1,21 @@
+/* Página pública do link do Culto no Lar (aberta no celular, pelo grupo do WhatsApp). */
+.culto-public .auth-card { width: min(560px, 100%); display: grid; gap: 14px; }
+.culto-public h1 { margin: 6px 0 0; font-size: 22px; line-height: 1.25; color: var(--blue-900); }
+.culto-public .auth-card > p { margin: 0; line-height: 1.55; }
+.culto-verse { margin: 0; padding: 10px 14px; border-left: 4px solid var(--blue-800); background: var(--surface-sunken, var(--blue-100)); border-radius: 0 12px 12px 0; font-style: italic; line-height: 1.5; color: var(--blue-900); }
+.culto-verse cite { font-style: normal; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.culto-public-list { display: grid; gap: 10px; }
+.culto-public-list > p { margin: 0; }
+.culto-public-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.culto-day { border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; background: var(--surface); }
+.culto-day-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.culto-day-head > div { display: grid; gap: 2px; min-width: 0; }
+.culto-day-head > div span { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.culto-day-done { margin-top: 10px; }
+.culto-day-head .button { min-height: 40px; padding: 7px 16px; flex: 0 0 auto; }
+.culto-day-host { font-weight: 700; color: var(--success); text-align: right; overflow-wrap: anywhere; }
+.culto-day-past { opacity: .6; }
+.culto-day-taken { background: var(--surface-sunken, var(--surface)); }
+.culto-day-form { display: grid; gap: 8px; margin-top: 12px; }
+.culto-day-form label { font-weight: 700; font-size: 14px; }
+.culto-honey { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
