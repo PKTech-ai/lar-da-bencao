@@ -22,14 +22,14 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
   if (!scale.month || scale.month.status === "deleted") notFound();
 
   const [names, coordinators, contact, recessDates] = await Promise.all([
-    query<{ ref: string; label: string }>(
-      `select 'w:' || id as ref, full_name as label from app.workers
+    query<{ ref: string; label: string; reference: string | null }>(
+      `select 'w:' || id as ref, full_name as label, null::text as reference from app.workers
         where id in (select worker_id from app.scale_assignments where scale_month_id = $1 and worker_id is not null)
        union all
-       select 's:' || id, full_name || ' (EXT.)' from app.speakers
+       select 's:' || id, full_name || ' (EXT.)', null from app.speakers
         where id in (select speaker_id from app.scale_assignments where scale_month_id = $1 and speaker_id is not null)
        union all
-       select 't:' || id, coalesce(code || ' — ', '') || title from app.studies
+       select 't:' || id, coalesce(code || ' — ', '') || title, nullif(btrim(reference), '') from app.studies
         where id in (select study_id from app.scale_assignments where scale_month_id = $1 and study_id is not null)`,
       [scale.month.id]
     ),
@@ -39,6 +39,8 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
   ]);
   const recess = recessKinds(ym, recessDates);
   const label = new Map(names.rows.map((row) => [row.ref, row.label]));
+  // Referência do estudo como na Biblioteca de Estudos (ex.: ESE Cap. X — itens 1 a 4), abaixo do roteiro.
+  const reference = new Map(names.rows.flatMap((row) => (row.reference ? [[row.ref, row.reference] as const] : [])));
   await appendAudit(actor, {
     category: "Impressão", action: dows.length > 1 ? "Impressão da escala mensal consolidada" : "Impressão de folha da escala",
     module: "Doutrina", section: "Escala mensal", entityType: "scale_month", entityId: scale.month.id, details: `${ym}${dows.length === 1 ? ` · ${DAY_NAME[dows[0]]}` : ""}`
@@ -73,8 +75,12 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
                           const prefix = `${dow}|${si}|${ri}|${day}|`;
                           const values = [...scale.assignments].filter(([k]) => k.startsWith(prefix))
                             .sort(([a], [b]) => Number(a.split("|")[4]) - Number(b.split("|")[4]))
-                            .map(([, v]) => (v ? label.get(v) ?? themeLabel(v) ?? "—" : "—"));
-                          return <td key={day}>{values.map((v, i) => <div key={i}>{v}</div>)}</td>;
+                            .map(([, v]) => ({ text: v ? label.get(v) ?? themeLabel(v) ?? "—" : "—", reference: reference.get(v) }));
+                          return (
+                            <td key={day}>
+                              {values.map((v, i) => <div key={i}>{v.text}{v.reference ? <div className="sheet-reference">{v.reference}</div> : null}</div>)}
+                            </td>
+                          );
                         })}
                       </tr>
                     ))}

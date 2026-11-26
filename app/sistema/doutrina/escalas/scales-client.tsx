@@ -24,14 +24,19 @@ type Payload = {
   recess: RecessDay[];
 };
 
-/** `group`: título do bloco na lista (optgroup), na ordem em que aparece. */
-type Choice = { value: string; label: string; tone?: Availability["color"]; availability?: Availability; group?: string };
+/**
+ * `group`: título do bloco na lista (optgroup), na ordem em que aparece.
+ * `name` e `reference`: estudo sem a referência e a referência da Biblioteca (mostrada abaixo do estudo escolhido).
+ */
+type Choice = { value: string; label: string; tone?: Availability["color"]; availability?: Availability; group?: string; name?: string; reference?: string };
 
 /** Opção da lista do tema da palestra que abre a caixa para digitar (não é gravada). */
 const TYPE_THEME = "__digitar__";
 const PALESTRA_GROUP = "Temas de palestra";
 const ESE_GROUP = "O Evangelho Segundo o Espiritismo — roteiros";
-const studyLabel = (s: ScaleStudy) => `${s.code ? `${s.code} — ` : ""}${s.title}`;
+const studyName = (s: ScaleStudy) => `${s.code ? `${s.code} — ` : ""}${s.title}`;
+/** Como na Biblioteca de Estudos: código, título e referência (ex.: "ROT. 045 — Perdoai… · ESE Cap. X — itens 1 a 4"). */
+const studyLabel = (s: ScaleStudy) => `${studyName(s)}${s.reference ? ` · ${s.reference}` : ""}`;
 const sameText = (a: string, b: string) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }) === 0;
 
 /** Opções da lista, com os blocos (optgroup) na ordem em que aparecem. */
@@ -221,7 +226,8 @@ export function ScalesClient() {
     };
     if (type === "STUDY") {
       const studies = (kind: string, group?: string): Choice[] =>
-        data.options.studies.filter((s) => s.type === kind).map((s) => ({ value: `t:${s.id}`, label: studyLabel(s), group }));
+        data.options.studies.filter((s) => s.type === kind)
+          .map((s) => ({ value: `t:${s.id}`, label: studyLabel(s), name: studyName(s), reference: s.reference || undefined, group }));
       if (section.s !== "PALESTRA") return studies(section.s ?? "");
       // Palestra pública: tema livre, tema digitado (ou buscado pelo título), temas de palestra e roteiros do ESE.
       const typed = typedThemeText(current);
@@ -268,7 +274,7 @@ export function ScalesClient() {
    */
   function saveTyped(key: string, current: string, choices: Choice[]) {
     const text = (typing?.text ?? "").replace(/\s+/g, " ").trim();
-    const study = choices.find((c) => c.group && sameText(c.label, text));
+    const study = choices.find((c) => c.group && (sameText(c.label, text) || sameText(c.name ?? "", text)));
     const value = study ? study.value : sameText(text, "Tema Livre") ? FREE_THEME : typedThemeValue(text);
     if (!value) {
       setMessage("");
@@ -463,7 +469,15 @@ export function ScalesClient() {
                                   <button type="button" className="slot-remove" title="Tirar desta posição" aria-label={`Tirar da escala — ${describeSlot(key, ym)}`}
                                     onClick={() => void call("PATCH", { key, value: "", version }, () => "Posição liberada.")}>×</button>
                                 ) : null;
-                                return <div className="slot-with-pin" key={key}>{select}{pin}{remove}</div>;
+                                // Estudo escolhido: a referência da Biblioteca aparece logo abaixo (ex.: ESE Cap. X — itens 1 a 4).
+                                const reference = choices.find((c) => c.value === current)?.reference;
+                                if (!reference) return <div className="slot-with-pin" key={key}>{select}{pin}{remove}</div>;
+                                return (
+                                  <div key={key}>
+                                    <div className="slot-with-pin">{select}{pin}{remove}</div>
+                                    <div className="slot-reference">{reference}</div>
+                                  </div>
+                                );
                               })}
                               {!readOnly && canAddExtra({ dow, si, ri }) && keys.length ? (
                                 <button className="link-button" onClick={() => void call("PUT", { op: "add", key: slotKey({ dow, si, ri, day, pos: 0 }).slice(0, -2), version })}>+ adicional</button>

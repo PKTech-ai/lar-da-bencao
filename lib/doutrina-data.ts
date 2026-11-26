@@ -31,7 +31,7 @@ export async function loadScaleOptions(db: Db = pool) {
   );
   const speakers = await db.query<ScaleSpeaker>("select id, full_name as name from app.speakers where active order by full_name");
   const studies = await db.query<ScaleStudy>(
-    `select id, study_type as type, coalesce(code, '') as code, title from app.studies
+    `select id, study_type as type, coalesce(code, '') as code, title, coalesce(reference, '') as reference from app.studies
       where department_key = 'doutrina' and active and study_type is not null order by study_type, code, title`
   );
   return { workers: workers.rows, speakers: speakers.rows, studies: studies.rows };

@@ -69,7 +69,8 @@ export function recessKinds(ym: string, days: readonly RecessDay[]) {
 
 export type ScaleWorker = { id: string; name: string; functions: readonly string[]; days: readonly number[] };
 export type ScaleSpeaker = { id: string; name: string };
-export type ScaleStudy = { id: string; type: string; code: string; title: string };
+/** `reference`: a referência da Biblioteca de Estudos (ex.: "ESE Cap. X — itens 1 a 4"), mostrada na escala abaixo do estudo. */
+export type ScaleStudy = { id: string; type: string; code: string; title: string; reference?: string };
 export type Slot = { dow: number; si: number; ri: number; day: number; pos: number };
 
 export const FREE_THEME = "free:Tema Livre";
