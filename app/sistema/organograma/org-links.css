@@ -1,0 +1,21 @@
+/* Organograma de Vinculação (aba do Organograma). Estrutura visual vem das classes org-a-* do globals.css. */
+.org-links { display: grid; gap: 12px; }
+.org-links > p { margin: 0; }
+.org-links .org-a-level-two { align-items: stretch; }
+.org-links .org-link-box { display: grid; gap: 8px; align-content: start; }
+.org-link-seat { display: grid; gap: 4px; text-align: left; border-top: 1px solid var(--line); padding-top: 8px; }
+.org-links .org-link-seat small { margin-top: 0; font-size: 11px; }
+.org-link-seat-title { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.org-link-person { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--blue-900); text-align: left; }
+.org-link-person b { font-weight: 700; overflow-wrap: anywhere; }
+.org-link-empty { color: var(--muted); font-style: italic; font-size: 13px; }
+.org-link-inactive { font-size: 11px; font-style: normal; color: var(--danger); font-weight: 700; margin-right: auto; }
+.org-link-add { display: flex; gap: 6px; align-items: center; }
+.org-link-add select { min-height: 36px; padding: 5px 10px; font-size: 13px; border-radius: 10px; flex: 1 1 auto; min-width: 0; }
+.org-link-add .button { min-height: 36px; padding: 5px 12px; font-size: 13px; border-radius: 10px; flex: 0 0 auto; }
+.org-links .org-a-relation small { display: block; }
+.org-link-dept { gap: 6px; min-height: 0; }
+.org-link-dept .org-link-add { flex-direction: column; align-items: stretch; }
+@media (max-width: 760px) {
+  .org-links .org-a-level-two { grid-template-columns: 1fr; gap: 10px; }
+}

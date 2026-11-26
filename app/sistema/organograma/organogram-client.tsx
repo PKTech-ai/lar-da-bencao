@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { OrgLinksPanel } from "./org-links-panel";
 
 const PRINT_CSS = `
 @page{size:A4 landscape;margin:7mm}
@@ -49,6 +50,14 @@ body{font-family:Arial,Helvetica,sans-serif;color:#173247;margin:0;background:#f
 .org-a-summary-card{border:1px solid #CFE1EC;border-radius:6px;padding:6px;background:#fff}
 .org-a-summary-card strong{display:block;color:#256892;font-size:7pt;margin-bottom:2px}
 .org-a-summary-card span{display:block;font-size:6.2pt;line-height:1.2;color:#5D7483}
+.org-links>p,.org-links .error,.org-links .success{display:none}
+.org-link-box{text-align:left}
+.org-link-seat{border-top:1px solid #D8E8F2;padding-top:4px;margin-top:4px;text-align:left}
+.org-link-seat-title{font-size:6.5pt;font-weight:bold;color:#5D7B8E;text-transform:uppercase}
+.org-link-person{font-size:8pt;color:#173247}
+.org-link-empty{color:#8A9BA7;font-style:italic}
+.org-link-seat small{font-size:6pt!important;color:#7A8D99}
+.org-link-dept{min-height:0}
 `;
 
 function printOrganogram() {
@@ -66,7 +75,7 @@ function printOrganogram() {
 }
 
 export function OrganogramClient() {
-  const [view, setView] = useState<"org-sintetico" | "org-analitico">("org-sintetico");
+  const [view, setView] = useState<"org-sintetico" | "org-analitico" | "org-vinculacao">("org-sintetico");
 
   return (
     <section className="card org-demo">
@@ -84,6 +93,7 @@ export function OrganogramClient() {
       <div className="org-tabs no-print" style={{ marginTop: 12 }}>
         <button type="button" className={view === "org-sintetico" ? "active" : undefined} onClick={() => setView("org-sintetico")}>Organograma Sintético</button>
         <button type="button" className={view === "org-analitico" ? "active" : undefined} onClick={() => setView("org-analitico")}>Organograma Analítico</button>
+        <button type="button" className={view === "org-vinculacao" ? "active" : undefined} onClick={() => setView("org-vinculacao")}>Organograma de Vinculação</button>
       </div>
 
       <div id="org-sintetico" className={view === "org-sintetico" ? "org-panel active" : "org-panel"}>
@@ -210,6 +220,10 @@ export function OrganogramClient() {
             <strong>Leitura institucional:</strong> a Assembleia Geral é o órgão soberano; a Diretoria administra; o Conselho Fiscal fiscaliza; e os departamentos executam as atividades finalísticas e de apoio.
           </div>
         </div>
+      </div>
+
+      <div id="org-vinculacao" className={view === "org-vinculacao" ? "org-panel active" : "org-panel"}>
+        {view === "org-vinculacao" ? <OrgLinksPanel /> : null}
       </div>
     </section>
   );

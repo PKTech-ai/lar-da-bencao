@@ -4,8 +4,9 @@ import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
 import { query, transaction } from "@/lib/db";
+import { writeDepartmentMarks } from "@/lib/department-access";
 import {
-  DEPARTMENT_MODULES, findDepartmentModule, levelFromMarks, marksFromLevel, type DepartmentLevel, type ModuleMark
+  DEPARTMENT_MODULES, findDepartmentModule, marksFromLevel, type DepartmentLevel, type ModuleMark
 } from "@/lib/department-modules";
 import { AppError, errorResponse } from "@/lib/errors";
 import { assertPermission } from "@/lib/permissions";
@@ -146,27 +147,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         before[department] = current[department] ?? [];
         after[department] = next[department];
 
-        await client.query("delete from app.user_module_access where user_id = $1 and department_key = $2", [id, department]);
-        for (const mark of next[department]) {
-          await client.query(
-            `insert into app.user_module_access (user_id, department_key, module_key, can_edit, updated_by) values ($1, $2, $3, $4, $5)`,
-            [id, department, mark.module, mark.edit, actor!.id]
-          );
-        }
-        // O resumo é o que o restante do sistema lê: sempre refeito junto com as marcas.
-        // keeps_coordination só mantém o nome nas listas: quem já era da coordenação e ainda altera algo ali.
-        const level = levelFromMarks(department, next[department]);
-        if (level) {
-          await client.query(
-            `insert into app.user_departments as ud (user_id, department_key, access_level, updated_at, updated_by) values ($1, $2, $3, now(), $4)
-             on conflict (user_id, department_key) do update set
-               keeps_coordination = excluded.access_level = 'consulta' and $5::boolean and (ud.access_level = 'coordenacao' or ud.keeps_coordination),
-               access_level = excluded.access_level, updated_at = now(), updated_by = excluded.updated_by`,
-            [id, department, level, actor!.id, next[department].some((mark) => mark.edit)]
-          );
-        } else {
-          await client.query("delete from app.user_departments where user_id = $1 and department_key = $2", [id, department]);
-        }
+        await writeDepartmentMarks(client, id, department, next[department], actor!.id);
       }
       const departments = Object.keys(after);
       if (!departments.length) return false;
