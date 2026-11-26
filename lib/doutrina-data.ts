@@ -30,9 +30,18 @@ export async function loadScaleOptions(db: Db = pool) {
       where w.status = 'active' order by w.full_name`
   );
   const speakers = await db.query<ScaleSpeaker>("select id, full_name as name from app.speakers where active order by full_name");
+  // `le`: estudo na pasta "LE" (O Livro dos Espíritos) da biblioteca ou numa subpasta — vai para o estudo de obra do sábado.
   const studies = await db.query<ScaleStudy>(
-    `select id, study_type as type, coalesce(code, '') as code, title, coalesce(reference, '') as reference from app.studies
-      where department_key = 'doutrina' and active and study_type is not null order by study_type, code, title`
+    `with recursive le as (
+       select id from app.study_folders
+        where department_key = 'doutrina' and parent_id is null and (lower(title) = 'le' or lower(title) like '%livro dos esp%')
+       union all
+       select f.id from app.study_folders f join le on f.parent_id = le.id
+     )
+     select s.id, s.study_type as type, coalesce(s.code, '') as code, s.title, coalesce(s.reference, '') as reference,
+            coalesce(s.folder_id in (select id from le), false) as le
+       from app.studies s
+      where s.department_key = 'doutrina' and s.active and s.study_type is not null order by s.study_type, s.code, s.title`
   );
   return { workers: workers.rows, speakers: speakers.rows, studies: studies.rows };
 }

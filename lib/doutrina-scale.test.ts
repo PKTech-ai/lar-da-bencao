@@ -157,6 +157,34 @@ describe("conferência e edição manual", () => {
     expect(validateSlotValue(parseSlotKey("3|2|2|2|0")!, `t:${uuid(800)}`, context)).toBeNull(); // ESE da quarta
   });
 
+  // Pasta O Livro dos Espíritos (le: true): estudos de qualquer tipo; fora dela, só o tipo Obra.
+  const book = [
+    ...studies,
+    { id: uuid(803), type: "OBRA", code: "", title: "Nosso Lar" },
+    { id: uuid(804), type: "OUTRO", code: "LE 001", title: "Deus", le: true },
+    { id: uuid(805), type: "OBRA", code: "LE 002", title: "Provas da existência de Deus", le: true },
+    { id: uuid(806), type: "OUTRO", code: "LE 003", title: "Atributos da Divindade", le: true },
+    { id: uuid(807), type: "OBRA", code: "OBRA 002", title: "Fora da pasta" }
+  ];
+
+  it("estudo de obra do sábado: estudo digitado, estudos da pasta O Livro dos Espíritos e do tipo Obra", () => {
+    const context = { assignments: new Map(), workers: team(1), speakers, studies: book };
+    const slot = parseSlotKey("6|0|2|5|0")!;
+    expect(validateSlotValue(slot, "txt:O Livro dos Espíritos — questões 1 a 10", context)).toBeNull();
+    expect(validateSlotValue(slot, "txt:a", context)).toMatch(/Estudo digitado inválido.*2 a 120/);
+    expect(validateSlotValue(slot, `t:${uuid(803)}`, context)).toBeNull(); // tipo Obra
+    expect(validateSlotValue(slot, `t:${uuid(804)}`, context)).toBeNull(); // pasta LE, tipo Outro
+    expect(validateSlotValue(slot, `t:${uuid(800)}`, context)).toMatch(/incompatível/); // roteiro do ESE não
+    expect(validateSlotValue(slot, FREE_THEME, context)).toMatch(/incompatível/); // Tema Livre é só da palestra
+    // Estar na pasta LE não serve para as outras atividades.
+    expect(validateSlotValue(parseSlotKey("3|2|2|2|0")!, `t:${uuid(804)}`, context)).toMatch(/incompatível/);
+  });
+
+  it("estudo da pasta O Livro dos Espíritos: os sábados seguintes recebem os próximos da mesma pasta", () => {
+    expect(studySequence(book, uuid(804), 3).map((s) => s.code)).toEqual(["LE 002", "LE 003"]);
+    expect(studySequence(book, uuid(807), 3)).toEqual([]); // tipo Obra fora da pasta não puxa os da pasta
+  });
+
   it("tema digitado: limpa espaços e recusa o curto, o longo e caractere de controle", () => {
     expect(typedThemeValue("  A   caridade\n segundo Paulo ")).toBe("txt:A caridade segundo Paulo");
     expect(typedThemeValue("a")).toBeNull();

@@ -69,14 +69,17 @@ export function recessKinds(ym: string, days: readonly RecessDay[]) {
 
 export type ScaleWorker = { id: string; name: string; functions: readonly string[]; days: readonly number[] };
 export type ScaleSpeaker = { id: string; name: string };
-/** `reference`: a referência da Biblioteca de Estudos (ex.: "ESE Cap. X — itens 1 a 4"), mostrada na escala abaixo do estudo. */
-export type ScaleStudy = { id: string; type: string; code: string; title: string; reference?: string };
+/**
+ * `reference`: a referência da Biblioteca de Estudos (ex.: "ESE Cap. X — itens 1 a 4"), mostrada na escala abaixo do estudo.
+ * `le`: o estudo está na pasta "LE" (O Livro dos Espíritos) da Biblioteca de Estudos ou numa subpasta dela.
+ */
+export type ScaleStudy = { id: string; type: string; code: string; title: string; reference?: string; le?: boolean };
 export type Slot = { dow: number; si: number; ri: number; day: number; pos: number };
 
 export const FREE_THEME = "free:Tema Livre";
 
 /**
- * Tema da palestra pública digitado na tela (`txt:<texto>`). O banco aceita o mesmo formato
+ * Tema da palestra pública ou estudo de obra digitado na tela (`txt:<texto>`). O banco aceita o mesmo formato
  * (migração 202611261200_tema_palestra.sql): até THEME_MAX caracteres, sem quebra de linha.
  */
 export const TYPED_THEME = "txt:";
@@ -100,9 +103,20 @@ export function themeLabel(value: string) {
   return typedThemeText(value);
 }
 
-/** Na palestra pública o tema pode vir dos temas de palestra ou dos roteiros do ESE. */
-export function themeStudyTypes(section: Pick<Section, "s">): readonly string[] {
-  return section.s === "PALESTRA" ? ["PALESTRA", "ESE"] : section.s ? [section.s] : [];
+/**
+ * Estudos que cabem na linha de estudo de uma seção: na palestra pública, os temas de palestra e os roteiros do ESE;
+ * no estudo de obra (sábado), os estudos da pasta O Livro dos Espíritos (de qualquer tipo) e os do tipo Obra;
+ * nas demais, o próprio tipo.
+ */
+export function studyFitsSection(section: Pick<Section, "s">, study: Pick<ScaleStudy, "type" | "le">) {
+  if (section.s === "PALESTRA") return study.type === "PALESTRA" || study.type === "ESE";
+  if (section.s === "OBRA") return study.type === "OBRA" || Boolean(study.le);
+  return Boolean(section.s) && study.type === section.s;
+}
+
+/** Linhas de estudo que aceitam texto digitado: o tema da palestra pública e o estudo de obra do sábado. */
+export function acceptsTypedStudy(section: Pick<Section, "s">) {
+  return section.s === "PALESTRA" || section.s === "OBRA";
 }
 
 export function slotKey(slot: Slot) {
@@ -466,14 +480,18 @@ const studyNumber = (study: ScaleStudy) => {
   return match ? Number(match[0]) : null;
 };
 
-/** Estudos que vêm depois do escolhido, pela numeração (ROT. 070 → 071, 072…), para os próximos dias da mesma linha. */
+/**
+ * Estudos que vêm depois do escolhido, pela numeração (ROT. 070 → 071, 072…), para os próximos dias da mesma linha.
+ * Um estudo da pasta O Livro dos Espíritos segue com os seguintes da mesma pasta, seja qual for o tipo.
+ */
 export function studySequence(studies: readonly ScaleStudy[], chosenId: string, count: number): ScaleStudy[] {
   const chosen = studies.find((s) => s.id === chosenId);
   const start = chosen ? studyNumber(chosen) : null;
   if (!chosen || start === null || chosen.type === "PALESTRA") return [];
   const next: ScaleStudy[] = [];
   let last = start;
-  for (const study of studies.filter((s) => s.type === chosen.type && (studyNumber(s) ?? -1) > start).sort((a, b) => studyNumber(a)! - studyNumber(b)!)) {
+  const sameFamily = (s: ScaleStudy) => (chosen.le ? Boolean(s.le) : !s.le && s.type === chosen.type);
+  for (const study of studies.filter((s) => sameFamily(s) && (studyNumber(s) ?? -1) > start).sort((a, b) => studyNumber(a)! - studyNumber(b)!)) {
     if (next.length >= count) break;
     if (studyNumber(study) === last) continue;
     next.push(study);
@@ -494,13 +512,13 @@ export function validateSlotValue(
   if (!value) return null;
   const { section, type } = roleOf(slot);
   if (type === "STUDY") {
-    if (section.s === "PALESTRA") {
-      if (value === FREE_THEME) return null;
-      const text = typedThemeText(value);
-      if (text !== null) return typedThemeValue(text) === value ? null : `Tema digitado inválido: use de 2 a ${THEME_MAX} caracteres.`;
+    if (section.s === "PALESTRA" && value === FREE_THEME) return null;
+    const text = typedThemeText(value);
+    if (text !== null && acceptsTypedStudy(section)) {
+      return typedThemeValue(text) === value ? null : `${section.s === "OBRA" ? "Estudo" : "Tema"} digitado inválido: use de 2 a ${THEME_MAX} caracteres.`;
     }
     const study = value.startsWith("t:") ? context.studies.find((s) => s.id === value.slice(2)) : undefined;
-    return study && themeStudyTypes(section).includes(study.type) ? null : "Estudo incompatível com esta atividade.";
+    return study && studyFitsSection(section, study) ? null : "Estudo incompatível com esta atividade.";
   }
   if (type === "SPEAKER") {
     if (value.startsWith("s:")) return context.speakers.some((s) => s.id === value.slice(2)) ? null : "Palestrante externo inativo ou inexistente.";

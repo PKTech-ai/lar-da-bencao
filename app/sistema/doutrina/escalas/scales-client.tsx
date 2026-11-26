@@ -5,7 +5,7 @@ import { useMobileDay } from "@/components/mobile-day-columns";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DAY_HOURS, DAY_NAME, DOW_ORDER, FREE_THEME, RECESS_KINDS, RECESS_KIND_KEYS, TEMPLATES, THEME_MAX, availabilityIndex, canAddExtra, monthDays, parseSlotKey, psychRuleDay,
-  psychWeekMessage, recessKinds, recessSet, roleOf, slotAvailability, slotKey, typedThemeText, typedThemeValue,
+  psychWeekMessage, acceptsTypedStudy, recessKinds, recessSet, roleOf, slotAvailability, slotKey, typedThemeText, typedThemeValue,
   type Availability, type Conflict, type PsychBooking, type RecessDay, type RecessKind, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
 } from "@/lib/doutrina-scale";
 
@@ -27,13 +27,20 @@ type Payload = {
 /**
  * `group`: título do bloco na lista (optgroup), na ordem em que aparece.
  * `name` e `reference`: estudo sem a referência e a referência da Biblioteca (mostrada abaixo do estudo escolhido).
+ * `disabled`: aviso na lista, que não pode ser escolhido.
  */
-type Choice = { value: string; label: string; tone?: Availability["color"]; availability?: Availability; group?: string; name?: string; reference?: string };
+type Choice = {
+  value: string; label: string; tone?: Availability["color"]; availability?: Availability; group?: string; name?: string; reference?: string; disabled?: boolean;
+};
 
-/** Opção da lista do tema da palestra que abre a caixa para digitar (não é gravada). */
+/** Opção da lista do tema da palestra (ou do estudo de obra) que abre a caixa para digitar (não é gravada). */
 const TYPE_THEME = "__digitar__";
 const PALESTRA_GROUP = "Temas de palestra";
 const ESE_GROUP = "O Evangelho Segundo o Espiritismo — roteiros";
+const LE_GROUP = "O Livro dos Espíritos";
+const OBRA_GROUP = "Outros estudos de obra";
+/** Ordem da Biblioteca: pelo número do código (LE 2 antes de LE 10) e depois pelo título. */
+const byCode = (a: ScaleStudy, b: ScaleStudy) => a.code.localeCompare(b.code, "pt-BR", { numeric: true }) || a.title.localeCompare(b.title, "pt-BR");
 const studyName = (s: ScaleStudy) => `${s.code ? `${s.code} — ` : ""}${s.title}`;
 /** Como na Biblioteca de Estudos: código, título e referência (ex.: "ROT. 045 — Perdoai… · ESE Cap. X — itens 1 a 4"). */
 const studyLabel = (s: ScaleStudy) => `${studyName(s)}${s.reference ? ` · ${s.reference}` : ""}`;
@@ -41,7 +48,9 @@ const sameText = (a: string, b: string) => a.localeCompare(b, "pt-BR", { sensiti
 
 /** Opções da lista, com os blocos (optgroup) na ordem em que aparecem. */
 function renderChoices(choices: Choice[], current: string) {
-  const option = (o: Choice) => <option key={o.value} value={o.value} className={o.tone && o.value !== current ? `opt-${o.tone}` : undefined}>{o.label}</option>;
+  const option = (o: Choice) => (
+    <option key={o.value} value={o.value} disabled={o.disabled} className={o.tone && o.value !== current ? `opt-${o.tone}` : undefined}>{o.label}</option>
+  );
   const out: ReactNode[] = [];
   for (let i = 0; i < choices.length;) {
     const group = choices[i].group;
@@ -236,16 +245,29 @@ export function ScalesClient() {
       return { value, label: `${flag}${w.name}${suffix}${note}`, tone: availability.color, availability };
     };
     if (type === "STUDY") {
-      const studies = (kind: string, group?: string): Choice[] =>
-        data.options.studies.filter((s) => s.type === kind)
+      const studies = (fits: (s: ScaleStudy) => boolean, group?: string, sort?: typeof byCode): Choice[] => {
+        const found = data.options.studies.filter(fits);
+        return (sort ? found.sort(sort) : found)
           .map((s) => ({ value: `t:${s.id}`, label: studyLabel(s), name: studyName(s), reference: s.reference || undefined, group }));
-      if (section.s !== "PALESTRA") return studies(section.s ?? "");
-      // Palestra pública: tema livre, tema digitado (ou buscado pelo título), temas de palestra e roteiros do ESE.
+      };
+      if (!acceptsTypedStudy(section)) return studies((s) => s.type === section.s);
       const typed = typedThemeText(current);
-      list.push({ value: FREE_THEME, label: "TEMA LIVRE" });
+      if (section.s === "PALESTRA") {
+        // Palestra pública: tema livre, tema digitado (ou buscado pelo título), temas de palestra e roteiros do ESE.
+        list.push({ value: FREE_THEME, label: "TEMA LIVRE" });
+        if (typed !== null) list.push({ value: current, label: `✎ ${typed}` });
+        list.push({ value: TYPE_THEME, label: "✎ Digitar ou buscar o tema…" });
+        return [...list, ...studies((s) => s.type === "PALESTRA", PALESTRA_GROUP), ...studies((s) => s.type === "ESE", ESE_GROUP)];
+      }
+      // Estudo de obra (sábado): estudo digitado (ou buscado pelo título), estudos da pasta O Livro dos Espíritos e outros estudos de obra.
       if (typed !== null) list.push({ value: current, label: `✎ ${typed}` });
-      list.push({ value: TYPE_THEME, label: "✎ Digitar ou buscar o tema…" });
-      return [...list, ...studies("PALESTRA", PALESTRA_GROUP), ...studies("ESE", ESE_GROUP)];
+      list.push({ value: TYPE_THEME, label: "✎ Digitar ou buscar o estudo…" });
+      const book = studies((s) => Boolean(s.le), LE_GROUP, byCode);
+      return [
+        ...list,
+        ...(book.length ? book : [{ value: "__le_vazia__", label: "A pasta LE da Biblioteca de Estudos ainda não tem estudos", group: LE_GROUP, disabled: true }]),
+        ...studies((s) => s.type === "OBRA" && !s.le, OBRA_GROUP, byCode)
+      ];
     }
     if (type === "SPEAKER") {
       data.options.workers.filter((w) => w.functions.includes("Palestrante")).forEach((w) => list.push(worker(w, " (INT.)")));
@@ -280,16 +302,17 @@ export function ScalesClient() {
   }
 
   /**
-   * Tema digitado da palestra: o título de um roteiro (ou tema de palestra) sugerido na lista vira o próprio estudo;
-   * "tema livre" vira Tema Livre; qualquer outro texto é gravado como digitado.
+   * Tema digitado da palestra (ou estudo digitado do sábado): o título de um estudo sugerido na lista vira o próprio estudo;
+   * na palestra, "tema livre" vira Tema Livre; qualquer outro texto é gravado como digitado.
    */
   function saveTyped(key: string, current: string, choices: Choice[]) {
     const text = (typing?.text ?? "").replace(/\s+/g, " ").trim();
-    const study = choices.find((c) => c.group && (sameText(c.label, text) || sameText(c.name ?? "", text)));
-    const value = study ? study.value : sameText(text, "Tema Livre") ? FREE_THEME : typedThemeValue(text);
+    const palestra = roleOf(parseSlotKey(key)!).section.s === "PALESTRA";
+    const study = choices.find((c) => c.group && !c.disabled && (sameText(c.label, text) || sameText(c.name ?? "", text)));
+    const value = study ? study.value : palestra && sameText(text, "Tema Livre") ? FREE_THEME : typedThemeValue(text);
     if (!value) {
       setMessage("");
-      setError(`Digite o tema com 2 a ${THEME_MAX} letras, ou escolha um roteiro do ESE na lista.`);
+      setError(palestra ? `Digite o tema com 2 a ${THEME_MAX} letras, ou escolha um roteiro do ESE na lista.` : `Digite o estudo com 2 a ${THEME_MAX} letras, ou escolha um estudo da lista.`);
       return;
     }
     setTyping(null);
@@ -413,10 +436,10 @@ export function ScalesClient() {
           <div className="sheet-title">CENTRO ESPÍRITA FILANTRÓPICO LAR DA BÊNÇÃO</div>
           <div className="sheet-sub">ESCALA DE TRABALHADORES — {DAY_NAME[dow]} — {ym.split("-").reverse().join("/")} · HORÁRIO: {DAY_HOURS[dow]}</div>
           {typing ? (
-            /* Sugestões da caixa do tema digitado: ao digitar parte do título ou o número, aparecem os roteiros do ESE. */
-            <datalist id="palestra-temas">
-              <option value="Tema Livre" />
-              {(data?.options.studies ?? []).filter((s) => s.type === "PALESTRA" || s.type === "ESE").map((s) => <option key={s.id} value={studyLabel(s)} />)}
+            /* Sugestões da caixa do texto digitado: ao digitar parte do título ou o número, aparecem os estudos da mesma lista. */
+            <datalist id="estudos-digitados">
+              {roleOf(parseSlotKey(typing.key)!).section.s === "PALESTRA" ? <option value="Tema Livre" /> : null}
+              {options(typing.key, byKey.get(typing.key) ?? "").filter((c) => c.group && !c.disabled).map((c) => <option key={c.value} value={c.label} />)}
             </datalist>
           ) : null}
           {TEMPLATES[dow].map((section, si) => (
@@ -457,14 +480,17 @@ export function ScalesClient() {
                                   </button>
                                 ) : pinned ? <span className="pin-button is-pinned" title={`${pinned.worker_name} é fixo`}>📌</span> : null;
                                 if (typing?.key === key && !readOnly) {
+                                  const palestra = roleOf({ dow, si, ri }).section.s === "PALESTRA";
                                   return (
                                     <form className="slot-with-pin theme-typing" key={key} onSubmit={(e) => { e.preventDefault(); saveTyped(key, current, choices); }}>
-                                      <input autoFocus list="palestra-temas" value={typing.text} maxLength={THEME_MAX} enterKeyHint="done"
-                                        placeholder="Digite o tema ou busque o roteiro" aria-label={`Tema digitado — ${describeSlot(key, ym)}`}
+                                      <input autoFocus list="estudos-digitados" value={typing.text} maxLength={THEME_MAX} enterKeyHint="done"
+                                        placeholder={palestra ? "Digite o tema ou busque o roteiro" : "Digite o estudo ou busque na lista"}
+                                        aria-label={`${palestra ? "Tema" : "Estudo"} digitado — ${describeSlot(key, ym)}`}
                                         onChange={(e) => setTyping({ key, text: e.target.value })}
                                         onKeyDown={(e) => { if (e.key === "Escape") setTyping(null); }} />
-                                      <button type="submit" className="button primary" title="Gravar o tema">OK</button>
-                                      <button type="button" className="slot-remove" title="Cancelar" aria-label="Cancelar o tema digitado" onClick={() => setTyping(null)}>×</button>
+                                      <button type="submit" className="button primary" title={palestra ? "Gravar o tema" : "Gravar o estudo"}>OK</button>
+                                      <button type="button" className="slot-remove" title="Cancelar" aria-label={palestra ? "Cancelar o tema digitado" : "Cancelar o estudo digitado"}
+                                        onClick={() => setTyping(null)}>×</button>
                                     </form>
                                   );
                                 }
