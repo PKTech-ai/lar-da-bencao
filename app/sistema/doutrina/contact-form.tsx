@@ -22,7 +22,7 @@ export function DoctrineContactForm({ coordinator, phone, canEdit }: { coordinat
   return (
     <form className="form-stack" onSubmit={save}>
       <div className="form-row">
-        <label>Coordenador(a) — Controle de Acesso<input value={coordinator} readOnly /></label>
+        <label>Coordenador(a) — Organograma de Vinculação<input value={coordinator} readOnly /></label>
         <label>WhatsApp / Contato<MaskedInput name="phone" mask={maskPhoneInput} defaultValue={phone} maxLength={40} disabled={!canEdit} inputMode="tel" placeholder="(92) 99999-9999" /></label>
       </div>
       {canEdit ? <div className="row-actions"><button className="button primary" disabled={busy}>Salvar contato</button>{status ? <span className="small">{status}</span> : null}</div> : null}
