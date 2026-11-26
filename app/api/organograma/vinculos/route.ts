@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         [input.seat, department]
       );
       if (taken.rows.some((r) => r.user_id === input.user_id)) throw new AppError(`${name} já está vinculado(a) em ${where}.`, 409, "ALREADY_LINKED");
-      if ((isBoardSeat(input.seat) || input.seat === "subcoordenacao") && taken.rows[0]) {
+      if ((isBoardSeat(input.seat) || isDepartmentSeat(input.seat)) && taken.rows[0]) {
         throw new AppError(`${where} já está com ${taken.rows[0].name}. Tire essa pessoa antes de vincular outra.`, 409, "SEAT_TAKEN");
       }
       // A mesma pessoa não é Coordenador(a) e Subcoordenador(a) do mesmo departamento (a pessoa já está travada acima).

@@ -162,7 +162,7 @@ export function OrgLinksPanel() {
                   <div key={seat} className="org-link-seat">
                     <div className="org-link-seat-title">{title}</div>
                     {people(rows)}
-                    {seat === "coordenacao" || !rows.length ? add(seat, key, inDepartment(key)) : null}
+                    {rows.length ? null : add(seat, key, inDepartment(key))}
                   </div>
                 );
               })}

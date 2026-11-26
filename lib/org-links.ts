@@ -21,7 +21,7 @@ export const ORG_SEATS: readonly OrgSeat[] = [
 
 export const isBoardSeat = (seat: string): seat is BoardSeat => BOARD_SEATS.some((s) => s.seat === seat);
 
-/** Cada departamento tem Coordenador(a) e Subcoordenador(a). Coordenação aceita mais de uma pessoa; Subcoordenação, uma. */
+/** Cada departamento tem um(a) Coordenador(a) e um(a) Subcoordenador(a). */
 export const DEPARTMENT_SEATS = [
   { seat: "coordenacao", label: "Coordenador(a)" },
   { seat: "subcoordenacao", label: "Subcoordenador(a)" }
