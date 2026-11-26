@@ -17,6 +17,7 @@ import { PatrimonyReport } from "@/components/modules/patrimonio-relatorio";
 import { ServiceOrdersPanel } from "@/components/modules/ordens-servico";
 import { EventoCompleto } from "@/components/modules/eventos-evento";
 import { LivrariaVendas } from "@/components/modules/livraria-venda";
+import { CaravanaAmorPanel } from "@/components/modules/assistencia-caravana";
 
 /** Aba que leva para uma tela já existente, sem duplicar cadastro. */
 function Shortcut({ href, label, text }: { href: string; label: string; text: string }) {
@@ -53,6 +54,7 @@ export function ModulePanel({ name }: { name: string }) {
     case "whatsapp-tesouraria": return <WhatsappQueue scope="tesouraria" />;
     case "trabalhadores-patrimonio": return <DepartmentWorkers department="patrimonio" />;
     case "trabalhadores-assistencia": return <DepartmentWorkers department="assistencia_social" />;
+    case "assistencia-caravana": return <CaravanaAmorPanel />;
     case "trabalhadores-eventos": return <DepartmentWorkers department="eventos" />;
     case "trabalhadores-divulgacao": return <DepartmentWorkers department="divulgacao" />;
     case "trabalhadores-juridico": return <DepartmentWorkers department="juridico" />;

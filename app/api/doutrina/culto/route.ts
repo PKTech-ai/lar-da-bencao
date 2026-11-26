@@ -5,135 +5,94 @@ import { assertSameOrigin } from "@/lib/csrf";
 import { query, transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import { canEditDoutrina, requireDoutrina } from "@/lib/doutrina-data";
-import { cultoEligible, cultoStatus, penultimateSaturday, type CultoRole } from "@/lib/doutrina-extras";
+import { CULTO_NAME_MAX, cultoHostName } from "@/lib/doutrina-extras";
 import { isValidMonth } from "@/lib/doutrina-scale";
+import { brDate, isProgramYear, penultimateSaturday, yearSaturdays } from "@/lib/monthly-saturdays";
 
-const monthSchema = z.string().refine(isValidMonth, "Mês inválido.");
+/**
+ * Programação anual do Culto no Lar dos Trabalhadores: um por mês, no penúltimo sábado (o último sábado é da
+ * Caravana do Amor). Quem tem Alterar em Culto no Lar escolhe um sábado livre e digita o nome do trabalhador.
+ */
+
 const putSchema = z.object({
-  month: monthSchema,
-  requester_id: z.string().uuid().nullable(),
-  house: z.string().trim().max(200),
-  leader_id: z.string().uuid().nullable(),
-  speaker_id: z.string().uuid().nullable(),
+  month: z.string().refine(isValidMonth, "Mês inválido."),
+  host_name: z.string().max(CULTO_NAME_MAX + 40),
+  /** Versão da linha do mês quando a tela abriu (0 = mês ainda sem nada gravado). */
   version: z.number().int().nonnegative()
 });
-const postSchema = z.object({ month: monthSchema, action: z.enum(["generate", "delete"]), version: z.number().int().nonnegative() });
 
-type CultoRow = {
-  id: string; year: number; month: number; culto_date: string; requester_id: string | null; house: string;
-  leader_id: string | null; speaker_id: string | null; deleted_at: string | null; version: number;
-};
+type CultoRow = { year: number; month: number; host_name: string; deleted_at: string | null; version: number };
 
-async function load(ym: string, lock = false, db: { query: typeof query } = { query }) {
+async function loadMonth(ym: string, db: { query: typeof query }) {
   const [y, m] = ym.split("-").map(Number);
   const rows = await db.query<CultoRow>(
-    `select id, year, month, to_char(culto_date, 'YYYY-MM-DD') as culto_date, requester_id, house, leader_id, speaker_id, deleted_at, version
-       from app.culto_lar_months where year=$1 and month=$2 ${lock ? "for update" : ""}`,
+    "select year, month, host_name, deleted_at, version from app.culto_lar_months where year=$1 and month=$2 for update",
     [y, m]
   );
   return rows.rows[0] ?? null;
-}
-
-/** Trabalhadores aprovados da Doutrina com as funções exigidas por papel (mock `cultoWorkerOptions`). */
-async function eligibleWorkers(db: { query: typeof query } = { query }) {
-  const rows = await db.query<{ id: string; name: string; functions: string[] }>(
-    `select w.id, w.full_name as name, w.functions from app.workers w
-       join app.worker_departments d on d.worker_id = w.id and d.department_key = 'doutrina'
-      where w.status = 'active' order by w.full_name`
-  );
-  return rows.rows;
 }
 
 export async function GET(request: Request) {
   try {
     const actor = await requireActor();
     await requireDoutrina(actor, "read", "culto-lar");
-    const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
-    const [row, workers] = await Promise.all([load(ym), eligibleWorkers()]);
-    const culto = row ?? { id: null, culto_date: penultimateSaturday(ym), requester_id: null, house: "", leader_id: null, speaker_id: null, deleted_at: null, version: 0 };
-    const options = (role: CultoRole) => workers.filter((w) => cultoEligible(role, w.functions)).map(({ id, name }) => ({ id, name }));
-    return Response.json({
-      culto: { ...culto, culto_date: penultimateSaturday(ym), status: cultoStatus(culto), saved: Boolean(row) },
-      options: { requester: options("requester"), leader: options("leader"), speaker: options("speaker") },
-      canEdit: await canEditDoutrina(actor, "culto-lar")
-    }, { headers: { "Cache-Control": "private, no-store" } });
+    const year = Number(new URL(request.url).searchParams.get("year"));
+    if (!isProgramYear(year)) throw new AppError("Ano inválido.");
+    const [rows, canEdit] = await Promise.all([
+      query<CultoRow>("select year, month, host_name, deleted_at, version from app.culto_lar_months where year=$1", [year]),
+      canEditDoutrina(actor, "culto-lar")
+    ]);
+    const saved = new Map(rows.rows.map((r) => [r.month, r]));
+    const months = yearSaturdays(year).map((m) => {
+      const row = saved.get(Number(m.month.slice(5)));
+      return { ...m, host_name: row && !row.deleted_at ? row.host_name : "", version: row?.version ?? 0 };
+    });
+    return Response.json({ year, months, canEdit }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return errorResponse(error);
   }
 }
 
-/** Define anfitrião, lar, dirigente e expositor do mês (escolha manual pela Doutrina). */
+/** Grava (ou libera, com nome vazio) o trabalhador do Culto no Lar de um mês. */
 export async function PUT(request: Request) {
   try {
     assertSameOrigin(request);
     const actor = await requireActor();
     await requireDoutrina(actor, "update", "culto-lar");
     const input = putSchema.parse(await request.json());
+    const name = cultoHostName(input.host_name);
+    if (name === null) throw new AppError(`Digite o nome do trabalhador com 2 a ${CULTO_NAME_MAX} letras.`);
     const [year, month] = input.month.split("-").map(Number);
+    const date = penultimateSaturday(input.month);
     const result = await transaction(async (client) => {
-      const current = await load(input.month, true, client);
-      if (current?.deleted_at) throw new AppError("A escala deste mês foi excluída. Gere a escala em branco para usar de novo.", 409, "CULTO_DELETED");
-      if ((current?.version ?? 0) !== input.version) throw new AppError("O Culto no Lar foi alterado por outra sessão. Recarregue a página.", 409, "VERSION_CONFLICT");
-      const workers = await eligibleWorkers(client);
-      for (const [role, id] of [["requester", input.requester_id], ["leader", input.leader_id], ["speaker", input.speaker_id]] as const) {
-        if (!id) continue;
-        const worker = workers.find((w) => w.id === id);
-        if (!worker || !cultoEligible(role, worker.functions)) {
-          throw new AppError(role === "leader" ? "Dirigente sem função de dirigente ou sem aprovação." : role === "speaker" ? "Expositor sem função de expositor/palestrante ou sem aprovação." : "Anfitrião sem aprovação ou fora da Doutrina.", 409, "WORKER_NOT_ELIGIBLE");
-        }
+      const current = await loadMonth(input.month, client);
+      // Outra pessoa mexeu neste sábado depois que a tela abriu: não sobrescreve sem querer.
+      if ((current?.version ?? 0) !== input.version) {
+        const taken = current && !current.deleted_at && current.host_name;
+        throw new AppError(taken
+          ? `O sábado ${brDate(date)} acabou de ser escolhido por ${current.host_name}. Recarregue a página e escolha outro sábado livre.`
+          : "Este sábado foi alterado por outra pessoa. Recarregue a página.", 409, "VERSION_CONFLICT");
       }
       const saved = await client.query<{ id: string; version: number }>(
-        `insert into app.culto_lar_months (year, month, culto_date, requester_id, house, leader_id, speaker_id, created_by, updated_by)
-         values ($1,$2,$3::date,$4,$5,$6,$7,$8,$8)
-         on conflict (year, month) do update set requester_id=excluded.requester_id, house=excluded.house, leader_id=excluded.leader_id,
-           speaker_id=excluded.speaker_id, updated_by=excluded.updated_by, updated_at=now(), version=app.culto_lar_months.version+1
+        `insert into app.culto_lar_months (year, month, culto_date, host_name, created_by, updated_by)
+         values ($1, $2, $3::date, $4, $5, $5)
+         on conflict (year, month) do update set host_name = excluded.host_name, culto_date = excluded.culto_date,
+           deleted_at = null, deleted_by = null, updated_by = excluded.updated_by, updated_at = now(),
+           version = app.culto_lar_months.version + 1
          returning id, version`,
-        [year, month, penultimateSaturday(input.month), input.requester_id, input.house, input.leader_id, input.speaker_id, actor.id]
+        [year, month, date, name, actor.id]
       );
-      const status = cultoStatus({ house: input.house, leader_id: input.leader_id, speaker_id: input.speaker_id });
+      const before = current && !current.deleted_at ? current.host_name : "";
       await appendAudit(actor, {
-        category: current ? "Edição" : "Inclusão", action: "Culto no Lar atualizado", module: "Doutrina", section: "Culto no Lar",
-        entityType: "culto_lar_month", entityId: saved.rows[0].id, details: `${input.month} · ${status}`,
-        before: current ? { house: current.house, leader_id: current.leader_id, speaker_id: current.speaker_id } : null,
-        after: { house: input.house, leader_id: input.leader_id, speaker_id: input.speaker_id }
+        category: before ? (name ? "Edição" : "Exclusão") : "Inclusão",
+        action: name ? "Culto no Lar: trabalhador do mês" : "Culto no Lar: sábado liberado",
+        module: "Doutrina", section: "Culto no Lar", entityType: "culto_lar_month", entityId: saved.rows[0].id,
+        details: `${brDate(date)}${name ? ` · ${name}` : ""}`,
+        before: before ? { host_name: before } : null, after: name ? { host_name: name } : null
       }, client);
-      return { version: saved.rows[0].version, status };
+      return { version: saved.rows[0].version, host_name: name };
     });
     return Response.json(result);
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
-
-/** Gerar escala em branco (substitui o mês) ou excluir a escala do mês (exclusão lógica). */
-export async function POST(request: Request) {
-  try {
-    assertSameOrigin(request);
-    const actor = await requireActor();
-    await requireDoutrina(actor, "update", "culto-lar");
-    const input = postSchema.parse(await request.json());
-    const [year, month] = input.month.split("-").map(Number);
-    await transaction(async (client) => {
-      const current = await load(input.month, true, client);
-      if ((current?.version ?? 0) !== input.version) throw new AppError("O Culto no Lar foi alterado por outra sessão. Recarregue a página.", 409, "VERSION_CONFLICT");
-      if (input.action === "delete" && (!current || current.deleted_at)) throw new AppError("Não há escala deste mês para excluir.", 404, "CULTO_NOT_FOUND");
-      const deleted = input.action === "delete";
-      const saved = await client.query<{ id: string }>(
-        `insert into app.culto_lar_months (year, month, culto_date, deleted_at, deleted_by, created_by, updated_by)
-         values ($1,$2,$3::date, case when $4 then now() end, case when $4 then $5::uuid end, $5, $5)
-         on conflict (year, month) do update set requester_id=null, house='', leader_id=null, speaker_id=null,
-           deleted_at=case when $4 then now() end, deleted_by=case when $4 then $5::uuid end,
-           updated_by=$5, updated_at=now(), version=app.culto_lar_months.version+1
-         returning id`,
-        [year, month, penultimateSaturday(input.month), deleted, actor.id]
-      );
-      await appendAudit(actor, {
-        category: deleted ? "Exclusão" : "Inclusão", action: deleted ? "Exclusão da escala do Culto no Lar" : "Escala do Culto no Lar gerada em branco",
-        module: "Doutrina", section: "Culto no Lar", entityType: "culto_lar_month", entityId: saved.rows[0].id, details: input.month,
-        before: current ? { house: current.house, leader_id: current.leader_id, speaker_id: current.speaker_id } : null
-      }, client);
-    });
-    return Response.json({ ok: true });
   } catch (error) {
     return errorResponse(error);
   }

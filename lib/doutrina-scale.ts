@@ -86,14 +86,15 @@ export type ScaleSpeaker = { id: string; name: string };
 /**
  * `reference`: a referência da Biblioteca de Estudos (ex.: "ESE Cap. X — itens 1 a 4"), mostrada na escala abaixo do estudo.
  * `le`: o estudo está na pasta "LE" (O Livro dos Espíritos) da Biblioteca de Estudos ou numa subpasta dela.
+ * `mep`: o estudo está na pasta "MEP" (Mediunidade: estudo e prática) da Biblioteca de Estudos ou numa subpasta dela.
  */
-export type ScaleStudy = { id: string; type: string; code: string; title: string; reference?: string; le?: boolean };
+export type ScaleStudy = { id: string; type: string; code: string; title: string; reference?: string; le?: boolean; mep?: boolean };
 export type Slot = { dow: number; si: number; ri: number; day: number; pos: number };
 
 export const FREE_THEME = "free:Tema Livre";
 
 /**
- * Tema da palestra pública ou estudo de obra digitado na tela (`txt:<texto>`). O banco aceita o mesmo formato
+ * Tema da palestra pública, estudo de obra ou roteiro do MEP digitado na tela (`txt:<texto>`). O banco aceita o mesmo formato
  * (migração 202611261200_tema_palestra.sql): até THEME_MAX caracteres, sem quebra de linha.
  */
 export const TYPED_THEME = "txt:";
@@ -120,17 +121,24 @@ export function themeLabel(value: string) {
 /**
  * Estudos que cabem na linha de estudo de uma seção: na palestra pública, os temas de palestra e os roteiros do ESE;
  * no estudo de obra (sábado), os estudos da pasta O Livro dos Espíritos (de qualquer tipo) e os do tipo Obra;
+ * no estudo do MEP (quinta), os estudos da pasta MEP (de qualquer tipo) e os do tipo MEP;
  * nas demais, o próprio tipo.
  */
-export function studyFitsSection(section: Pick<Section, "s">, study: Pick<ScaleStudy, "type" | "le">) {
+export function studyFitsSection(section: Pick<Section, "s">, study: Pick<ScaleStudy, "type" | "le" | "mep">) {
   if (section.s === "PALESTRA") return study.type === "PALESTRA" || study.type === "ESE";
   if (section.s === "OBRA") return study.type === "OBRA" || Boolean(study.le);
+  if (section.s === "MEP") return study.type === "MEP" || Boolean(study.mep);
   return Boolean(section.s) && study.type === section.s;
 }
 
-/** Linhas de estudo que aceitam texto digitado: o tema da palestra pública e o estudo de obra do sábado. */
+/** Linhas de estudo que aceitam texto digitado: o tema da palestra pública, o estudo de obra do sábado e o roteiro do MEP da quinta. */
 export function acceptsTypedStudy(section: Pick<Section, "s">) {
-  return section.s === "PALESTRA" || section.s === "OBRA";
+  return section.s === "PALESTRA" || section.s === "OBRA" || section.s === "MEP";
+}
+
+/** Como a tela chama o texto digitado em cada linha de estudo: "Tema" (palestra), "Roteiro" (MEP) ou "Estudo" (obra). */
+export function typedStudyNoun(section: Pick<Section, "s">) {
+  return section.s === "PALESTRA" ? "Tema" : section.s === "MEP" ? "Roteiro" : "Estudo";
 }
 
 export function slotKey(slot: Slot) {

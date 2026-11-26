@@ -76,6 +76,7 @@ export const MODULE_PAGES: readonly ModulePage[] = [
       { slug: "rancho", label: "Rancho dos Evangelizandos", resource: "assistencia-rancho", group: "Famílias e entregas" },
       { slug: "kits", label: "Kits de Higiene", resource: "assistencia-kits", group: "Famílias e entregas" },
       { slug: "atividades", label: "Controle de Atividades", resource: "assistencia-atividades", group: "Famílias e entregas" },
+      { slug: "caravana", label: "Caravana do Amor", panel: "assistencia-caravana", group: "Famílias e entregas" },
       { slug: "voluntarios", label: "Cadastro de Voluntários", resource: "assistencia-voluntarios", group: "Voluntários e doadores" },
       { slug: "mantenedores", label: "Mantenedores da Cesta Básica", resource: "assistencia-mantenedores", group: "Voluntários e doadores" },
       { slug: "cafe", label: "Doadores do Café das Crianças", resource: "assistencia-cafe", group: "Voluntários e doadores" },

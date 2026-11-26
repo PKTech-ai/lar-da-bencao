@@ -45,6 +45,7 @@ export const DEPARTMENT_MODULES: Readonly<Record<string, readonly DepartmentModu
     { key: "rancho", label: "Rancho dos Evangelizandos", group: "Famílias e entregas" },
     { key: "kits", label: "Kits de Higiene", group: "Famílias e entregas" },
     { key: "atividades", label: "Controle de Atividades", group: "Famílias e entregas" },
+    { key: "caravana", label: "Caravana do Amor", viewOnly: true, group: "Famílias e entregas" },
     { key: "voluntarios", label: "Cadastro de Voluntários", group: "Voluntários e doadores" },
     { key: "mantenedores", label: "Mantenedores da Cesta Básica", group: "Voluntários e doadores" },
     { key: "cafe", label: "Doadores do Café das Crianças", group: "Voluntários e doadores" },

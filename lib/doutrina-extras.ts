@@ -1,14 +1,19 @@
 /**
  * Culto no Lar, Planejamento de Treinamentos e Caravana no Lar — regras do mock v215 (lógica pura).
  */
-import { monthDays } from "@/lib/doutrina-scale";
-
 /* ---------------- Culto no Lar ---------------- */
 
-export function penultimateSaturday(ym: string) {
-  const saturdays = monthDays(ym, 6);
-  const day = saturdays.length >= 2 ? saturdays[saturdays.length - 2] : saturdays[0];
-  return `${ym}-${String(day).padStart(2, "0")}`;
+export { penultimateSaturday } from "@/lib/monthly-saturdays";
+
+/** Nome do trabalhador digitado na programação do Culto no Lar. O banco aceita o mesmo (até 120 caracteres). */
+export const CULTO_NAME_MAX = 120;
+
+/** Texto digitado → nome gravado; "" libera a data; null quando curto, longo demais ou com caractere de controle. */
+export function cultoHostName(text: string): string | null {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  if (clean.length < 2 || clean.length > CULTO_NAME_MAX || /[\u0000-\u001f\u007f]/.test(clean)) return null;
+  return clean;
 }
 
 export const CULTO_LEADER_FUNCTIONS = ["Dirigente de Estudo", "Dirigente de Reunião", "Dirigente de Palestra"] as const;
