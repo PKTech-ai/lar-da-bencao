@@ -6,13 +6,16 @@ import { query, transaction } from "@/lib/db";
 import { writeDepartmentMarks } from "@/lib/department-access";
 import { marksFromLevel } from "@/lib/department-modules";
 import { AppError, errorResponse } from "@/lib/errors";
-import { departmentsToRevoke, isBoardSeat, ORG_DEPARTMENTS, ORG_SEATS, seatDepartments, seatLabel, type OrgSeat } from "@/lib/org-links";
+import {
+  CONSELHO_MAX, higherLevel, isBoardSeat, levelFromLinks, ORG_DEPARTMENTS, ORG_SEATS, seatDepartments, seatLabel, seatLevel, unlinkEffect, type OrgSeat
+} from "@/lib/org-links";
 import { assertPermission, hasPermission } from "@/lib/permissions";
 
 /**
  * Organograma de Vinculação. Todos os usuários ativos veem quem ocupa cada cargo; só o Administrador vincula e
- * desvincula. Vincular dá acesso total no setor do cargo (lib/org-links.ts → seatDepartments); desvincular tira o
- * acesso que aquele vínculo deu, menos onde outro vínculo da mesma pessoa ainda dá. O perfil da pessoa não muda.
+ * desvincula. Vincular dá acesso no setor do cargo (lib/org-links.ts → seatDepartments e seatLevel: total, ou só
+ * consulta para o Vice-Presidente); desvincular tira o acesso que aquele vínculo deu, menos onde outro vínculo da
+ * mesma pessoa ainda dá (aí fica o nível desse outro vínculo). O perfil da pessoa não muda.
  */
 
 const headers = { "Cache-Control": "private, no-store" };
@@ -74,6 +77,8 @@ export async function POST(request: Request) {
       if (department && !labels.rows.some((d) => d.key === department)) throw new AppError("Departamento inexistente.", 400, "DEPARTMENT_NOT_FOUND");
       const where = seatLabel(input.seat, department ? label(department) : undefined);
 
+      // Um vínculo por vez em cada cargo: duas pessoas vinculando juntas não passam do limite do Conselho Fiscal.
+      await client.query("select pg_advisory_xact_lock(hashtext('app.org_links:' || $1))", [`${input.seat}:${department ?? ""}`]);
       const taken = await client.query<{ user_id: string; name: string }>(
         `${LINKS_SQL} where l.seat = $1 and coalesce(l.department_key, '') = coalesce($2, '')`,
         [input.seat, department]
@@ -82,19 +87,29 @@ export async function POST(request: Request) {
       if (isBoardSeat(input.seat) && taken.rows[0]) {
         throw new AppError(`${where} já está com ${taken.rows[0].name}. Tire essa pessoa antes de vincular outra.`, 409, "SEAT_TAKEN");
       }
+      if (input.seat === "conselho_fiscal" && taken.rows.length >= CONSELHO_MAX) {
+        throw new AppError(`O Conselho Fiscal já tem ${CONSELHO_MAX} membros. Tire um antes de vincular outro.`, 409, "SEAT_FULL");
+      }
 
       const granted = seatDepartments(input.seat, department, labels.rows.map((d) => d.key));
+      const level = seatLevel(input.seat);
+      const others = await client.query<{ seat: OrgSeat; granted: string[] }>("select seat, granted from app.org_links where user_id = $1", [input.user_id]);
       const saved = await client.query<{ id: string }>(
         "insert into app.org_links (seat, department_key, user_id, granted, created_by) values ($1, $2, $3, $4, $5) returning id",
         [input.seat, department, input.user_id, granted, actor.id]
       );
-      for (const key of granted) await writeDepartmentMarks(client, input.user_id, key, marksFromLevel(key, "coordenacao"), actor.id);
+      // Onde outro vínculo da pessoa já dá o mesmo nível ou mais, fica como está (o Vice que também coordena não perde nada).
+      for (const key of granted) {
+        const kept = levelFromLinks(key, others.rows);
+        if (!kept || !higherLevel(kept, level)) await writeDepartmentMarks(client, input.user_id, key, marksFromLevel(key, level), actor.id);
+      }
 
+      const what = level === "consulta" ? "só consulta em" : "acesso total em";
       await appendAudit(actor, {
         category: "Segurança", action: "Vinculação no organograma", module: "Controle de Acesso", section: "Organograma de Vinculação",
         entityType: "user", entityId: input.user_id, result: "success",
-        details: `${name} · ${where} · acesso total em: ${granted.map(label).join(", ") || "nada"}`.slice(0, 1800),
-        after: { seat: input.seat, department_key: department, granted }
+        details: `${name} · ${where} · ${what}: ${granted.map(label).join(", ") || "nada"}`.slice(0, 1800),
+        after: { seat: input.seat, department_key: department, granted, level }
       }, client);
       return { id: saved.rows[0].id, granted };
     });
@@ -117,21 +132,22 @@ export async function DELETE(request: Request) {
       const link = found.rows[0];
       if (!link) throw new AppError("Esse vínculo já foi retirado. Recarregue a página.", 404, "NOT_FOUND");
       await client.query("select 1 from app.users where id = $1 for update", [link.user_id]);
-      const others = await client.query<{ granted: string[] }>("select granted from app.org_links where user_id = $1 and id <> $2", [link.user_id, id]);
-      const revoke = departmentsToRevoke(link.granted, others.rows);
+      const others = await client.query<{ seat: OrgSeat; granted: string[] }>("select seat, granted from app.org_links where user_id = $1 and id <> $2", [link.user_id, id]);
+      const { revoke, downgrade } = unlinkEffect(link, others.rows);
 
       await client.query("delete from app.org_links where id = $1", [id]);
       for (const key of revoke) await writeDepartmentMarks(client, link.user_id, key, [], actor.id);
+      for (const key of downgrade) await writeDepartmentMarks(client, link.user_id, key, marksFromLevel(key, "consulta"), actor.id);
 
       const labels = await client.query<{ key: string; label: string }>("select key, label from app.departments");
       const label = (key: string) => labels.rows.find((d) => d.key === key)?.label ?? key;
       await appendAudit(actor, {
         category: "Segurança", action: "Desvinculação no organograma", module: "Controle de Acesso", section: "Organograma de Vinculação",
         entityType: "user", entityId: link.user_id, result: "success",
-        details: `${link.name} · ${seatLabel(link.seat, link.department_key ? label(link.department_key) : undefined)} · acesso retirado em: ${revoke.map(label).join(", ") || "nada"}`.slice(0, 1800),
-        before: { seat: link.seat, department_key: link.department_key, granted: link.granted }, after: { revoked: revoke }
+        details: `${link.name} · ${seatLabel(link.seat, link.department_key ? label(link.department_key) : undefined)} · acesso retirado em: ${revoke.map(label).join(", ") || "nada"}${downgrade.length ? ` · passa a só consultar: ${downgrade.map(label).join(", ")}` : ""}`.slice(0, 1800),
+        before: { seat: link.seat, department_key: link.department_key, granted: link.granted }, after: { revoked: revoke, downgraded: downgrade }
       }, client);
-      return { revoked: revoke };
+      return { revoked: revoke, downgraded: downgrade };
     });
     return Response.json(result, { headers });
   } catch (error) {

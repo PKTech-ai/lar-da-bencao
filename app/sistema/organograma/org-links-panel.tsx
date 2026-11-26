@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BOARD_SEATS, departmentsToRevoke, ORG_DEPARTMENTS, seatDepartments, seatLabel, type OrgSeat } from "@/lib/org-links";
+import { BOARD_SEATS, CONSELHO_MAX, ORG_DEPARTMENTS, seatDepartments, seatLabel, seatLevel, unlinkEffect, type OrgSeat } from "@/lib/org-links";
 import "./org-links.css";
 
 type Link = { id: string; seat: OrgSeat; department_key: string | null; user_id: string; granted: string[]; name: string; active: boolean };
@@ -37,13 +37,17 @@ export function OrgLinksPanel() {
   function accessText(seat: OrgSeat, department: string | null = null) {
     if (seat === "presidente") return "Acesso total em todos os departamentos e na Diretoria";
     const keys = seatDepartments(seat, department, active);
-    return keys.length ? `Acesso total em ${list(keys)}` : "Sem acesso a liberar";
+    if (!keys.length) return "Sem acesso a liberar";
+    return seatLevel(seat) === "consulta" ? `Só consulta em ${list(keys)} (não altera)` : `Acesso total em ${list(keys)}`;
   }
 
   async function link(seat: OrgSeat, department: string | null, user: Option) {
     const keys = seatDepartments(seat, department, active);
     const where = seatLabel(seat, department ? label(department) : undefined);
-    if (!window.confirm(`Vincular ${user.name} em ${where}?\n\nA pessoa passa a ter acesso total (consultar, alterar, editar e excluir) em:\n${list(keys) || "nenhum departamento"}`)) return false;
+    const what = seatLevel(seat) === "consulta"
+      ? "A pessoa passa a poder só consultar (sem alterar, editar ou excluir) em:"
+      : "A pessoa passa a ter acesso total (consultar, alterar, editar e excluir) em:";
+    if (!window.confirm(`Vincular ${user.name} em ${where}?\n\n${what}\n${list(keys) || "nenhum departamento"}`)) return false;
     setBusy(true); setError(""); setMessage("");
     const response = await fetch("/api/organograma/vinculos", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -52,15 +56,17 @@ export function OrgLinksPanel() {
     const body = await response.json().catch(() => ({}));
     setBusy(false);
     if (!response.ok) { setError(body.error ?? "Não foi possível vincular."); void load().catch(() => undefined); return false; }
-    setMessage(`${user.name} vinculado(a) em ${where}. Acesso total liberado.`);
+    setMessage(`${user.name} vinculado(a) em ${where}. ${seatLevel(seat) === "consulta" ? "Consulta liberada." : "Acesso total liberado."}`);
     await load().catch((e: Error) => setError(e.message));
     return true;
   }
 
   async function unlink(row: Link) {
     const where = seatLabel(row.seat, row.department_key ? label(row.department_key) : undefined);
-    const lose = departmentsToRevoke(row.granted, data!.links.filter((l) => l.user_id === row.user_id && l.id !== row.id));
-    const text = lose.length ? `\n\nA pessoa perde o acesso em:\n${list(lose)}` : "\n\nO acesso continua, porque outro vínculo dela libera os mesmos departamentos.";
+    const { revoke: lose, downgrade } = unlinkEffect(row, data!.links.filter((l) => l.user_id === row.user_id && l.id !== row.id));
+    const text = (lose.length ? `\n\nA pessoa perde o acesso em:\n${list(lose)}` : "")
+      + (downgrade.length ? `\n\nPassa a só consultar em:\n${list(downgrade)}` : "")
+      || "\n\nO acesso continua, porque outro vínculo dela libera os mesmos departamentos.";
     if (!window.confirm(`Tirar ${row.name} de ${where}?${text}`)) return;
     setBusy(true); setError(""); setMessage("");
     const response = await fetch(`/api/organograma/vinculos?id=${encodeURIComponent(row.id)}`, { method: "DELETE" });
@@ -88,7 +94,7 @@ export function OrgLinksPanel() {
       {message ? <div className="success" role="status">{message}</div> : null}
       <p className="small muted">
         {data.canEdit
-          ? <>Vincule cada pessoa ao seu cargo. Ao vincular, ela <strong>já ganha acesso total</strong> (consultar, alterar, editar e excluir) no seu setor: o <strong>Presidente</strong> em todos os departamentos; os demais membros da Diretoria, no próprio setor; o Conselho Fiscal, na página do Conselho Fiscal; cada coordenação, no próprio departamento. Ao tirar, o acesso sai junto. O perfil da pessoa não muda. Só aparece quem tem conta ativa no sistema.</>
+          ? <>Vincule cada pessoa ao seu cargo. Ao vincular, ela <strong>já ganha acesso total</strong> (consultar, alterar, editar e excluir) no seu setor: o <strong>Presidente</strong> em todos os departamentos; Secretário(a) e Tesoureiro(a), no próprio setor; os 3 membros do Conselho Fiscal, na página do Conselho Fiscal; cada coordenação, no próprio departamento. O <strong>Vice-Presidente só consulta</strong> a Diretoria, sem alterar. Ao tirar, o acesso sai junto. O perfil da pessoa não muda. Só aparece quem tem conta ativa no sistema.</>
           : <>Quem ocupa cada cargo da Casa. Só o Administrador do Sistema altera esta aba.</>}
       </p>
       <div className="org-analytic-wrap">
@@ -127,9 +133,12 @@ export function OrgLinksPanel() {
             <strong>CONSELHO FISCAL</strong>
             <span>Órgão de fiscalização</span>
             <div className="org-link-seat">
-              <div className="org-link-seat-title">Membros</div>
-              {people(of("conselho_fiscal"), "— nenhum membro vinculado —")}
-              {add("conselho_fiscal", null, of("conselho_fiscal"))}
+              <div className="org-link-seat-title">Membros ({of("conselho_fiscal").length} de {CONSELHO_MAX})</div>
+              {of("conselho_fiscal").length ? people(of("conselho_fiscal")) : null}
+              {Array.from({ length: Math.max(0, CONSELHO_MAX - of("conselho_fiscal").length) }, (_, i) => (
+                <div key={`vago-${i}`} className="org-link-person org-link-empty">— vago —</div>
+              ))}
+              {of("conselho_fiscal").length < CONSELHO_MAX ? add("conselho_fiscal", null, of("conselho_fiscal")) : null}
               <small>{accessText("conselho_fiscal")}</small>
             </div>
           </div>

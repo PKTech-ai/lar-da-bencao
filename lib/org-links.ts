@@ -29,8 +29,17 @@ export function seatLabel(seat: OrgSeat, departmentLabel?: string) {
   return BOARD_SEATS.find((s) => s.seat === seat)!.label;
 }
 
+/** O Conselho Fiscal tem 3 membros. */
+export const CONSELHO_MAX = 3;
+
+/** Nível que o vínculo dá: o Vice-Presidente só consulta; os demais cargos, acesso total (coordenação). */
+export type GrantLevel = "coordenacao" | "consulta";
+export const seatLevel = (seat: OrgSeat): GrantLevel => (seat === "vice_presidente" ? "consulta" : "coordenacao");
+const RANK: Record<GrantLevel, number> = { consulta: 1, coordenacao: 2 };
+export const higherLevel = (a: GrantLevel, b: GrantLevel) => RANK[a] >= RANK[b];
+
 /**
- * Departamentos em que o vínculo dá acesso total. Só o Presidente vê todos (menos o Conselho Fiscal, que fiscaliza a
+ * Departamentos em que o vínculo dá acesso. Só o Presidente vê todos (menos o Conselho Fiscal, que fiscaliza a
  * Diretoria); os outros cargos, só o próprio setor. `active` = departamentos ativos no sistema.
  */
 export function seatDepartments(seat: OrgSeat, department: string | null, active: readonly string[]): string[] {
@@ -43,8 +52,30 @@ export function seatDepartments(seat: OrgSeat, department: string | null, active
   return wanted.filter((key) => active.includes(key) && DEPARTMENT_MODULES[key]);
 }
 
-/** O que a pessoa perde ao sair de um vínculo: o que ele liberou, menos o que outro vínculo dela ainda libera. */
-export function departmentsToRevoke(granted: readonly string[], otherLinksOfSamePerson: readonly { granted: readonly string[] }[]) {
-  const kept = new Set(otherLinksOfSamePerson.flatMap((l) => l.granted));
-  return granted.filter((key) => !kept.has(key));
+type LinkLike = { seat: OrgSeat; granted: readonly string[] };
+
+/** Maior nível que os outros vínculos da pessoa dão no departamento, ou null quando nenhum dá. */
+export function levelFromLinks(department: string, links: readonly LinkLike[]): GrantLevel | null {
+  let best: GrantLevel | null = null;
+  for (const link of links) {
+    if (!link.granted.includes(department)) continue;
+    const level = seatLevel(link.seat);
+    if (!best || !higherLevel(best, level)) best = level;
+  }
+  return best;
+}
+
+/**
+ * O que acontece ao tirar a pessoa de um vínculo: onde ela perde o acesso (nenhum outro vínculo dela dá) e onde
+ * passa a só consultar (outro vínculo dela dá só consulta).
+ */
+export function unlinkEffect(link: LinkLike, otherLinksOfSamePerson: readonly LinkLike[]) {
+  const revoke: string[] = [];
+  const downgrade: string[] = [];
+  for (const key of link.granted) {
+    const kept = levelFromLinks(key, otherLinksOfSamePerson);
+    if (!kept) revoke.push(key);
+    else if (!higherLevel(kept, seatLevel(link.seat))) downgrade.push(key);
+  }
+  return { revoke, downgrade };
 }
