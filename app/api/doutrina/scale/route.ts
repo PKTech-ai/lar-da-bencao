@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { appendAudit } from "@/lib/audit";
 import { assertSameOrigin } from "@/lib/csrf";
+import { loadCultoMonth } from "@/lib/culto-data";
 import { transaction } from "@/lib/db";
 import { AppError, errorResponse } from "@/lib/errors";
 import {
@@ -51,8 +52,9 @@ export async function GET(request: Request) {
     const actor = await requireActor();
     await requireDoutrina(actor, "read", "escalas");
     const ym = monthSchema.parse(new URL(request.url).searchParams.get("month"));
-    const [scale, options, canEdit, fixed, outside, recess] = await Promise.all([
-      loadScale(ym), loadScaleOptions(), canEditDoutrina(actor, "escalas"), loadFixed(), loadPsychOutside(ym), loadRecess(ym)
+    const [scale, options, canEdit, fixed, outside, recess, culto, cultoEdit] = await Promise.all([
+      loadScale(ym), loadScaleOptions(), canEditDoutrina(actor, "escalas"), loadFixed(), loadPsychOutside(ym), loadRecess(ym),
+      loadCultoMonth(ym), canEditDoutrina(actor, "culto-lar")
     ]);
     const review = scale.month?.reviewed ? reviewScale(scale.assignments, options, ym, outside) : null;
     return Response.json({
@@ -67,7 +69,9 @@ export async function GET(request: Request) {
       /** Psicofônicos de quarta e sexta dos meses vizinhos nas semanas que viram o mês (RN-ESC-001). */
       outside,
       /** Dias sem escala do mês (recesso ou evento da casa), com o tipo. */
-      recess
+      recess,
+      /** Culto no Lar do mês (penúltimo sábado, 19:30 às 20:30), na folha de sábado; quem tem Alterar em Culto no Lar escolhe Dirigente e Expositor. */
+      culto: { ...culto, canEdit: cultoEdit }
     }, { headers: noStore });
   } catch (error) {
     return errorResponse(error);

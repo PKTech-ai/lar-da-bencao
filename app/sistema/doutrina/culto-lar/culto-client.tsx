@@ -1,13 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { CULTO_NAME_MAX, CULTO_PURPOSE } from "@/lib/doutrina-extras";
+import { CultoPersonSelect, saveCulto, type CultoOption, type CultoPatch } from "@/components/culto-people";
+import { CULTO_HOURS, CULTO_NAME_MAX, CULTO_PURPOSE } from "@/lib/doutrina-extras";
 import { brDate } from "@/lib/monthly-saturdays";
 
-type CultoMonth = { month: string; label: string; culto: string; caravana: string; host_name: string; version: number };
-type Payload = { year: number; months: CultoMonth[]; canEdit: boolean };
+type CultoMonth = {
+  month: string; label: string; culto: string; caravana: string; host_name: string;
+  leader_id: string | null; speaker_id: string | null; leader_name: string; speaker_name: string; version: number;
+};
+type Payload = { year: number; months: CultoMonth[]; options: { leader: CultoOption[]; speaker: CultoOption[] }; canEdit: boolean };
 
-/** Programação anual do Culto no Lar: escolher um penúltimo sábado livre e digitar o nome do trabalhador. */
+/**
+ * Programação anual do Culto no Lar: escolher um penúltimo sábado livre e digitar o nome do trabalhador; a Doutrina
+ * escolhe o Dirigente e o Expositor de cada culto.
+ */
 export function CultoClient({ initialYear, years }: { initialYear: number; years: number[] }) {
   const [year, setYear] = useState(initialYear);
   const [data, setData] = useState<Payload | null>(null);
@@ -30,18 +37,13 @@ export function CultoClient({ initialYear, years }: { initialYear: number; years
 
   useEffect(() => { void load().catch((e) => setError(e.message)); }, [load]);
 
-  async function save(row: CultoMonth, hostName: string, done: string) {
+  async function save(row: CultoMonth, patch: CultoPatch, done: string) {
     setBusy(true); setError(""); setMessage("");
-    const response = await fetch("/api/doutrina/culto", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ month: row.month, host_name: hostName, version: row.version })
-    });
-    const body = await response.json();
+    const result = await saveCulto(row.month, row.version, patch);
     setBusy(false);
-    if (!response.ok) {
-      setError(body.error ?? "Não foi possível gravar.");
-      if (response.status === 409) void load().catch(() => undefined);
+    if (result.error) {
+      setError(result.error);
+      if (result.status === 409) void load().catch(() => undefined);
       return;
     }
     setEditing(null);
@@ -56,16 +58,17 @@ export function CultoClient({ initialYear, years }: { initialYear: number; years
       setError("Digite o nome do trabalhador.");
       return;
     }
-    void save(row, text, `${text} ficou com o Culto no Lar de ${brDate(row.culto)}.`);
+    void save(row, { host_name: text }, `${text} ficou com o Culto no Lar de ${brDate(row.culto)}.`);
   }
 
   const free = data?.months.filter((m) => !m.host_name).length ?? 0;
+  const nameIn = (list: CultoOption[], id: string | null) => list.find((o) => o.id === id)?.name ?? "";
 
   return (
     <div className="form-stack">
       <section className="card">
         <p className="small">{CULTO_PURPOSE}</p>
-        <p className="small muted">Um culto por mês, sempre no <strong>penúltimo sábado</strong>. O último sábado é da Caravana do Amor, por isso as datas nunca coincidem.</p>
+        <p className="small muted">Um culto por mês, sempre no <strong>penúltimo sábado</strong>, das <strong>{CULTO_HOURS}</strong>. O último sábado é da Caravana do Amor, por isso as datas nunca coincidem. O culto aparece também na folha de sábado da Escala Mensal.</p>
       </section>
 
       <section className="card">
@@ -83,13 +86,14 @@ export function CultoClient({ initialYear, years }: { initialYear: number; years
         {data ? (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Mês</th><th>Data</th><th>Trabalhador</th><th>Situação</th></tr></thead>
+              <thead><tr><th>Mês</th><th>Data e horário</th><th>Trabalhador</th><th>Dirigente</th><th>Expositor</th><th>Situação</th></tr></thead>
               <tbody>
                 {data.months.map((row) => (
                   <tr key={row.month}>
                     <td><strong>{row.label}</strong></td>
                     <td>
                       <strong>{brDate(row.culto)}</strong>
+                      <div className="small">{CULTO_HOURS}</div>
                       <div className="small muted">Penúltimo sábado · Caravana do Amor em {brDate(row.caravana).slice(0, 5)}</div>
                     </td>
                     <td>
@@ -108,12 +112,26 @@ export function CultoClient({ initialYear, years }: { initialYear: number; years
                           {data.canEdit ? <>
                             <button type="button" className="link-button no-print" disabled={busy} onClick={() => setEditing({ month: row.month, text: row.host_name })}>Trocar</button>
                             <button type="button" className="link-button no-print" disabled={busy}
-                              onClick={() => { if (window.confirm(`Liberar o sábado ${brDate(row.culto)} (${row.host_name})?`)) void save(row, "", `Sábado ${brDate(row.culto)} liberado.`); }}>Liberar</button>
+                              onClick={() => { if (window.confirm(`Liberar o sábado ${brDate(row.culto)} (${row.host_name})?`)) void save(row, { host_name: "" }, `Sábado ${brDate(row.culto)} liberado.`); }}>Liberar</button>
                           </> : null}
                         </div>
                       ) : data.canEdit ? (
                         <button type="button" className="button no-print" disabled={busy} onClick={() => { setError(""); setEditing({ month: row.month, text: "" }); }}>Escolher este sábado</button>
                       ) : <span className="muted">—</span>}
+                    </td>
+                    <td>
+                      {data.canEdit ? (
+                        <CultoPersonSelect label={`Dirigente — Culto no Lar de ${brDate(row.culto)}`} value={row.leader_id} name={row.leader_name}
+                          options={data.options.leader} disabled={busy}
+                          onChange={(id) => void save(row, { leader_id: id }, id ? `Dirigente de ${brDate(row.culto)}: ${nameIn(data.options.leader, id)}.` : `Dirigente de ${brDate(row.culto)} retirado.`)} />
+                      ) : row.leader_name || <span className="muted">—</span>}
+                    </td>
+                    <td>
+                      {data.canEdit ? (
+                        <CultoPersonSelect label={`Expositor — Culto no Lar de ${brDate(row.culto)}`} value={row.speaker_id} name={row.speaker_name}
+                          options={data.options.speaker} disabled={busy}
+                          onChange={(id) => void save(row, { speaker_id: id }, id ? `Expositor de ${brDate(row.culto)}: ${nameIn(data.options.speaker, id)}.` : `Expositor de ${brDate(row.culto)} retirado.`)} />
+                      ) : row.speaker_name || <span className="muted">—</span>}
                     </td>
                     <td>{row.host_name ? <span className="audit-badge">Agendado</span> : <span className="small muted">Disponível</span>}</td>
                   </tr>

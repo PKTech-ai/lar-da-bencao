@@ -10,7 +10,7 @@ export default async function CultoLarPage() {
   const years = Array.from({ length: 4 }, (_, i) => current - 1 + i);
   return (
     <>
-      <header className="module-section-head"><div><h2>Culto no Lar</h2><p>Programação do ano: um culto por mês, no penúltimo sábado.</p></div></header>
+      <header className="module-section-head"><div><h2>Culto no Lar</h2><p>Programação do ano: um culto por mês, no penúltimo sábado, das 19:30 às 20:30.</p></div></header>
       <CultoClient initialYear={initial} years={years.includes(initial) ? years : [...years, initial]} />
     </>
   );

@@ -4,7 +4,10 @@ import { PrintButton } from "@/components/print-button";
 import { appendAudit } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { departmentCoordinators } from "@/lib/department-coordinators";
+import { loadCultoMonth } from "@/lib/culto-data";
 import { loadRecess, loadScale } from "@/lib/doutrina-data";
+import { CULTO_HOURS } from "@/lib/doutrina-extras";
+import { brDate } from "@/lib/monthly-saturdays";
 import { DAY_HOURS, DAY_NAME, DOW_ORDER, RECESS_KINDS, TEMPLATES, isValidMonth, monthDays, recessKinds, rowOrder, scaleStatusLabel, themeLabel } from "@/lib/doutrina-scale";
 import { requireModulePage } from "@/lib/page-auth";
 
@@ -21,7 +24,7 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
   const scale = await loadScale(ym);
   if (!scale.month || scale.month.status === "deleted") notFound();
 
-  const [names, coordinators, contact, recessDates] = await Promise.all([
+  const [names, coordinators, contact, recessDates, culto] = await Promise.all([
     query<{ ref: string; label: string; reference: string | null }>(
       `select 'w:' || id as ref, full_name as label, null::text as reference from app.workers
         where id in (select worker_id from app.scale_assignments where scale_month_id = $1 and worker_id is not null)
@@ -35,7 +38,8 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
     ),
     departmentCoordinators("doutrina"),
     query<{ phone: string | null }>("select phone from app.department_contacts where department_key = 'doutrina'"),
-    loadRecess(ym)
+    loadRecess(ym),
+    loadCultoMonth(ym)
   ]);
   const recess = recessKinds(ym, recessDates);
   const label = new Map(names.rows.map((row) => [row.ref, row.label]));
@@ -88,6 +92,22 @@ export default async function PrintScalePage({ searchParams }: { searchParams: P
                 </table>
               </div>
             ))}
+            {dow === 6 ? (
+              <div>
+                <h3>CULTO NO LAR DOS TRABALHADORES — PENÚLTIMO SÁBADO · HORÁRIO: {CULTO_HOURS.toUpperCase()}</h3>
+                <table>
+                  <thead><tr><th>DATA</th><th>TRABALHADOR (LAR)</th><th>DIRIGENTE</th><th>EXPOSITOR</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td>{brDate(culto.culto).slice(0, 5)}</td>
+                      <td>{culto.host_name || "—"}</td>
+                      <td>{culto.leader_name || "—"}</td>
+                      <td>{culto.speaker_name || "—"}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             <p className="small">Responsável: {coordinators.join(" / ") || "Não informado"} · Contato: {contact.rows[0]?.phone || "Não informado"}</p>
             <p className="small muted"><em>“{QUOTE}”</em><br />{QUOTE_SOURCE}</p>
           </section>

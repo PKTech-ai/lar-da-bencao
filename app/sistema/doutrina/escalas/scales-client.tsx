@@ -8,6 +8,7 @@ import {
   psychWeekMessage, acceptsTypedStudy, recessKinds, recessSet, roleOf, rowOrder, slotAvailability, slotKey, typedStudyNoun, typedThemeText, typedThemeValue,
   type Availability, type Conflict, type PsychBooking, type RecessDay, type RecessKind, type ScaleSpeaker, type ScaleStatus, type ScaleStudy, type ScaleWorker
 } from "@/lib/doutrina-scale";
+import { CultoSheetBlock, type SheetCulto } from "./culto-block";
 
 type Payload = {
   month: { id: string; status: ScaleStatus; statusLabel: string; reviewed: boolean; version: number } | null;
@@ -22,6 +23,8 @@ type Payload = {
   outside: PsychBooking[];
   /** Dias sem escala do mês (recesso ou evento da casa). */
   recess: RecessDay[];
+  /** Culto no Lar do mês (penúltimo sábado), mostrado na folha de sábado. */
+  culto: SheetCulto;
 };
 
 /**
@@ -552,6 +555,9 @@ export function ScalesClient() {
               </div>
             </div>
           ))}
+          {dow === 6 && data?.culto ? (
+            <CultoSheetBlock culto={data.culto} workers={data.options.workers} onSaved={() => load().catch((e) => setError(e.message))} />
+          ) : null}
         </section>
       ) : data ? (
         <div className="notice">{data.month?.status === "deleted" ? "Escala excluída deste mês. Use “Gerar escala” para criar novamente." : "Nenhuma escala gerada neste mês."}</div>

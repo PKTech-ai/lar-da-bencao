@@ -5,6 +5,9 @@
 
 export { penultimateSaturday } from "@/lib/monthly-saturdays";
 
+/** Horário fixo do Culto no Lar dos Trabalhadores. */
+export const CULTO_HOURS = "19:30 às 20:30";
+
 /** Nome do trabalhador digitado na programação do Culto no Lar. O banco aceita o mesmo (até 120 caracteres). */
 export const CULTO_NAME_MAX = 120;
 
